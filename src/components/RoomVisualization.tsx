@@ -9,9 +9,13 @@ import StarterMinerModal from './StarterMinerModal';
 // Add keyframes for the pulse animation
 const pulseStyle = `
   @keyframes pulse {
-    0% { box-shadow: 0 0 0 1px #FFDD00; }
-    50% { box-shadow: 0 0 0 3px #FFDD00; }
-    100% { box-shadow: 0 0 0 1px #FFDD00; }
+    0% { filter: drop-shadow(0 0 1px #FFDD00); }
+    50% { filter: drop-shadow(0 0 8px #FFDD00); }
+    100% { filter: drop-shadow(0 0 1px #FFDD00); }
+  }
+
+  .miner-pulse {
+    animation: pulse 2s infinite;
   }
 `;
 
@@ -85,6 +89,11 @@ export function RoomVisualization({
   };
 
   const handleClaimStarterMiner = async (x: number, y: number) => {
+    // Save position to local storage for UI persistence
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('claimedMinerPosition', JSON.stringify({x, y}));
+    }
+    
     await onGetStarterMiner(x, y);
     setIsStarterMinerModalOpen(false);
     // Enable grid mode after claiming to show the user their miner
@@ -133,12 +142,71 @@ export function RoomVisualization({
             />
           );
         })}
+        
+        {/* Show miners on the grid */}
+        {hasClaimedStarterMiner && facilityData && facilityData.miners > 0 && (
+          <div className="absolute inset-0">
+            {getClaimedMinerPositions().map((minerPos, index) => {
+              // Find the grid position data for this miner
+              const pos = gridPositions.find(p => p.x === minerPos.x && p.y === minerPos.y);
+              if (!pos) return null;
+              
+              return (
+                <div 
+                  key={`miner-${index}`}
+                  className="absolute pointer-events-none z-20"
+                  style={{
+                    top: pos.top,
+                    left: pos.left,
+                    width: pos.width,
+                    height: pos.height,
+                    transform: 'skew(-24deg, 14deg)',
+                  }}
+                >
+                  <div className="relative w-full h-full">
+                    <Image
+                      src="/banana-miner.gif"
+                      alt="Banana Miner"
+                      fill
+                      className="object-contain miner-pulse"
+                      style={{ 
+                        transform: 'skew(24deg, -14deg) scale(2.5) translate(-10%, -15%)',
+                        imageRendering: 'pixelated'
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   };
 
+  // Function to get the positions of claimed miners
+  // In a full implementation, this would come from contract data
+  const getClaimedMinerPositions = () => {
+    // For now, we'll use local storage to persist the chosen position
+    // In production, this would come from contract data
+    if (typeof window !== 'undefined' && hasClaimedStarterMiner) {
+      const savedPositionStr = localStorage.getItem('claimedMinerPosition');
+      if (savedPositionStr) {
+        try {
+          return [JSON.parse(savedPositionStr)];
+        } catch (e) {
+          console.error("Error parsing miner position:", e);
+        }
+      }
+    }
+    
+    // Default fallback position if nothing is stored yet
+    return [{x: 0, y: 0}]; // Default to top right position
+  };
+
   return (
     <>
+      <style jsx global>{pulseStyle}</style>
       <div className="relative w-full h-[690px] bg-[#001420] rounded-lg border-2 border-banana overflow-hidden">
         {hasFacility ? (
           <div className="relative w-full h-full flex flex-col">

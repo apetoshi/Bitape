@@ -107,11 +107,32 @@ export default function RoomPage() {
 
   // Check if selected tile has a miner
   const selectedTileHasMiner = (x: number, y: number): boolean => {
-    if (!playerMiners || playerMiners.length === 0) {
+    if (!gameState.hasClaimedStarterMiner) {
       return false;
     }
-    // Implementation would check if any miner exists at the given coordinates
-    return false;
+    
+    // Check localStorage for miner position
+    if (typeof window !== 'undefined') {
+      const savedPositionStr = localStorage.getItem('claimedMinerPosition');
+      if (savedPositionStr) {
+        try {
+          const position = JSON.parse(savedPositionStr);
+          return position.x === x && position.y === y;
+        } catch (e) {
+          console.error("Error parsing miner position:", e);
+        }
+      }
+    }
+    
+    // Fallback check based on facility miners count
+    const hasFacilityWithMiner = 
+      gameState.facilityData !== null && 
+      gameState.facilityData !== undefined &&
+      typeof gameState.facilityData === 'object' &&
+      'miners' in gameState.facilityData &&
+      gameState.facilityData.miners > 0;
+    
+    return hasFacilityWithMiner && playerMiners.length > 0;
   };
 
   // Redirect if not connected or trying to access someone else's room
