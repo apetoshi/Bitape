@@ -9,8 +9,6 @@
 # next.js
 /.next/
 /out/
-
-# production
 /build
 
 # misc
@@ -30,4 +28,7 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
-next-env.d.ts 
+next-env.d.ts
+
+# Large files
+node_modules/@next/swc-darwin-arm64/next-swc.darwin-arm64.node 
