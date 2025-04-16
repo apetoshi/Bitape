@@ -26,6 +26,11 @@ const GameLayout: React.FC = () => {
     setIsModalOpen(false);
   };
 
+  const handleClaimReward = async () => {
+    if (!gameState.claimReward) return;
+    await gameState.claimReward();
+  };
+
   const renderTabContent = () => {
     switch (activeTab) {
       case 'RESOURCES':
@@ -65,9 +70,9 @@ const GameLayout: React.FC = () => {
             <div className="space-y-2">
               {gameState.hasFacility ? (
                 <>
-                  <p className="game-text">- FACILITY LEVEL: <span className="game-value">{gameState.facilityLevel}</span></p>
-                  <p className="game-text">- POWER OUTPUT: <span className="game-value">{gameState.facilityPower}</span> WATTS</p>
-                  <p className="game-text">- EFFICIENCY: <span className="game-value">{((gameState.facilityPower / 20) * 100).toFixed(1)}%</span></p>
+                  <p className="game-text">- FACILITY LEVEL: <span className="game-value">{gameState.facilityData?.level || 0}</span></p>
+                  <p className="game-text">- POWER OUTPUT: <span className="game-value">{gameState.facilityData?.power || 0}</span> WATTS</p>
+                  <p className="game-text">- EFFICIENCY: <span className="game-value">{((gameState.facilityData?.power || 0) / 20 * 100).toFixed(1)}%</span></p>
                 </>
               ) : (
                 <p className="game-text">- NO TILE SELECTED</p>
@@ -115,7 +120,7 @@ const GameLayout: React.FC = () => {
             
             <MiningClaimSection 
               minedBit={gameState.minedBit}
-              onClaimReward={gameState.claimReward}
+              onClaimReward={handleClaimReward}
               isClaimingReward={gameState.isClaimingReward}
             />
           </div>

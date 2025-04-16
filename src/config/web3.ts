@@ -1,5 +1,4 @@
 import { createConfig, http } from 'wagmi';
-import { mainnet, arbitrum } from 'wagmi/chains';
 import { QueryClient } from '@tanstack/react-query';
 
 // Define ApeChain as a custom chain
@@ -24,10 +23,10 @@ const apechain = {
 
 // 1. Create wagmi config
 export const config = createConfig({
-  chains: [mainnet],
+  chains: [apechain],
   connectors: [], // Add your connectors here
   transports: {
-    [mainnet.id]: http(process.env.NEXT_PUBLIC_ALCHEMY_RPC_URL),
+    [apechain.id]: http(),
   },
 });
 

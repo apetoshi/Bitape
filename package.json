@@ -15,6 +15,7 @@
     "@web3modal/wagmi": "^5.1.11",
     "ethers": "^5.7.2",
     "next": "15.3.0",
+    "puppeteer": "^24.6.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "viem": "^2.26.3",

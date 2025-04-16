@@ -24,13 +24,13 @@ const LandingPage = () => {
         <div className="flex items-center gap-8">
           <div className="flex items-center">
             <Image
-              src="/bitape-logo.svg"
+              src="/bitape.png"
               alt="BitApe Logo"
-              width={32}
-              height={32}
-              className="mr-2 pixel-art"
+              width={100}
+              height={100}
+              className="hover:opacity-80 transition-opacity"
+              priority
             />
-            <span className="font-press-start text-banana text-xl">bitape</span>
           </div>
           <nav className="flex gap-8">
             <Link href="/about" className="font-press-start text-white hover:text-banana">

@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitape: A Peer-to-Peer Electronic Big Cash System</title>
+    <style>
+        body {
+            font-family: "Times New Roman", Times, serif;
+            line-height: 1.5;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            font-size: 18px;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .author {
+            text-align: center;
+            font-style: normal;
+            margin-bottom: 5px;
+            font-weight: normal;
+        }
+        .alias {
+            text-align: center;
+            margin-bottom: 5px;
+        }
+        .website {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        h2 {
+            font-size: 18px;
+            margin-top: 30px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        .abstract {
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        .section {
+            margin-bottom: 20px;
+        }
+        .formula {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .figure {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .figure-caption {
+            text-align: center;
+            font-style: italic;
+            margin-top: 10px;
+        }
+        ul {
+            list-style-type: disc;
+            padding-left: 20px;
+        }
+        .page-break {
+            page-break-before: always;
+            margin-top: 30px;
+        }
+        .page-number {
+            text-align: center;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Bitape: A Peer-to-Peer Electronic Big Cash System</h1>
+    <p class="author">Apetoshi Bitmoto</p>
+    <p class="alias">aka "apetoshi"</p>
+    <p class="website">bitape (dot) tech</p>
+
+    <p class="abstract">Abstract</p>
+    <p>Bitcoin is the most iconic and successful cryptocurrency ever created. Its simplicity,
+    fixed supply, and halving-based emission schedule have stood the test of time. This is
+    objectively the greatest token mechanic ever created. Bitape is built on this truth. Bitape's mission is simple: to become the most recognized token in the world; it is
+    Bitcoin, but bigger. It takes the exact mechanics that made Bitcoin legendary and
+    scales it with precision and purpose. Bitape is launching as the largest token economy
+    on Abstract, the biggest consumer chain. With a fixed supply of 21 million, a halving
+    schedule every 4,200,000 blocks, and a fully onchain mining system, Bitape reboots
+    the Bitcoin playbook for a new generation of users.</p>
+
+    <h2>1 Introduction</h2>
+    <p>Everyone knows Bitcoin. It's the most well-known and widely recognized cryptocurrency in
+    the world. People understand it: a fixed supply, decentralized mining, and halving every
+    few years. But for the next generation of users, gamers, creators, investors, new entrants to
+    crypto; Bitcoin is too expensive, too slow, and too disconnected from the worlds they live
+    in.</p>
+    <p>Bitcoin relies on proof-of-work mining. However, buying physical mining hardware is
+    expensive, dominated by monopolistic mining pools, and nearly impossible for new entrants
+    to participate meaningfully. Bitape flips this dynamic, offering accessible, onchain mining
+    with no hardware requirements, using the same economic foundation and decentralization
+    that made Bitcoin work. By utilizing onchain mining, Bitape makes the most iconic token
+    model accessible, earnable, and understandable by anyone.</p>
+    <p>Bitape aims to become the most recognized coin on the planet by combining
+    the proven emission mechanics of Bitcoin with viral, community-driven incentives.</p>
+
+    <h2>2 Supply Cap and Distribution</h2>
+    <p>Bitape has a fixed supply of 21 million tokens. Emission follows a geometric distribution:</p>
+    <p class="formula">S = Σ<sub>i=0</sub><sup>∞</sup> R<sub>0</sub> · N<sub>h</sub> · (1/2)<sup>i</sup> = 21,000,000 (1)</p>
+
+    <div class="page-number">1</div>
+    <div class="page-break"></div>
+
+    <h2>3 Halving Schedule</h2>
+    <p>Bitape follows a halving mechanism inspired by Bitcoin. The reward per block is 2.3 $ BIT
+    and halves every 4,200,000 blocks, approximately every 53.5 days assuming a 1.1-second
+    average block time.</p>
+
+    <div class="figure">
+        <svg width="400" height="300" viewBox="0 0 400 300">
+            <rect x="50" y="30" width="300" height="220" fill="white" stroke="black" stroke-width="1"/>
+            
+            <!-- X-axis -->
+            <line x1="50" y1="250" x2="350" y2="250" stroke="black" stroke-width="1"/>
+            <text x="200" y="280" text-anchor="middle" font-size="12">Block Number</text>
+            
+            <!-- X-axis ticks -->
+            <line x1="50" y1="250" x2="50" y2="255" stroke="black" stroke-width="1"/>
+            <text x="50" y="270" text-anchor="middle" font-size="10">0</text>
+            
+            <line x1="100" y1="250" x2="100" y2="255" stroke="black" stroke-width="1"/>
+            <text x="100" y="270" text-anchor="middle" font-size="10">0.42</text>
+            
+            <line x1="150" y1="250" x2="150" y2="255" stroke="black" stroke-width="1"/>
+            <text x="150" y="270" text-anchor="middle" font-size="10">0.84</text>
+            
+            <line x1="200" y1="250" x2="200" y2="255" stroke="black" stroke-width="1"/>
+            <text x="200" y="270" text-anchor="middle" font-size="10">1.26</text>
+            
+            <line x1="250" y1="250" x2="250" y2="255" stroke="black" stroke-width="1"/>
+            <text x="250" y="270" text-anchor="middle" font-size="10">1.68</text>
+            
+            <line x1="300" y1="250" x2="300" y2="255" stroke="black" stroke-width="1"/>
+            <text x="300" y="270" text-anchor="middle" font-size="10">2.1</text>
+            
+            <text x="330" y="270" text-anchor="middle" font-size="10">·10<tspan baseline-shift="super">7</tspan></text>
+            
+            <!-- Y-axis -->
+            <line x1="50" y1="250" x2="50" y2="30" stroke="black" stroke-width="1"/>
+            <text x="30" y="140" text-anchor="middle" transform="rotate(-90, 30, 140)" font-size="12">Bitape per Block</text>
+            
+            <!-- Y-axis ticks -->
+            <line x1="45" y1="250" x2="50" y2="250" stroke="black" stroke-width="1"/>
+            <text x="40" y="254" text-anchor="end" font-size="10">0</text>
+            
+            <line x1="45" y1="210" x2="50" y2="210" stroke="black" stroke-width="1"/>
+            <text x="40" y="214" text-anchor="end" font-size="10">0.5</text>
+            
+            <line x1="45" y1="170" x2="50" y2="170" stroke="black" stroke-width="1"/>
+            <text x="40" y="174" text-anchor="end" font-size="10">1</text>
+            
+            <line x1="45" y1="130" x2="50" y2="130" stroke="black" stroke-width="1"/>
+            <text x="40" y="134" text-anchor="end" font-size="10">1.5</text>
+            
+            <line x1="45" y1="90" x2="50" y2="90" stroke="black" stroke-width="1"/>
+            <text x="40" y="94" text-anchor="end" font-size="10">2</text>
+            
+            <line x1="45" y1="50" x2="50" y2="50" stroke="black" stroke-width="1"/>
+            <text x="40" y="54" text-anchor="end" font-size="10">2.5</text>
+            
+            <!-- Step function -->
+            <path d="M50,50 H100 V130 H150 V170 H200 V210 H250 V230 H300 V240 H350" fill="none" stroke="blue" stroke-width="2"/>
+            
+            <!-- Chart title -->
+            <text x="200" y="20" text-anchor="middle" font-size="14">Bitape Halving Schedule</text>
+        </svg>
+    </div>
+    <p class="figure-caption">Figure 1: Emission rate of Bitape per block over time. Halves every 4,200,000 blocks.</p>
+
+    <p>Block Emission Formula</p>
+    <p class="formula">R<sub>b</sub>(n) = R<sub>0</sub> · (1/2)<sup>⌊n/N<sub>h</sub>⌋</sup> (2)</p>
+
+    <p>Where:</p>
+    <ul>
+        <li>R<sub>0</sub> = 2.3 is the initial emission rate (Bitape per block)</li>
+        <li>n is the current block number</li>
+        <li>N<sub>h</sub> = 4,200,000 is the halving interval in blocks</li>
+    </ul>
+
+    <h2>4 Onchain Mining</h2>
+    <p>Players acquire miners and facilities, each contributing to a user's total hashpower. Mining
+    rewards are distributed every block, proportionally to each player's share of the network
+    hashrate.</p>
+
+    <div class="page-number">2</div>
+    <div class="page-break"></div>
+
+    <p>Hashpower Contribution</p>
+    <p>Let:</p>
+    <ul>
+        <li>h<sub>i</sub> be the hashpower of player i</li>
+        <li>H be the total network hashpower: H = Σh<sub>i</sub></li>
+        <li>R<sub>b</sub> be the Bitape emission rate per block</li>
+    </ul>
+    <p>Then the Bitape reward for player i in a block is:</p>
+    <p class="formula">R<sub>i</sub> = (h<sub>i</sub>/H) · R<sub>b</sub> (3)</p>
+
+    <p>Miners</p>
+    <p>Miners are used to gain hashrate in the network. Every miner has three fields:</p>
+    <ul>
+        <li>Hashrate: The amount of hashrate provided by this miner.</li>
+        <li>Power Consumption: The amount of electrical power required to operate this miner.</li>
+        <li>Cost: The cost in $ BIT required to purchase this miner.</li>
+    </ul>
+    <p>Miners can be purchased at any time using $ BIG, as long as the facility has room.</p>
+
+    <p>Facilities</p>
+    <p>Facilities house miners. Facilities can be upgraded using $ BIG, but there is a 24-hour
+    cooldown before the next upgrade. Every facility has three fields:</p>
+    <ul>
+        <li>Total Miners: The total number of miners this facility can hold.</li>
+        <li>Power Output: The total amount of electrical power this facility can output.</li>
+        <li>Cost: The cost in $ BIT required to upgrade to this facility.</li>
+    </ul>
+    <p>The following constraint must be satisfied:</p>
+    <p class="formula">Σ(Power Consumption of all miners in facility) ≤ Facility Power Output</p>
+
+    <div class="page-number">3</div>
+    <div class="page-break"></div>
+
+    <h2>5 Initialization, Referrals, and Burn Mechanics</h2>
+    <p>Players begin by purchasing their initial facility with a small amount of APE to prevent sybil
+    attacks. This facility comes with an optional free miner to kickstart mining immediately.
+    After initialization, all further miners and facility upgrades are purchased in $ BIT.</p>
+
+    <p>Bitape incorporates both deflationary pressure and viral growth incentives through its
+    referral and burn mechanics:</p>
+    <ul>
+        <li>Burn Mechanic: 75% of all miner purchases and facility upgrades are permanently
+        burned, reducing total supply over time.</li>
+        <li>Referral Rewards: 2.5% of all mined rewards are allocated to the referring address,
+        creating a sustainable incentive for user-driven onboarding.</li>
+    </ul>
+    <p>These systems ensure there's a constant $ BIT sink while rewarding early growth and
+    long-term participation.</p>
+
+    <h2>6 Contract Address</h2>
+    <ul>
+        <li>Bitape Token: 0xd5f2A51440059C5E7B1E1E21634B5f48860A53f3</li>
+        <li>Main Program: 0x9281b1D9291e2D1911a400877B5c5e3c85342672</li>
+    </ul>
+
+    <div class="page-number">4</div>
+</body>
+</html>

@@ -292,14 +292,16 @@ export default function RoomPage() {
       {/* Header - smaller and more compact */}
       <header className="nav-bar flex justify-between items-center px-4 py-2">
         <div className="flex items-center">
-          <Image
-            src="/bitape-logo.svg"
-            alt="BitApe Logo"
-            width={24}
-            height={24}
-            className="mr-2 pixel-art"
-          />
-          <span className="font-press-start text-banana text-lg">bitape</span>
+          <Link href="/">
+            <Image
+              src="/bitape.png"
+              alt="BitApe Logo"
+              width={64}
+              height={64}
+              className="hover:opacity-80 transition-opacity"
+              priority
+            />
+          </Link>
         </div>
         <nav className="flex items-center gap-2">
           <Link href="/about" className="font-press-start text-sm text-white hover:text-banana">
@@ -488,7 +490,13 @@ export default function RoomPage() {
                 </div>
                 <div className="bg-dark-blue p-2 mb-2 flex items-center opacity-50 rounded">
                   <div className="w-8 h-8 mr-2">
-                    <Image src="/miner-gorilla.png" alt="Gorilla Gadget" width={32} height={32} className="object-contain" />
+                    <Image
+                      src="/gorilla-gadget.gif"
+                      alt="Gorilla Gadget"
+                      width={32}
+                      height={32}
+                      className="object-contain"
+                    />
                   </div>
                   <div className="flex flex-col">
                     <span className="text-banana font-press-start text-xs">GORILLA GADGET</span>
@@ -497,7 +505,7 @@ export default function RoomPage() {
                 </div>
                 <div className="bg-dark-blue p-2 mb-2 flex items-center opacity-50 rounded">
                   <div className="w-8 h-8 mr-2">
-                    <Image src="/miner-apepad.png" alt="ApePad Mini" width={32} height={32} className="object-contain" />
+                    <Image src="/apepad.png" alt="ApePad Mini" width={32} height={32} className="object-contain" />
                   </div>
                   <div className="flex flex-col">
                     <span className="text-banana font-press-start text-xs">APEPAD MINI</span>

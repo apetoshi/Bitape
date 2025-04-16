@@ -2,25 +2,32 @@
 
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import ConnectWalletButton from './ConnectWalletButton';
 
 const Header: React.FC = () => {
   return (
     <header className="bg-royal py-4 px-6 flex justify-between items-center">
       <div className="flex items-center">
-        {/* Logo would be replaced with actual BitApe logo */}
-        <div className="mr-2 text-banana font-bold text-2xl">
-          <span className="pixel-text">bitape</span>
-        </div>
+        <Link href="/" className="flex items-center">
+          <Image
+            src="/bitape.png"
+            alt="BitApe Logo"
+            width={80}
+            height={80}
+            className="hover:opacity-80 transition-opacity"
+            priority
+          />
+        </Link>
         
-        <nav className="hidden md:flex ml-8">
-          <Link href="/about" className="pixel-text text-white mx-3 hover:text-banana">
+        <nav className="hidden md:flex ml-12">
+          <Link href="/about" className="font-press-start text-white mx-3 hover:text-banana">
             ABOUT
           </Link>
-          <Link href="/trade" className="pixel-text text-white mx-3 hover:text-banana">
+          <Link href="/trade" className="font-press-start text-white mx-3 hover:text-banana">
             TRADE $BIT
           </Link>
-          <Link href="/leaderboard" className="pixel-text text-white mx-3 hover:text-banana">
+          <Link href="/leaderboard" className="font-press-start text-white mx-3 hover:text-banana">
             LEADERBOARD
           </Link>
         </nav>
