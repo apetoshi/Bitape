@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useAccount, useContractRead } from 'wagmi';
-import { Address, zeroAddress } from 'viem';
+import { zeroAddress } from 'viem';
 import { useGameState } from '@/hooks/useGameState';
 import { useTokenBalance } from '@/hooks/useTokenBalance';
 import { CONTRACT_ADDRESSES, MAIN_CONTRACT_ABI } from '@/config/contracts';
@@ -13,12 +13,12 @@ import BuyFacilityModal from '@/components/BuyFacilityModal';
 import AccountModal from '@/components/AccountModal';
 import ReferralModal from '@/components/ReferralModal';
 import RoomVisualization from '@/components/RoomVisualization';
-import FacilityStats from '@/components/FacilityStats';
 import ResourcesPanel from '@/components/ResourcesPanel';
 import { useIsMounted } from '@/hooks/useIsMounted';
-import { formatEther } from 'viem/utils';
-import Modal from '../../../components/Modal';
 import FacilityPurchaseModal from '@/components/FacilityPurchaseModal';
+import { useMiningData } from '@/hooks/useMiningData';
+import MiningClaimSection from '@/components/MiningClaimSection';
+import { useDisclosure } from '@chakra-ui/react';
 
 type Tab = 'resources' | 'space' | 'selectedTile';
 
@@ -445,7 +445,7 @@ export default function RoomPage() {
         isOpen={isReferralModalOpen}
         onClose={() => setIsReferralModalOpen(false)}
         totalReferrals={gameState.totalReferrals || 0}
-        totalBigEarned={gameState.totalBigEarned || '0.00'}
+        totalBitEarned={gameState.totalBitEarned || '0.00'}
       />
 
       {/* Miner Purchase Modal */}

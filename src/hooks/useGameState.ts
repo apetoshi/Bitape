@@ -1,5 +1,5 @@
 import { useAccount, useContractRead, useContractWrite, useTransaction, useBalance, useWaitForTransactionReceipt, useWriteContract, useSimulateContract } from 'wagmi';
-import { formatEther, parseEther, Address, zeroAddress, type Hex } from 'viem';
+import { formatEther, parseEther, Address, zeroAddress, type Hex, type Hash } from 'viem';
 import { CONTRACT_ADDRESSES, MINING_CONTROLLER_ABI, ERC20_ABI, APECHAIN_ID, MAIN_CONTRACT_ABI } from '../config/contracts';
 import { useEffect, useState, useMemo } from 'react';
 
@@ -76,8 +76,15 @@ export interface GameState {
   isUserActive: boolean;
 
   totalReferrals: number;
-  totalBigEarned: string;
+  totalBitEarned: string;
   refetch: () => void;
+
+  // Referral info
+  referralInfo: {
+    referralCode: string;
+    totalReferrals: number;
+    rewardsEarned: string;
+  };
 }
 
 export function useGameState(): GameState {
@@ -100,8 +107,7 @@ export function useGameState(): GameState {
   const [isClaimingReward, setIsClaimingReward] = useState(false);
   const [isUpgrading, setIsUpgrading] = useState(false);
   const [totalReferrals, setTotalReferrals] = useState(0);
-  const [totalBigEarned, setTotalBigEarned] = useState('0');
-  const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
+  const [totalBitEarned, setTotalBitEarned] = useState('0');
 
   // Contract reads
   const { data: gameActiveState } = useContractRead({
@@ -166,7 +172,7 @@ export function useGameState(): GameState {
   });
 
   // Get referral info
-  const { data: referralInfo } = useContractRead({
+  const { data: referralData } = useContractRead({
     address: CONTRACT_ADDRESSES.MAIN,
     abi: MAIN_CONTRACT_ABI,
     functionName: 'getUserReferralInfo',
@@ -207,42 +213,19 @@ export function useGameState(): GameState {
   }, [hasInitializedFacility]);
 
   // Contract write functions
-  const { write: purchaseFacilityWrite } = useContractWrite({
-    address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
-    abi: MAIN_CONTRACT_ABI,
-    functionName: 'purchaseInitialFacility',
-  });
-
-  const { write: getStarterMinerWrite } = useContractWrite({
-    address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
-    abi: MAIN_CONTRACT_ABI,
-    functionName: 'getFreeStarterMiner',
-  });
-
-  const { write: claimRewardWrite } = useContractWrite({
-    address: CONTRACT_ADDRESSES.MINING_CONTROLLER as `0x${string}`,
-    abi: MINING_CONTROLLER_ABI,
-    functionName: 'claimReward',
-  });
-
-  const { write: upgradeFacilityWrite } = useContractWrite({
-    address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
-    abi: MAIN_CONTRACT_ABI,
-    functionName: 'upgradeFacility',
-  });
+  const { writeContract } = useWriteContract();
 
   const handlePurchaseFacility = async () => {
-    if (!address) return;
     try {
       setIsPurchasingFacility(true);
-      const result = await purchaseFacilityWrite({
+      await writeContract({
+        address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
+        abi: MAIN_CONTRACT_ABI,
+        functionName: 'purchaseInitialFacility',
         args: [zeroAddress as `0x${string}`],
         value: parseEther('10')
       });
-      if (result?.hash) {
-        setTxHash(result.hash);
-        await refetchStats();
-      }
+      await refetchStats();
     } catch (error) {
       console.error('Error purchasing facility:', error);
     } finally {
@@ -254,13 +237,13 @@ export function useGameState(): GameState {
     if (!address) return;
     try {
       setIsGettingStarterMiner(true);
-      const result = await getStarterMinerWrite({
+      await writeContract({
+        address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
+        abi: MAIN_CONTRACT_ABI,
+        functionName: 'getFreeStarterMiner',
         args: [BigInt(x), BigInt(y)]
       });
-      if (result?.hash) {
-        setTxHash(result.hash);
-        await refetchStats();
-      }
+      await refetchStats();
     } catch (error) {
       console.error('Error getting starter miner:', error);
     } finally {
@@ -272,11 +255,12 @@ export function useGameState(): GameState {
     if (!address) return;
     try {
       setIsClaimingReward(true);
-      const result = await claimRewardWrite();
-      if (result?.hash) {
-        setTxHash(result.hash);
-        await refetchStats();
-      }
+      await writeContract({
+        address: CONTRACT_ADDRESSES.MINING_CONTROLLER as `0x${string}`,
+        abi: MINING_CONTROLLER_ABI,
+        functionName: 'claimReward'
+      });
+      await refetchStats();
     } catch (error) {
       console.error('Error claiming reward:', error);
     } finally {
@@ -288,11 +272,12 @@ export function useGameState(): GameState {
     if (!address) return;
     try {
       setIsUpgrading(true);
-      const result = await upgradeFacilityWrite();
-      if (result?.hash) {
-        setTxHash(result.hash);
-        await refetchStats();
-      }
+      await writeContract({
+        address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
+        abi: MAIN_CONTRACT_ABI,
+        functionName: 'upgradeFacility'
+      });
+      await refetchStats();
     } catch (error) {
       console.error('Error upgrading facility:', error);
     } finally {
@@ -302,16 +287,12 @@ export function useGameState(): GameState {
 
   // Update referral info
   useEffect(() => {
-    if (referralInfo) {
-      const [totalRefs, totalEarned] = referralInfo as [bigint, bigint];
+    if (referralData) {
+      const [totalRefs, totalEarned] = referralData as [bigint, bigint];
       setTotalReferrals(Number(totalRefs));
-      setTotalBigEarned(formatEther(totalEarned));
+      setTotalBitEarned(formatEther(totalEarned));
     }
-  }, [referralInfo]);
-
-  const { isLoading: isPending } = useTransaction({
-    hash: txHash,
-  });
+  }, [referralData]);
 
   return {
     isConnected,
@@ -357,14 +338,19 @@ export function useGameState(): GameState {
     isPurchasingFacility,
     isGettingStarterMiner,
     isClaimingReward,
-    isUpgradingFacility: isUpgrading || isPending,
+    isUpgradingFacility: isUpgrading,
     isGameActive: !!gameActiveState,
     isUserActive: !!userActiveState,
     totalReferrals,
-    totalBigEarned,
+    totalBitEarned,
     refetch: () => {
       refetchInitialized();
       refetchStats();
+    },
+    referralInfo: {
+      referralCode: address ? address.slice(2, 8).toUpperCase() : '',
+      totalReferrals: Number(totalReferrals),
+      rewardsEarned: totalBitEarned,
     },
   };
 }

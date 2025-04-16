@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useGameState } from '../hooks/useGameState';
+import { useGameState } from '@/hooks/useGameState';
+import { useMiningData } from '@/hooks/useMiningData';
 import Header from '../components/Header';
 import ResourcesPanel from '../components/ResourcesPanel';
 import StatsDisplay from '../components/StatsDisplay';

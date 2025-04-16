@@ -4,6 +4,8 @@ import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import ConnectWalletButton from './ConnectWalletButton';
+import { useGameState } from '@/hooks/useGameState';
+import { useAccount } from 'wagmi';
 
 const Header: React.FC = () => {
   return (

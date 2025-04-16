@@ -3,9 +3,10 @@
 import React from 'react';
 import Image from 'next/image';
 import { Dialog } from '@headlessui/react';
-import { useContractWrite, useAccount, useTransaction } from 'wagmi';
+import { useAccount, useContractWrite, useTransaction } from 'wagmi';
 import { parseEther } from 'viem';
 import { CONTRACT_ADDRESSES, MAIN_CONTRACT_ABI } from '@/config/contracts';
+import { useGameState } from '@/hooks/useGameState';
 
 interface BuyFacilityModalProps {
   isOpen: boolean;

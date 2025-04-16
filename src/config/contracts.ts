@@ -89,6 +89,13 @@ export const MAIN_CONTRACT_ABI = [
     stateMutability: 'nonpayable',
     type: 'function',
   },
+  {
+    inputs: [],
+    name: 'upgradeFacility',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
 ] as const;
 
 // Mining Controller ABI

@@ -1,5 +1,6 @@
 import React from 'react';
 import Image from 'next/image';
+import { Dialog } from '@headlessui/react';
 
 interface StarterMinerModalProps {
   isOpen: boolean;
@@ -19,49 +20,57 @@ const StarterMinerModal: React.FC<StarterMinerModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50">
-      <div className="absolute inset-0 bg-black bg-opacity-50" onClick={onClose} />
-      <div className="relative bg-royal border-2 border-banana p-6 max-w-lg w-full m-4">
-        <h2 className="font-press-start text-2xl text-banana mb-6">CLAIM YOUR FREE BANANA MINER</h2>
-        
-        <div className="bg-opacity-10 bg-white p-6 mb-8">
-          <div className="space-y-4 font-press-start">
-            <p className="text-white">Selected Position: {selectedTile ? `X:${selectedTile.x}, Y:${selectedTile.y}` : 'None'}</p>
-            
-            <div className="relative w-32 h-32 mx-auto mb-6">
-              <Image
-                src="/banana-miner.gif"
-                alt="Banana Miner"
-                fill
-                className="object-contain"
-              />
-            </div>
+    <Dialog
+      open={isOpen}
+      onClose={onClose}
+      className="relative z-50"
+    >
+      <div className="fixed inset-0 bg-black/70" aria-hidden="true" />
+      <div className="fixed inset-0 flex items-center justify-center p-4">
+        <Dialog.Panel className="relative bg-royal border-2 border-banana p-6 max-w-lg w-full m-4">
+          <Dialog.Title className="font-press-start text-2xl text-banana mb-6">
+            CLAIM YOUR FREE BANANA MINER
+          </Dialog.Title>
+          
+          <div className="bg-opacity-10 bg-white p-6 mb-8">
+            <div className="space-y-4 font-press-start">
+              <p className="text-white">Selected Position: {selectedTile ? `X:${selectedTile.x}, Y:${selectedTile.y}` : 'None'}</p>
+              
+              <div className="relative w-32 h-32 mx-auto mb-6">
+                <Image
+                  src="/banana-miner.gif"
+                  alt="Banana Miner"
+                  fill
+                  className="object-contain"
+                />
+              </div>
 
-            <div className="space-y-2 text-white">
-              <p>- HASH RATE: 100 GH/S</p>
-              <p>- ENERGY: 1 WATT</p>
-              <p>- PRICE: FREE</p>
+              <div className="space-y-2 text-white">
+                <p>- HASH RATE: 100 GH/S</p>
+                <p>- ENERGY: 1 WATT</p>
+                <p>- PRICE: FREE</p>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="flex justify-end space-x-4">
-          <button
-            onClick={onClose}
-            className="font-press-start px-6 py-2 border-2 border-banana text-banana hover:bg-banana hover:text-royal transition-colors"
-          >
-            CANCEL
-          </button>
-          <button
-            onClick={() => selectedTile && onClaim(selectedTile.x, selectedTile.y)}
-            disabled={!selectedTile || isProcessing}
-            className="font-press-start px-6 py-2 bg-banana text-royal hover:bg-opacity-90 transition-colors disabled:opacity-50"
-          >
-            {isProcessing ? 'CLAIMING...' : 'CLAIM FREE MINER'}
-          </button>
-        </div>
+          <div className="flex justify-end space-x-4">
+            <button
+              onClick={onClose}
+              className="font-press-start px-6 py-2 border-2 border-banana text-banana hover:bg-banana hover:text-royal transition-colors"
+            >
+              CANCEL
+            </button>
+            <button
+              onClick={() => selectedTile && onClaim(selectedTile.x, selectedTile.y)}
+              disabled={!selectedTile || isProcessing}
+              className="font-press-start px-6 py-2 bg-banana text-royal hover:bg-opacity-90 transition-colors disabled:opacity-50"
+            >
+              {isProcessing ? 'CLAIMING...' : 'CLAIM FREE MINER'}
+            </button>
+          </div>
+        </Dialog.Panel>
       </div>
-    </div>
+    </Dialog>
   );
 };
 

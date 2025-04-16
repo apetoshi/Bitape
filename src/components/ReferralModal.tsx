@@ -6,19 +6,19 @@ interface ReferralModalProps {
   isOpen: boolean;
   onClose: () => void;
   totalReferrals: number;
-  totalBigEarned: string;
+  totalBitEarned: string;
 }
 
 const ReferralModal: React.FC<ReferralModalProps> = ({
   isOpen,
   onClose,
   totalReferrals,
-  totalBigEarned
+  totalBitEarned
 }) => {
   const { address } = useAccount();
 
   const referralLink = address 
-    ? `https://www.bigcoin.tech?ref=${address}`
+    ? `https://bitape.tech?ref=${address}`
     : '';
 
   return (
@@ -37,7 +37,7 @@ const ReferralModal: React.FC<ReferralModalProps> = ({
             </Dialog.Title>
             
             <p className="text-sm font-press-start text-center text-white mb-8">
-              SHARE YOUR REFERRAL LINK WITH FRIENDS AND EARN A 2.5% BONUS OF WHATEVER BIGCOIN THEY MINE!
+              SHARE YOUR REFERRAL LINK WITH FRIENDS AND EARN A 2.5% BONUS OF WHATEVER BITCOIN THEY MINE!
             </p>
 
             <div className="bg-royal-dark p-4 mb-8 rounded">
@@ -47,8 +47,8 @@ const ReferralModal: React.FC<ReferralModalProps> = ({
                   <p className="font-press-start text-banana text-xl">{totalReferrals}</p>
                 </div>
                 <div>
-                  <p className="font-press-start text-white mb-2">TOTAL BIG EARNED</p>
-                  <p className="font-press-start text-banana text-xl">{totalBigEarned} $BIG</p>
+                  <p className="font-press-start text-white mb-2">TOTAL BIT EARNED</p>
+                  <p className="font-press-start text-banana text-xl">{totalBitEarned} $BIT</p>
                 </div>
               </div>
 
