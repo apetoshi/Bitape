@@ -1,11 +1,19 @@
 "use client";
 
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAccount } from 'wagmi';
-import GameLayout from '@/components/GameLayout';
 import LandingPage from '@/components/LandingPage';
 
 export default function Home() {
-  const { isConnected } = useAccount();
+  const router = useRouter();
+  const { isConnected, address } = useAccount();
   
-  return isConnected ? <GameLayout /> : <LandingPage />;
+  useEffect(() => {
+    if (isConnected && address) {
+      router.push(`/room/${address}`);
+    }
+  }, [isConnected, address, router]);
+
+  return <LandingPage />;
 }

@@ -4,6 +4,9 @@ import { WagmiConfig } from 'wagmi';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { config, queryClient, projectId } from '@/config/web3';
 import { createWeb3Modal } from '@web3modal/wagmi/react';
+import { CacheProvider } from '@chakra-ui/next-js';
+import { ChakraProvider, extendTheme } from '@chakra-ui/react';
+import { RainbowKitProvider } from '@rainbow-me/rainbowkit';
 
 // Initialize Web3Modal
 createWeb3Modal({
@@ -16,11 +19,32 @@ createWeb3Modal({
   ],
 });
 
+// Extend the theme
+const theme = extendTheme({
+  styles: {
+    global: {
+      body: {
+        bg: 'transparent',
+      },
+    },
+  },
+  config: {
+    initialColorMode: 'dark',
+    useSystemColorMode: false,
+  },
+});
+
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <WagmiConfig config={config}>
       <QueryClientProvider client={queryClient}>
-        {children}
+        <CacheProvider>
+          <ChakraProvider theme={theme}>
+            <RainbowKitProvider>
+              {children}
+            </RainbowKitProvider>
+          </ChakraProvider>
+        </CacheProvider>
       </QueryClientProvider>
     </WagmiConfig>
   );
