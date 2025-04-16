@@ -60,9 +60,9 @@ const Header: React.FC = () => {
           <Link href="/trade" className="font-press-start text-white mx-3 hover:text-banana">
             TRADE $BIT
           </Link>
-          <Link href="/leaderboard" className="font-press-start text-white mx-3 hover:text-banana">
+          <span className="font-press-start text-gray-500 mx-3 cursor-not-allowed">
             LEADERBOARD
-          </Link>
+          </span>
         </nav>
       </div>
       

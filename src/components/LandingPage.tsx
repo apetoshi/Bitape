@@ -1,15 +1,35 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import ConnectWalletButton from './ConnectWalletButton';
 import { useAccount } from 'wagmi';
+import { useContractRead } from 'wagmi';
+import { CONTRACT_ADDRESSES, MAIN_CONTRACT_ABI } from '../config/contracts';
 
 const LandingPage = () => {
   const router = useRouter();
   const { isConnected, address } = useAccount();
+  const [minedBit, setMinedBit] = useState("0");
+
+  // Check mining status from contract
+  const { data: miningStarted } = useContractRead({
+    address: CONTRACT_ADDRESSES.MAIN,
+    abi: MAIN_CONTRACT_ABI,
+    functionName: 'miningHasStarted' as any,
+  });
+
+  // Format mining data display - since mining hasn't started, we'll show 0
+  useEffect(() => {
+    if (miningStarted === true) {
+      // For future: When mining starts, fetch actual mined BIT
+      setMinedBit("0"); // For now still 0 since mining hasn't started
+    } else {
+      setMinedBit("0");
+    }
+  }, [miningStarted]);
 
   useEffect(() => {
     if (isConnected && address) {
@@ -39,9 +59,9 @@ const LandingPage = () => {
             <Link href="/trade" className="font-press-start text-white hover:text-banana">
               TRADE $BIT
             </Link>
-            <Link href="/leaderboard" className="font-press-start text-[#4A5568] hover:text-banana">
+            <span className="font-press-start text-gray-500 cursor-not-allowed">
               LEADERBOARD
-            </Link>
+            </span>
           </nav>
         </div>
         <div className="flex gap-4">
@@ -75,7 +95,7 @@ const LandingPage = () => {
           </h1>
           
           <p className="text-2xl md:text-3xl font-press-start text-banana pixel-text">
-            971,753 $BIT HAS ALREADY BEEN MINED.
+            {minedBit} $BIT HAS ALREADY BEEN MINED.
           </p>
           
           <p className="text-xl md:text-2xl font-press-start text-white pixel-text">
