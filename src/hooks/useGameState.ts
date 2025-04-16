@@ -1,7 +1,7 @@
-import { useAccount, useContractRead, useContractWrite, useTransaction, useBalance, useWaitForTransactionReceipt, useWriteContract, useSimulateContract } from 'wagmi';
-import { formatEther, parseEther, Address, zeroAddress, type Hex, type Hash } from 'viem';
+import { useAccount, useContractRead, useBalance, useWriteContract } from 'wagmi';
+import { formatEther, parseEther, zeroAddress } from 'viem';
 import { CONTRACT_ADDRESSES, MINING_CONTROLLER_ABI, ERC20_ABI, APECHAIN_ID, MAIN_CONTRACT_ABI } from '../config/contracts';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 
 interface PlayerFacility {
   power: bigint;
@@ -85,6 +85,9 @@ export interface GameState {
     totalReferrals: number;
     rewardsEarned: string;
   };
+
+  // Facility price
+  initialFacilityPrice: string;
 }
 
 export function useGameState(): GameState {
@@ -93,15 +96,15 @@ export function useGameState(): GameState {
   // State variables
   const [apeBalance, setApeBalance] = useState('0');
   const [bitBalance, setBitBalance] = useState('0');
-  const [minedBit, setMinedBit] = useState('0');
+  const [minedBit] = useState('0');
   const [hasFacility, setHasFacility] = useState(false);
-  const [spacesLeft, setSpacesLeft] = useState(0);
-  const [gigawattsAvailable, setGigawattsAvailable] = useState(0);
-  const [miningRate, setMiningRate] = useState('0');
-  const [hashRate, setHashRate] = useState('0');
-  const [blocksUntilHalving, setBlocksUntilHalving] = useState('0');
-  const [networkHashRatePercentage, setNetworkHashRatePercentage] = useState('0');
-  const [totalNetworkHashRate, setTotalNetworkHashRate] = useState('0');
+  const [spacesLeft] = useState(0);
+  const [gigawattsAvailable] = useState(0);
+  const [miningRate] = useState('0');
+  const [hashRate] = useState('0');
+  const [blocksUntilHalving] = useState('0');
+  const [networkHashRatePercentage] = useState('0');
+  const [totalNetworkHashRate] = useState('0');
   const [isPurchasingFacility, setIsPurchasingFacility] = useState(false);
   const [isGettingStarterMiner, setIsGettingStarterMiner] = useState(false);
   const [isClaimingReward, setIsClaimingReward] = useState(false);
@@ -219,10 +222,10 @@ export function useGameState(): GameState {
     try {
       setIsPurchasingFacility(true);
       await writeContract({
-        address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
+        address: CONTRACT_ADDRESSES.MAIN,
         abi: MAIN_CONTRACT_ABI,
         functionName: 'purchaseInitialFacility',
-        args: [zeroAddress as `0x${string}`],
+        args: [zeroAddress],
         value: parseEther('10')
       });
       await refetchStats();
@@ -238,7 +241,7 @@ export function useGameState(): GameState {
     try {
       setIsGettingStarterMiner(true);
       await writeContract({
-        address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
+        address: CONTRACT_ADDRESSES.MAIN,
         abi: MAIN_CONTRACT_ABI,
         functionName: 'getFreeStarterMiner',
         args: [BigInt(x), BigInt(y)]
@@ -256,7 +259,7 @@ export function useGameState(): GameState {
     try {
       setIsClaimingReward(true);
       await writeContract({
-        address: CONTRACT_ADDRESSES.MINING_CONTROLLER as `0x${string}`,
+        address: CONTRACT_ADDRESSES.MINING_CONTROLLER,
         abi: MINING_CONTROLLER_ABI,
         functionName: 'claimReward'
       });
@@ -273,9 +276,10 @@ export function useGameState(): GameState {
     try {
       setIsUpgrading(true);
       await writeContract({
-        address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
+        address: CONTRACT_ADDRESSES.MAIN,
         abi: MAIN_CONTRACT_ABI,
-        functionName: 'upgradeFacility'
+        functionName: 'upgradeFacility',
+        args: []
       });
       await refetchStats();
     } catch (error) {
@@ -352,5 +356,6 @@ export function useGameState(): GameState {
       totalReferrals: Number(totalReferrals),
       rewardsEarned: totalBitEarned,
     },
+    initialFacilityPrice: '10',
   };
 }

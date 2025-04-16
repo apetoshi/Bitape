@@ -1,89 +1,60 @@
 'use client';
 
-import { useAccount, useContractRead, useContractWrite, useWaitForTransaction } from 'wagmi';
+import { useAccount, useContractRead, useContractWrite, useTransaction } from 'wagmi';
 import { CONTRACT_ADDRESSES, MINING_CONTROLLER_ABI } from '@/config/contracts';
 import { formatUnits } from 'viem';
+
+interface MiningData {
+  minedBit: bigint;
+  hashRate: bigint;
+  networkShare: bigint;
+}
 
 export function useMiningData() {
   const { address } = useAccount();
 
-  // Get unclaimed rewards
-  const { data: unclaimedRewards } = useContractRead({
+  // Get mining data
+  const { data: miningData } = useContractRead({
     address: CONTRACT_ADDRESSES.MINING_CONTROLLER,
     abi: MINING_CONTROLLER_ABI,
-    functionName: 'getUnclaimedRewards',
-    args: [address as `0x${string}`],
+    functionName: 'getMiningData',
+    args: [address],
     query: {
       enabled: !!address,
     },
-  });
+  }) as { data: [bigint, bigint, bigint] | undefined };
 
-  // Get user mining rate
-  const { data: userMiningRate } = useContractRead({
-    address: CONTRACT_ADDRESSES.MINING_CONTROLLER,
-    abi: MINING_CONTROLLER_ABI,
-    functionName: 'getUserMiningRate',
-    args: [address as `0x${string}`],
-    query: {
-      enabled: !!address,
-    },
-  });
-
-  // Get network hash rate
-  const { data: networkHashRate } = useContractRead({
-    address: CONTRACT_ADDRESSES.MINING_CONTROLLER,
-    abi: MINING_CONTROLLER_ABI,
-    functionName: 'getNetworkHashRate',
-    query: {
-      enabled: true,
-    },
-  });
-
-  // Get user hash rate
-  const { data: userHashRate } = useContractRead({
-    address: CONTRACT_ADDRESSES.MINING_CONTROLLER,
-    abi: MINING_CONTROLLER_ABI,
-    functionName: 'getUserHashRate',
-    args: [address as `0x${string}`],
-    query: {
-      enabled: !!address,
-    },
-  });
-
-  // Get blocks until halving
-  const { data: blocksUntilHalving } = useContractRead({
-    address: CONTRACT_ADDRESSES.MINING_CONTROLLER,
-    abi: MINING_CONTROLLER_ABI,
-    functionName: 'getBlocksUntilHalving',
-    query: {
-      enabled: true,
-    },
-  });
+  // Format mining data
+  const formattedMiningData = {
+    minedBit: miningData ? formatUnits(miningData[0], 18) : '0',
+    hashRate: miningData ? formatUnits(miningData[1], 18) : '0',
+    networkShare: miningData ? formatUnits(miningData[2], 18) : '0',
+  };
 
   // Claim rewards function
-  const { write: claimReward, data: claimData } = useContractWrite({
-    address: CONTRACT_ADDRESSES.MINING_CONTROLLER,
-    abi: MINING_CONTROLLER_ABI,
-    functionName: 'claimReward',
-  });
+  const { writeContract, data: claimData } = useContractWrite();
 
-  const { isLoading: isClaimLoading, isSuccess: isClaimSuccess } = useWaitForTransaction({
-    hash: claimData?.hash,
-  });
+  const handleClaimReward = async () => {
+    if (!address) return;
+    
+    try {
+      await writeContract({
+        address: CONTRACT_ADDRESSES.MINING_CONTROLLER,
+        abi: MINING_CONTROLLER_ABI,
+        functionName: 'claimReward',
+      });
+    } catch (error) {
+      console.error('Error claiming reward:', error);
+    }
+  };
 
-  // Calculate percentage of network hash rate
-  const networkHashRatePercentage = userHashRate && networkHashRate
-    ? (Number(userHashRate) / Number(networkHashRate) * 100).toFixed(4)
-    : '0.0000';
+  const { isLoading: isClaimLoading, isSuccess: isClaimSuccess } = useTransaction({
+    hash: claimData,
+  });
 
   return {
-    unclaimedRewards: unclaimedRewards ? formatUnits(unclaimedRewards as bigint, 18) : '0',
-    userMiningRate: userMiningRate ? formatUnits(userMiningRate as bigint, 18) : '0',
-    networkHashRate: networkHashRate ? formatUnits(networkHashRate as bigint, 18) : '0',
-    userHashRate: userHashRate ? formatUnits(userHashRate as bigint, 18) : '0',
-    networkHashRatePercentage,
-    blocksUntilHalving: blocksUntilHalving ? Number(blocksUntilHalving) : 0,
-    claimReward,
+    ...formattedMiningData,
+    claimReward: handleClaimReward,
     isClaimLoading,
     isClaimSuccess,
   };

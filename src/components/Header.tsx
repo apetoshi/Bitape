@@ -3,7 +3,10 @@
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import ConnectWalletButton from './ConnectWalletButton';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { Button } from '@/components/ui/button';
+import { useDisclosure } from '@chakra-ui/react';
+import ReferralModal from './ReferralModal';
 import { useGameState } from '@/hooks/useGameState';
 import { useAccount } from 'wagmi';
 
@@ -42,7 +45,7 @@ const Header: React.FC = () => {
         <Link href="/refer" className="pixel-button mr-2 hidden md:block">
           REFER A FRIEND
         </Link>
-        <ConnectWalletButton />
+        <ConnectButton />
       </div>
     </header>
   );

@@ -6,7 +6,7 @@ interface MiningClaimSectionProps {
   isClaimingReward: boolean;
 }
 
-const MiningClaimSection: React.FC<MiningClaimSectionProps> = ({
+export const MiningClaimSection: React.FC<MiningClaimSectionProps> = ({
   minedBit,
   onClaimReward,
   isClaimingReward
@@ -26,5 +26,3 @@ const MiningClaimSection: React.FC<MiningClaimSectionProps> = ({
     </div>
   );
 };
-
-export default MiningClaimSection;

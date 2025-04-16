@@ -3,6 +3,7 @@ import Image from 'next/image';
 import { useContractRead } from 'wagmi';
 import { CONTRACT_ADDRESSES, MAIN_CONTRACT_ABI } from '../config/contracts';
 import { Address, zeroAddress } from 'viem';
+import { Button } from '@/components/ui/button';
 
 // Add keyframes for the pulse animation
 const pulseStyle = `
@@ -13,19 +14,17 @@ const pulseStyle = `
   }
 `;
 
-interface FacilityData {
-  power: number;
-  level: number;
-  miners: number;
-  capacity: number;
-  used: number;
-  resources: number;
-  spaces: number;
-}
-
-interface RoomVisualizationProps {
+export interface RoomVisualizationProps {
   hasFacility: boolean;
-  facilityData?: FacilityData;
+  facilityData?: {
+    power: number;
+    level: number;
+    miners: number;
+    capacity: number;
+    used: number;
+    resources: number;
+    spaces: number;
+  };
   onPurchaseFacility: () => Promise<void>;
   onGetStarterMiner: (x: number, y: number) => Promise<void>;
   onUpgradeFacility: () => Promise<void>;
@@ -36,10 +35,9 @@ interface RoomVisualizationProps {
   address?: Address;
   isGridMode?: boolean;
   toggleGridMode?: () => void;
-  placedMiners?: { x: number, y: number }[];
 }
 
-const RoomVisualization: React.FC<RoomVisualizationProps> = ({
+export function RoomVisualization({
   hasFacility,
   facilityData,
   onPurchaseFacility,
@@ -50,11 +48,11 @@ const RoomVisualization: React.FC<RoomVisualizationProps> = ({
   isUpgradingFacility,
   onTileSelect,
   address,
-  isGridMode = false,
-  toggleGridMode,
-  placedMiners
-}) => {
+  isGridMode,
+  toggleGridMode
+}: RoomVisualizationProps) {
   const [selectedTile, setSelectedTile] = useState<{x: number, y: number}>();
+  const [showGrid, setShowGrid] = useState(false);
 
   // Check if user has claimed their free miner
   const { data: minerData } = useContractRead({
@@ -81,170 +79,49 @@ const RoomVisualization: React.FC<RoomVisualizationProps> = ({
     return false;
   };
 
-  if (!hasFacility) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full bg-royal">
-        <div className="text-center">
-          <h2 className="font-press-start text-2xl mb-4 text-banana">YOU DON'T HAVE A SPACE TO MINE!</h2>
-          <div className="space-y-2 text-sm mb-6">
-            <p className="text-white">- NO MINING SPACE</p>
-            <p className="text-white">- 0 TOTAL SPACES</p>
-            <p className="text-white">- 0 TOTAL GIGAWATTS</p>
-            <p className="text-white">- CANT MINE WITHOUT SPACE, BUDDY</p>
-          </div>
-          <button 
-            className="bg-banana text-royal font-press-start px-6 py-3 rounded hover:bg-opacity-90"
-            onClick={onPurchaseFacility}
-            disabled={isPurchasingFacility}
-          >
-            {isPurchasingFacility ? 'PURCHASING...' : 'BUY FACILITY'}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <>
-      {/* Add the keyframes animation style */}
-      <style jsx global>{pulseStyle}</style>
-      <div className="relative w-full h-[690px] bg-royal overflow-hidden overflow-x-hidden">
-        <div className="relative w-full h-full flex items-center justify-center">
-          {/* Background Image */}
-          <div className="relative w-full h-full max-w-full overflow-hidden">
-            <Image 
-              src="/bedroom.png" 
-              alt="Mining Facility" 
-              fill 
-              sizes="100%" 
-              style={{ objectFit: 'contain', objectPosition: 'center' }}
-              priority 
-            />
+    <div className="relative w-full h-[500px] bg-gray-900 rounded-lg overflow-hidden">
+      {hasFacility ? (
+        <>
+          <Image
+            src="/bedroom.png"
+            alt="Mining Facility"
+            fill
+            style={{ objectFit: 'contain', objectPosition: 'center' }}
+          />
+          <div className="absolute bottom-0 left-0 right-0 p-4 bg-black/50 backdrop-blur-sm">
+            <div className="flex justify-between items-center">
+              <Button
+                onClick={toggleGridMode}
+                variant="outline"
+                size="sm"
+              >
+                {isGridMode ? 'HIDE GRID' : 'SHOW GRID'}
+              </Button>
+              <Button
+                onClick={onUpgradeFacility}
+                loading={isUpgradingFacility}
+                variant="solid"
+                size="sm"
+              >
+                UPGRADE
+              </Button>
+            </div>
           </div>
-
-          {/* Clickable Mining Spaces - Positioned to match the isometric view */}
-          <div className="absolute inset-0 scale-[0.98]">
-            <div
-              onClick={() => handleTileClick(0, 0)}
-              className={`absolute w-[85px] h-[85px] cursor-pointer transition-all duration-300 ${
-                selectedTile?.x === 0 && selectedTile?.y === 0
-                  ? "bg-blue-500 bg-opacity-40"
-                  : isGridMode ? "bg-blue-500 bg-opacity-20 hover:bg-opacity-30" : ""
-              }`}
-              style={{
-                top: '51.5%', left: '44.5%', transform: 'translate(-50%, -50%) rotate(-2deg)',
-                borderRadius: "2px",
-                animation: selectedTile?.x === 0 && selectedTile?.y === 0 ? "pulse 1.5s infinite" : "none"
-              }}
-            />
-            {placedMiners?.some(miner => miner.x === 0 && miner.y === 0) && (
-              <Image 
-                src="/banana-miner.gif"
-                alt="Banana Miner"
-                width={85}
-                height={85}
-                className="absolute"
-                style={{ top: '54%', left: '44.5%', transform: 'translate(-50%, -50%) rotate(-2deg)' }}
-              />
-            )}
-            <div
-              onClick={() => handleTileClick(1, 0)}
-              className={`absolute w-[85px] h-[85px] cursor-pointer transition-all duration-300 ${
-                selectedTile?.x === 1 && selectedTile?.y === 0
-                  ? "bg-blue-500 bg-opacity-40"
-                  : isGridMode ? "bg-blue-500 bg-opacity-20 hover:bg-opacity-30" : ""
-              }`}
-              style={{
-                top: '57.5%', left: '31.5%', transform: 'translate(-50%, -50%) rotate(-2deg)',
-                borderRadius: "2px",
-                animation: selectedTile?.x === 1 && selectedTile?.y === 0 ? "pulse 1.5s infinite" : "none"
-              }}
-            />
-            {placedMiners?.some(miner => miner.x === 1 && miner.y === 0) && (
-              <Image 
-                src="/banana-miner.gif"
-                alt="Banana Miner"
-                width={85}
-                height={85}
-                className="absolute"
-                style={{ top: '60.5%', left: '31.5%', transform: 'translate(-50%, -50%) rotate(-2deg)' }}
-              />
-            )}
-            <div
-              onClick={() => handleTileClick(1, 1)}
-              className={`absolute w-[85px] h-[85px] cursor-pointer transition-all duration-300 ${
-                selectedTile?.x === 1 && selectedTile?.y === 1
-                  ? "bg-blue-500 bg-opacity-40"
-                  : isGridMode ? "bg-blue-500 bg-opacity-20 hover:bg-opacity-30" : ""
-              }`}
-              style={{
-                top: "64%",
-                left: "43%",
-                transform: "skew(-30deg, 0) rotate(45deg)",
-                borderRadius: "2px",
-                animation: selectedTile?.x === 1 && selectedTile?.y === 1 ? "pulse 1.5s infinite" : "none"
-              }}
-            />
-            {placedMiners?.some(miner => miner.x === 1 && miner.y === 1) && (
-              <Image 
-                src="/banana-miner.gif"
-                alt="Banana Miner"
-                width={85}
-                height={85}
-                className="absolute"
-                style={{ top: '66.4%', left: '44.5%', transform: 'translate(-50%, -50%) rotate(-2deg)' }}
-              />
-            )}
-            <div
-              onClick={() => handleTileClick(0, 1)}
-              className={`absolute w-[85px] h-[85px] cursor-pointer transition-all duration-300 ${
-                selectedTile?.x === 0 && selectedTile?.y === 1
-                  ? "bg-blue-500 bg-opacity-40"
-                  : isGridMode ? "bg-blue-500 bg-opacity-20 hover:bg-opacity-30" : ""
-              }`}
-              style={{
-                top: "58%",
-                left: "56%",
-                transform: "skew(-30deg, 0) rotate(45deg)",
-                borderRadius: "2px",
-                animation: selectedTile?.x === 0 && selectedTile?.y === 1 ? "pulse 1.5s infinite" : "none"
-              }}
-            />
-            {placedMiners?.some(miner => miner.x === 0 && miner.y === 1) && (
-              <Image 
-                src="/banana-miner.gif"
-                alt="Banana Miner"
-                width={85}
-                height={85}
-                className="absolute"
-                style={{ top: '60.5%', left: '56.5%', transform: 'translate(-50%, -50%) rotate(-2deg)' }}
-              />
-            )}
-          </div>
-        </div>
-
-        {/* Control Panel - fixed at bottom */}
-        <div className="absolute bottom-4 left-4 flex gap-4 z-20">
-          {/* Left Gameboy Button */}
-          <button
-            className="bg-[#444444] text-yellow-300 text-xs font-press-start px-4 py-3 rounded-lg shadow-lg border-b-4 border-[#222222] focus:outline-none hover:bg-[#555555] hover:translate-y-[1px] hover:border-b-2 active:translate-y-[3px] active:border-b-0 transition-all"
-            onClick={toggleGridMode}
+        </>
+      ) : (
+        <div className="flex flex-col items-center justify-center h-full text-center p-4">
+          <p className="text-gray-400 mb-4">You don&apos;t have any mining space yet.</p>
+          <Button
+            onClick={onPurchaseFacility}
+            loading={isPurchasingFacility}
+            variant="solid"
+            size="lg"
           >
-            GRID
-          </button>
-          
-          {/* Right Gameboy Button */}
-          <button
-            className="bg-[#444444] text-yellow-300 text-xs font-press-start px-4 py-3 rounded-lg shadow-lg border-b-4 border-[#222222] focus:outline-none hover:bg-[#555555] hover:translate-y-[1px] hover:border-b-2 active:translate-y-[3px] active:border-b-0 transition-all"
-            onClick={onUpgradeFacility}
-            disabled={isUpgradingFacility}
-          >
-            UPGRADE
-          </button>
+            Purchase Facility
+          </Button>
         </div>
-      </div>
-    </>
+      )}
+    </div>
   );
-};
-
-export default RoomVisualization;
+}

@@ -1,52 +1,29 @@
 'use client';
 
 import React from 'react';
-import Image from 'next/image';
 import { Dialog } from '@headlessui/react';
-import { useAccount, useContractWrite, useTransaction } from 'wagmi';
-import { parseEther } from 'viem';
-import { CONTRACT_ADDRESSES, MAIN_CONTRACT_ABI } from '@/config/contracts';
 import { useGameState } from '@/hooks/useGameState';
 
 interface BuyFacilityModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm?: () => void;
 }
 
-const BuyFacilityModal: React.FC<BuyFacilityModalProps> = ({
-  isOpen,
-  onClose,
-  onConfirm
-}) => {
-  const { address } = useAccount();
-  
-  const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as `0x${string}`;
-  
-  const { data: hash, isPending: isWritePending, writeContract } = useContractWrite();
+export function BuyFacilityModal({ isOpen, onClose, onConfirm }: BuyFacilityModalProps) {
+  const { 
+    purchaseFacility, 
+    isPurchasingFacility, 
+    apeBalance,
+    initialFacilityPrice,
+  } = useGameState();
 
-  const { isLoading: isConfirming } = useTransaction({
-    hash,
-  });
+  const hasEnoughApe = parseFloat(apeBalance) >= parseFloat(initialFacilityPrice);
 
   const handlePurchase = async () => {
-    try {
-      await writeContract({
-        address: CONTRACT_ADDRESSES.MAIN,
-        abi: MAIN_CONTRACT_ABI,
-        functionName: 'purchaseInitialFacility',
-        args: [ZERO_ADDRESS],
-        value: parseEther('0.1'), // 10 APE
-      });
-      onConfirm();
-    } catch (error) {
-      console.error('Failed to purchase facility:', error);
-    }
+    await purchaseFacility();
+    onConfirm?.();
   };
-
-  const isLoading = isWritePending || isConfirming;
-
-  if (!isOpen) return null;
 
   return (
     <Dialog
@@ -54,70 +31,43 @@ const BuyFacilityModal: React.FC<BuyFacilityModalProps> = ({
       onClose={onClose}
       className="relative z-50"
     >
-      <div className="fixed inset-0 bg-black/70" aria-hidden="true" />
-      
+      <div className="fixed inset-0 bg-black/70 transition-opacity duration-300" aria-hidden="true" />
       <div className="fixed inset-0 flex items-center justify-center p-4">
-        <Dialog.Panel className="w-full max-w-2xl bg-royal border-4 border-banana rounded-lg shadow-xl">
-          <div className="p-6">
-            <Dialog.Title className="text-xl font-press-start text-center text-banana mb-4">
-              PURCHASE YOUR FIRST MINING SPACE
-            </Dialog.Title>
-            
-            <p className="text-sm font-press-start text-center text-white mb-6">
-              Start mining BitApe with your own mining facility!
+        <Dialog.Panel className="w-full max-w-md bg-royal border-2 border-banana p-6 shadow-lg shadow-black/25 transform transition-all">
+          <Dialog.Title className="font-press-start text-xl text-banana mb-6 text-center">
+            PURCHASE INITIAL FACILITY
+          </Dialog.Title>
+          
+          <div className="bg-royal-dark p-6 mb-8 border border-banana/20">
+            <p className="font-press-start text-white text-sm text-center">
+              Purchase your initial facility for {initialFacilityPrice} APE to start mining BIT.
             </p>
-
-            <div className="relative w-full h-48 mb-6">
-              <Image
-                src="/bedroom.png"
-                alt="Mining Facility"
-                fill
-                className="object-contain pixel-art"
-                priority
-              />
-            </div>
-
-            <div className="space-y-4 mb-6">
-              <div className="flex justify-between items-center font-press-start text-sm">
-                <span className="text-white">Power Output:</span>
-                <span className="text-banana">20 WATTS</span>
-              </div>
-              <div className="flex justify-between items-center font-press-start text-sm">
-                <span className="text-white">Space Capacity:</span>
-                <span className="text-banana">4 UNITS</span>
-              </div>
-              <div className="flex justify-between items-center font-press-start text-sm">
-                <span className="text-white">Price:</span>
-                <span className="text-banana">10 APE</span>
-              </div>
-            </div>
-
-            <div className="bg-royal-blue p-4 rounded-lg mb-6">
-              <p className="text-center font-press-start text-banana text-sm">
-                FREE STARTER MINER INCLUDED!
+            {!hasEnoughApe && (
+              <p className="font-press-start text-red-500 text-sm mt-4 text-center">
+                You need at least {initialFacilityPrice} APE to purchase a facility.
               </p>
-            </div>
+            )}
+          </div>
 
-            <div className="flex justify-center gap-4">
-              <button
-                onClick={onClose}
-                className="px-6 py-2 bg-transparent font-press-start text-banana text-sm border-2 border-banana hover:bg-banana hover:text-royal transition-colors"
-              >
-                CANCEL
-              </button>
-              <button
-                onClick={handlePurchase}
-                disabled={isLoading}
-                className="px-6 py-2 bg-banana font-press-start text-royal text-sm hover:bg-banana-dark transition-colors disabled:opacity-50"
-              >
-                {isLoading ? 'PURCHASING...' : 'PURCHASE NOW'}
-              </button>
-            </div>
+          <div className="flex justify-center space-x-6">
+            <button
+              onClick={onClose}
+              className="font-press-start px-8 py-3 border-2 border-banana text-banana hover:bg-banana/10 active:bg-banana/20 transition-colors duration-150"
+            >
+              CANCEL
+            </button>
+            <button
+              onClick={handlePurchase}
+              disabled={!hasEnoughApe || isPurchasingFacility}
+              className="font-press-start px-8 py-3 bg-banana text-royal hover:bg-banana/90 active:bg-banana/80 transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isPurchasingFacility ? 'PURCHASING...' : 'PURCHASE FACILITY'}
+            </button>
           </div>
         </Dialog.Panel>
       </div>
     </Dialog>
   );
-};
+}
 
 export default BuyFacilityModal; 

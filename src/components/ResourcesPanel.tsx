@@ -7,7 +7,7 @@ interface ResourcesPanelProps {
   gigawattsAvailable: number | string;
 }
 
-const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
+export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
   apeBalance,
   bitBalance,
   spacesLeft,
@@ -40,5 +40,3 @@ const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
     </div>
   );
 };
-
-export default ResourcesPanel;

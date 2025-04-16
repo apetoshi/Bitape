@@ -12,13 +12,13 @@ import { CONTRACT_ADDRESSES, MAIN_CONTRACT_ABI } from '@/config/contracts';
 import BuyFacilityModal from '@/components/BuyFacilityModal';
 import AccountModal from '@/components/AccountModal';
 import ReferralModal from '@/components/ReferralModal';
-import RoomVisualization from '@/components/RoomVisualization';
-import ResourcesPanel from '@/components/ResourcesPanel';
+import { RoomVisualization } from '@/components/RoomVisualization';
+import { ResourcesPanel } from '@/components/ResourcesPanel';
+import { MiningClaimSection } from '@/components/MiningClaimSection';
 import { useIsMounted } from '@/hooks/useIsMounted';
 import FacilityPurchaseModal from '@/components/FacilityPurchaseModal';
-import { useMiningData } from '@/hooks/useMiningData';
-import MiningClaimSection from '@/components/MiningClaimSection';
 import { useDisclosure } from '@chakra-ui/react';
+import { Address } from 'viem';
 
 type Tab = 'resources' | 'space' | 'selectedTile';
 

@@ -4,10 +4,10 @@ import React, { useState } from 'react';
 import { useGameState } from '@/hooks/useGameState';
 import { useMiningData } from '@/hooks/useMiningData';
 import Header from '../components/Header';
-import ResourcesPanel from '../components/ResourcesPanel';
+import { ResourcesPanel } from './ResourcesPanel';
 import StatsDisplay from '../components/StatsDisplay';
-import MiningClaimSection from '../components/MiningClaimSection';
-import RoomVisualization from '../components/RoomVisualization';
+import { MiningClaimSection } from './MiningClaimSection';
+import { RoomVisualization } from './RoomVisualization';
 import FacilityPurchaseModal from './FacilityPurchaseModal';
 
 type TabType = 'RESOURCES' | 'SPACE' | 'SELECTED_TILE';
