@@ -44,6 +44,13 @@ export const MAIN_CONTRACT_ABI = [
   },
   {
     inputs: [{ name: 'user', type: 'address' }],
+    name: 'acquiredStarterMiner',
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [{ name: 'user', type: 'address' }],
     name: 'getPlayerFacility',
     outputs: [
       { name: 'power', type: 'uint256' },

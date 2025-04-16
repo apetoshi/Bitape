@@ -88,6 +88,9 @@ export interface GameState {
 
   // Facility price
   initialFacilityPrice: string;
+
+  // Miner status
+  hasClaimedStarterMiner: boolean;
 }
 
 export function useGameState(): GameState {
@@ -196,6 +199,17 @@ export function useGameState(): GameState {
     }
   });
 
+  // Check if user has already claimed starter miner
+  const { data: hasClaimedStarterMiner, refetch: refetchStarterMiner } = useContractRead({
+    address: CONTRACT_ADDRESSES.MAIN,
+    abi: MAIN_CONTRACT_ABI,
+    functionName: 'acquiredStarterMiner' as any,
+    args: [address as `0x${string}`],
+    query: {
+      enabled: !!address,
+    },
+  });
+
   // Update state when data changes
   useEffect(() => {
     if (apeBalanceData) {
@@ -240,13 +254,29 @@ export function useGameState(): GameState {
     if (!address) return;
     try {
       setIsGettingStarterMiner(true);
+      // Validate that user has a facility first
+      if (!hasFacility) {
+        console.error('You must purchase a facility before claiming a miner');
+        return;
+      }
+      
+      // Validate that user hasn't already claimed a starter miner
+      if (hasClaimedStarterMiner) {
+        console.error('You have already claimed your starter miner');
+        return;
+      }
+
       await writeContract({
         address: CONTRACT_ADDRESSES.MAIN,
         abi: MAIN_CONTRACT_ABI,
         functionName: 'getFreeStarterMiner',
         args: [BigInt(x), BigInt(y)]
       });
+      
+      // Refetch all relevant data
       await refetchStats();
+      await refetchStarterMiner();
+      await refetchInitialized();
     } catch (error) {
       console.error('Error getting starter miner:', error);
     } finally {
@@ -357,5 +387,6 @@ export function useGameState(): GameState {
       rewardsEarned: totalBitEarned,
     },
     initialFacilityPrice: '10',
+    hasClaimedStarterMiner: !!hasClaimedStarterMiner,
   };
 }

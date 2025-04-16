@@ -152,6 +152,7 @@ const GameLayout: React.FC = () => {
               isPurchasingFacility={gameState.isPurchasingFacility}
               isGettingStarterMiner={gameState.isGettingStarterMiner}
               isUpgradingFacility={gameState.isUpgradingFacility}
+              hasClaimedStarterMiner={gameState.hasClaimedStarterMiner}
             />
           </div>
         </div>

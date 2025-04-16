@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useContractRead } from 'wagmi';
 import { CONTRACT_ADDRESSES, MAIN_CONTRACT_ABI } from '../config/contracts';
 import { Address, zeroAddress } from 'viem';
 import { Button } from '@/components/ui/button';
+import StarterMinerModal from './StarterMinerModal';
 
 // Add keyframes for the pulse animation
 const pulseStyle = `
@@ -35,6 +36,7 @@ export interface RoomVisualizationProps {
   address?: Address;
   isGridMode?: boolean;
   toggleGridMode?: () => void;
+  hasClaimedStarterMiner?: boolean;
 }
 
 export function RoomVisualization({
@@ -49,9 +51,11 @@ export function RoomVisualization({
   onTileSelect,
   address,
   isGridMode,
-  toggleGridMode
+  toggleGridMode,
+  hasClaimedStarterMiner
 }: RoomVisualizationProps) {
   const [selectedTile, setSelectedTile] = useState<{x: number, y: number}>();
+  const [isStarterMinerModalOpen, setIsStarterMinerModalOpen] = useState(false);
 
   // Check if user has claimed their free miner
   const { data: minerData } = useContractRead({
@@ -64,11 +68,28 @@ export function RoomVisualization({
     }
   });
 
+  // Show starter miner modal if facility exists but no miner has been claimed
+  useEffect(() => {
+    if (hasFacility && !hasClaimedStarterMiner && !isGridMode) {
+      // Only show the prompt if they haven't toggled grid mode yet
+      setIsStarterMinerModalOpen(true);
+    }
+  }, [hasFacility, hasClaimedStarterMiner, isGridMode]);
+
   const handleTileClick = (x: number, y: number) => {
     if (!isGridMode) return;
     setSelectedTile({ x, y });
     if (onTileSelect) {
       onTileSelect(x, y);
+    }
+  };
+
+  const handleClaimStarterMiner = async (x: number, y: number) => {
+    await onGetStarterMiner(x, y);
+    setIsStarterMinerModalOpen(false);
+    // Enable grid mode after claiming to show the user their miner
+    if (toggleGridMode && !isGridMode) {
+      toggleGridMode();
     }
   };
 
@@ -117,66 +138,86 @@ export function RoomVisualization({
   };
 
   return (
-    <div className="relative w-full h-[690px] bg-[#001420] rounded-lg border-2 border-banana overflow-hidden">
-      {hasFacility ? (
-        <div className="relative w-full h-full flex flex-col">
-          <div className="relative flex-grow">
-            <Image
-              src="/bedroom.png"
-              alt="Mining Facility"
-              fill
-              style={{ 
-                objectFit: 'contain',
-                objectPosition: 'center',
-                imageRendering: 'pixelated'
-              }}
-              priority
-            />
-            {renderMiningSpaces()}
-          </div>
-          <div className="relative w-full bg-[#001420] border-t-2 border-banana p-4">
-            <div className="flex justify-between items-center">
-              <button
-                onClick={toggleGridMode}
-                className={`pixel-button font-press-start ${
-                  isGridMode 
-                    ? 'bg-banana text-royal' 
-                    : 'bg-transparent text-banana border-2 border-banana hover:bg-banana hover:text-royal'
-                }`}
-                disabled={isPurchasingFacility || isGettingStarterMiner || isUpgradingFacility}
-              >
-                {isGridMode ? 'HIDE GRID' : 'SHOW GRID'}
-              </button>
-              <button
-                onClick={onUpgradeFacility}
-                className={`pixel-button font-press-start ${
-                  isUpgradingFacility 
-                    ? 'bg-gray-500 text-white cursor-not-allowed' 
-                    : 'bg-banana text-royal hover:bg-[#FFE55C]'
-                }`}
-                disabled={isPurchasingFacility || isGettingStarterMiner || isUpgradingFacility}
-              >
-                {isUpgradingFacility ? 'UPGRADING...' : 'UPGRADE'}
-              </button>
+    <>
+      <div className="relative w-full h-[690px] bg-[#001420] rounded-lg border-2 border-banana overflow-hidden">
+        {hasFacility ? (
+          <div className="relative w-full h-full flex flex-col">
+            <div className="relative flex-grow">
+              <Image
+                src="/bedroom.png"
+                alt="Mining Facility"
+                fill
+                style={{ 
+                  objectFit: 'contain',
+                  objectPosition: 'center',
+                  imageRendering: 'pixelated'
+                }}
+                priority
+              />
+              {renderMiningSpaces()}
+            </div>
+            <div className="relative w-full bg-[#001420] border-t-2 border-banana p-4">
+              <div className="flex justify-between items-center">
+                <button
+                  onClick={toggleGridMode}
+                  className={`pixel-button font-press-start ${
+                    isGridMode 
+                      ? 'bg-banana text-royal' 
+                      : 'bg-transparent text-banana border-2 border-banana hover:bg-banana hover:text-royal'
+                  }`}
+                  disabled={isPurchasingFacility || isGettingStarterMiner || isUpgradingFacility}
+                >
+                  {isGridMode ? 'HIDE GRID' : 'SHOW GRID'}
+                </button>
+                {!hasClaimedStarterMiner && (
+                  <button
+                    onClick={() => setIsStarterMinerModalOpen(true)}
+                    className="pixel-button font-press-start bg-banana text-royal hover:bg-[#FFE55C] mx-2"
+                    disabled={isGettingStarterMiner}
+                  >
+                    {isGettingStarterMiner ? 'CLAIMING...' : 'CLAIM FREE MINER'}
+                  </button>
+                )}
+                <button
+                  onClick={onUpgradeFacility}
+                  className={`pixel-button font-press-start ${
+                    isUpgradingFacility 
+                      ? 'bg-gray-500 text-white cursor-not-allowed' 
+                      : 'bg-banana text-royal hover:bg-[#FFE55C]'
+                  }`}
+                  disabled={isPurchasingFacility || isGettingStarterMiner || isUpgradingFacility}
+                >
+                  {isUpgradingFacility ? 'UPGRADING...' : 'UPGRADE'}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center h-full text-center p-4">
-          <p className="font-press-start text-banana mb-6">You don't have any mining space yet.</p>
-          <button
-            onClick={onPurchaseFacility}
-            disabled={isPurchasingFacility}
-            className={`pixel-button font-press-start ${
-              isPurchasingFacility 
-                ? 'bg-gray-500 text-white cursor-not-allowed' 
-                : 'bg-banana text-royal hover:bg-[#FFE55C]'
-            }`}
-          >
-            {isPurchasingFacility ? 'PURCHASING...' : 'PURCHASE FACILITY'}
-          </button>
-        </div>
-      )}
-    </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center h-full text-center p-4">
+            <p className="font-press-start text-banana mb-6">You don't have any mining space yet.</p>
+            <button
+              onClick={onPurchaseFacility}
+              disabled={isPurchasingFacility}
+              className={`pixel-button font-press-start ${
+                isPurchasingFacility 
+                  ? 'bg-gray-500 text-white cursor-not-allowed' 
+                  : 'bg-banana text-royal hover:bg-[#FFE55C]'
+              }`}
+            >
+              {isPurchasingFacility ? 'PURCHASING...' : 'PURCHASE FACILITY'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Starter Miner Modal */}
+      <StarterMinerModal
+        isOpen={isStarterMinerModalOpen}
+        onClose={() => setIsStarterMinerModalOpen(false)}
+        onClaim={handleClaimStarterMiner}
+        selectedTile={selectedTile}
+        isProcessing={isGettingStarterMiner}
+      />
+    </>
   );
 }
