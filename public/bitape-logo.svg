@@ -1,0 +1,12 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Base circle -->
+  <circle cx="16" cy="16" r="15" fill="#FFD700" stroke="#FFD700" stroke-width="2"/>
+  
+  <!-- Ape face stylized as pixel art -->
+  <path d="M10,12 h12 v8 h-12 z" fill="#0A2472"/>
+  <path d="M12,14 h2 v2 h-2 z M18,14 h2 v2 h-2 z" fill="#FFD700"/>
+  <path d="M14,18 h4 v1 h-4 z" fill="#FFD700"/>
+  
+  <!-- Pixel art crown -->
+  <path d="M11,10 h10 l-2,2 h-6 l-2,-2 z" fill="#FFD700"/>
+</svg> 

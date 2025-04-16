@@ -1,0 +1,22 @@
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Grid lines -->
+  <g stroke="#FFD700" stroke-width="2" opacity="0.5">
+    <!-- Horizontal lines -->
+    <path d="M40,50 L160,50" />
+    <path d="M20,100 L180,100" />
+    <path d="M40,150 L160,150" />
+    
+    <!-- Vertical lines -->
+    <path d="M50,40 L50,160" />
+    <path d="M100,20 L100,180" />
+    <path d="M150,40 L150,160" />
+    
+    <!-- Circles -->
+    <circle cx="100" cy="100" r="80" />
+    <circle cx="100" cy="100" r="60" />
+    <circle cx="100" cy="100" r="40" />
+  </g>
+  
+  <!-- Highlight effect -->
+  <path d="M100,20 A80,80 0 0,1 180,100" stroke="#FFD700" stroke-width="4" />
+</svg>

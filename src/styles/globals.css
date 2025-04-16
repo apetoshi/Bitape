@@ -1,0 +1,258 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+/* BitApe theme colors */
+:root {
+  --royal: #001B44;
+  --royal-dark: #001433;
+  --banana: #FFD700;
+  --banana-dark: #CCAC00;
+  --royal-blue: #002B69;
+  --royal-blue-light: #003380;
+  --royal-blue-dark: #001F4D;
+  --banana-yellow: #FFD700;
+  --banana-yellow-light: #FFDF33;
+  --banana-yellow-dark: #CCAC00;
+  --text-primary: #FFFFFF;
+  --text-secondary: #A0AEC0;
+  --border-color: #2D3748;
+  --background-dark: #001B44;
+  --background-darker: #001433;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-royal text-white;
+    background-image: linear-gradient(rgba(0, 27, 68, 0.95), rgba(0, 27, 68, 0.95)),
+      repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255, 255, 255, 0.1) 2px, rgba(255, 255, 255, 0.1) 4px);
+    min-height: 100vh;
+    image-rendering: pixelated;
+  }
+}
+
+@layer components {
+  .font-press-start {
+    font-family: 'Press Start 2P', monospace;
+  }
+
+  .pixel-text {
+    text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.5);
+    image-rendering: pixelated;
+  }
+
+  .pixel-art {
+    image-rendering: pixelated;
+    transform: scale(1.2);
+    transition: transform 0.2s ease;
+  }
+
+  .pixel-art:hover {
+    transform: scale(1.4);
+  }
+
+  .pixel-border {
+    position: relative;
+    border: 2px solid theme('colors.banana');
+    box-shadow: 0 0 0 2px theme('colors.banana');
+    image-rendering: pixelated;
+  }
+
+  .pixel-border::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    background: linear-gradient(45deg, theme('colors.banana') 25%, transparent 25%, transparent 75%, theme('colors.banana') 75%);
+    background-size: 4px 4px;
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  .pixel-button {
+    position: relative;
+    image-rendering: pixelated;
+    transition: all 0.2s ease;
+    box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.2);
+  }
+
+  .pixel-button:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0px rgba(0, 0, 0, 0.2);
+  }
+
+  .pixel-button:active {
+    transform: translate(2px, 2px);
+    box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.2);
+  }
+
+  .nav-bar {
+    @apply bg-royal border-b border-banana/20;
+  }
+
+  .panel {
+    @apply bg-royal-blue border-2 border-banana;
+  }
+
+  .tab-button {
+    @apply font-press-start px-4 py-2 text-sm border-2 border-banana;
+  }
+
+  .tab-button.active {
+    @apply bg-banana text-royal;
+  }
+
+  .game-panel {
+    @apply bg-[#001F2D] border-[3px] border-banana rounded-sm p-4;
+    box-shadow: 0 0 0 3px theme('colors.banana');
+    position: relative;
+  }
+
+  .game-panel::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    background: linear-gradient(45deg, theme('colors.banana') 25%, transparent 25%, transparent 75%, theme('colors.banana') 75%);
+    background-size: 6px 6px;
+    z-index: -1;
+  }
+
+  .game-text {
+    @apply font-press-start text-sm tracking-wider uppercase;
+    text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.2);
+  }
+
+  .game-button {
+    @apply font-press-start px-4 py-2 text-sm border-2 border-banana 
+    hover:bg-banana hover:text-royal transition-colors relative;
+    box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.2);
+  }
+
+  .game-button:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0px rgba(0, 0, 0, 0.2);
+  }
+
+  .game-button:active {
+    transform: translate(2px, 2px);
+    box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.2);
+  }
+
+  .game-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .game-value {
+    @apply text-banana;
+  }
+
+  .resource-icon {
+    @apply w-6 h-6;
+    image-rendering: pixelated;
+    image-rendering: -webkit-optimize-contrast;
+    transform: scale(1.2);
+    transition: transform 0.2s ease;
+  }
+
+  .resource-icon:hover {
+    transform: scale(1.4);
+  }
+
+  .game-bg {
+    @apply bg-royal;
+    background-image: 
+      linear-gradient(45deg, rgba(255,215,0,0.1) 25%, transparent 25%),
+      linear-gradient(-45deg, rgba(255,215,0,0.1) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, rgba(255,215,0,0.1) 75%),
+      linear-gradient(-45deg, transparent 75%, rgba(255,215,0,0.1) 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 10px 0, 10px -10px, 0px 10px;
+  }
+
+  .claim-button {
+    @apply font-press-start px-6 py-3 bg-banana text-royal hover:bg-opacity-90 
+    transition-colors disabled:opacity-50;
+    box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.2);
+  }
+
+  .claim-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 6px 6px 0px rgba(0, 0, 0, 0.2);
+  }
+
+  .claim-button:active {
+    transform: translateY(0);
+    box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.2);
+  }
+
+  .modal-overlay {
+    @apply fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50;
+  }
+
+  .modal-content {
+    @apply bg-royal border-2 border-banana p-6 max-w-lg w-full m-4 max-h-[90vh] overflow-y-auto;
+  }
+
+  .modal-header {
+    @apply flex justify-between items-center mb-4;
+  }
+
+  .modal-title {
+    @apply font-press-start text-xl text-banana;
+  }
+
+  .modal-close {
+    @apply bg-transparent border-none text-white cursor-pointer text-2xl;
+  }
+}
+
+@layer utilities {
+  .text-banana-yellow {
+    @apply text-banana;
+  }
+
+  .resource-item {
+    @apply flex items-center mb-2;
+  }
+
+  .resource-item-icon {
+    @apply mr-2 w-6 h-6;
+  }
+
+  .stats-panel {
+    @apply bg-[#070E1B] border-2 border-[#0A2472] p-4 mb-4;
+  }
+
+  .room-container {
+    @apply bg-[#070E1B] border-2 border-[#0A2472] relative overflow-hidden;
+    aspect-ratio: 1 / 1;
+  }
+
+  @keyframes mine {
+    0% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+    100% { transform: translateY(0); }
+  }
+
+  .miner {
+    animation: mine 2s infinite;
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .game-text {
+    font-size: 0.8rem;
+  }
+  
+  .game-button, .claim-button {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.7rem;
+  }
+  
+  .stats-panel, .room-container {
+    padding: 0.5rem;
+  }
+}

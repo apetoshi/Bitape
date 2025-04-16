@@ -1,0 +1,42 @@
+{
+  "pages": {
+    "/page": [
+      "static/chunks/[root-of-the-server]__ecfa1faf._.css",
+      "static/chunks/node_modules_97c1e06e._.js",
+      "static/chunks/node_modules_next_dist_97d1fcc1._.js",
+      "static/chunks/node_modules_@wagmi_core_dist_esm_5c6bb379._.js",
+      "static/chunks/node_modules_6c90b394._.js",
+      "static/chunks/node_modules_@web3modal_core_dist_esm_23346493._.js",
+      "static/chunks/node_modules_@web3modal_wallet_dist_esm_2e3f7a8e._.js",
+      "static/chunks/node_modules_zod_lib_index_mjs_ee760afb._.js",
+      "static/chunks/node_modules_@web3modal_217c7992._.js",
+      "static/chunks/node_modules_@web3modal_431d35da._.js",
+      "static/chunks/node_modules_@web3modal_ui_dist_esm_d1f9c96b._.js",
+      "static/chunks/node_modules_@web3modal_base_dist_esm_1f274434._.js",
+      "static/chunks/node_modules_@web3modal_scaffold-ui_dist_esm_src_views_2855dbe2._.js",
+      "static/chunks/node_modules_@web3modal_scaffold-ui_dist_esm_src_partials_afd94334._.js",
+      "static/chunks/node_modules_@web3modal_scaffold-ui_dist_esm_src_d59490f7._.js",
+      "static/chunks/node_modules_@web3modal_scaffold-ui_dist_esm_exports_index_b899eb71.js",
+      "static/chunks/node_modules_e3d6a5ac._.js",
+      "static/chunks/node_modules_@walletconnect_core_dist_index_es_d6db9b66.js",
+      "static/chunks/node_modules_@walletconnect_sign-client_dist_index_es_44396601.js",
+      "static/chunks/02306_elliptic_16437b61._.js",
+      "static/chunks/node_modules_@web3modal_aee71873._.js",
+      "static/chunks/node_modules_@walletconnect_5332e6bf._.js",
+      "static/chunks/node_modules_@stablelib_e81ff8e2._.js",
+      "static/chunks/node_modules_a9477600._.js",
+      "static/chunks/src_6b6a6849._.js",
+      "static/chunks/src_app_layout_tsx_c0237562._.js",
+      "static/chunks/src_df5d945a._.js",
+      "static/chunks/node_modules_05ec78cb._.js",
+      "static/chunks/src_app_page_tsx_55d2d788._.js",
+      "static/chunks/[turbopack]_browser_dev_hmr-client_hmr-client_ts_fd44f5a4._.js",
+      "static/chunks/node_modules_next_dist_compiled_2ce9398a._.js",
+      "static/chunks/node_modules_next_dist_client_8f19e6fb._.js",
+      "static/chunks/node_modules_next_dist_2ecbf5fa._.js",
+      "static/chunks/node_modules_@swc_helpers_cjs_00636ac3._.js",
+      "static/chunks/_e69f0d32._.js",
+      "static/chunks/_93808211._.js"
+    ]
+  }
+}

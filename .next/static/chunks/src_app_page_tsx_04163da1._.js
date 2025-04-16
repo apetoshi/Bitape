@@ -1,0 +1,33 @@
+(globalThis.TURBOPACK_CHUNK_LISTS = globalThis.TURBOPACK_CHUNK_LISTS || []).push({
+    script: typeof document === "object" ? document.currentScript : undefined,
+    chunks: [
+  "static/chunks/node_modules_565ff003._.js",
+  "static/chunks/node_modules_@wagmi_core_dist_esm_a94bdc5e._.js",
+  "static/chunks/node_modules_wagmi_dist_esm_e71e71e7._.js",
+  "static/chunks/node_modules_b8cf2cc1._.js",
+  "static/chunks/node_modules_@web3modal_core_dist_esm_23346493._.js",
+  "static/chunks/node_modules_@web3modal_wallet_dist_esm_2e3f7a8e._.js",
+  "static/chunks/node_modules_zod_lib_index_mjs_ee760afb._.js",
+  "static/chunks/node_modules_@web3modal_217c7992._.js",
+  "static/chunks/node_modules_@web3modal_431d35da._.js",
+  "static/chunks/node_modules_@web3modal_ui_dist_esm_d1f9c96b._.js",
+  "static/chunks/node_modules_@web3modal_base_dist_esm_1f274434._.js",
+  "static/chunks/node_modules_@web3modal_scaffold-ui_dist_esm_src_views_2855dbe2._.js",
+  "static/chunks/node_modules_@web3modal_scaffold-ui_dist_esm_src_partials_afd94334._.js",
+  "static/chunks/node_modules_@web3modal_scaffold-ui_dist_esm_src_d59490f7._.js",
+  "static/chunks/node_modules_@web3modal_scaffold-ui_dist_esm_exports_index_b899eb71.js",
+  "static/chunks/node_modules_e3d6a5ac._.js",
+  "static/chunks/node_modules_@walletconnect_core_dist_index_es_d6db9b66.js",
+  "static/chunks/node_modules_@walletconnect_sign-client_dist_index_es_44396601.js",
+  "static/chunks/02306_elliptic_16437b61._.js",
+  "static/chunks/node_modules_3826ede1._.js",
+  "static/chunks/node_modules_ox__esm_core_08935900._.js",
+  "static/chunks/node_modules_@tanstack_9653c020._.js",
+  "static/chunks/node_modules_@web3modal_aee71873._.js",
+  "static/chunks/node_modules_@walletconnect_5332e6bf._.js",
+  "static/chunks/node_modules_@stablelib_e81ff8e2._.js",
+  "static/chunks/node_modules_58f73eb3._.js",
+  "static/chunks/src_b0ee4bb4._.js"
+],
+    source: "dynamic"
+});
