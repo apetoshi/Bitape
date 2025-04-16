@@ -226,7 +226,7 @@ export function useGameState(): GameState {
         abi: MAIN_CONTRACT_ABI,
         functionName: 'purchaseInitialFacility',
         args: [zeroAddress],
-        value: parseEther('10')
+        value: parseEther('0.1')
       });
       await refetchStats();
     } catch (error) {
