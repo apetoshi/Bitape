@@ -1,5 +1,5 @@
-import { useAccount, useContractRead, useContractWrite, useTransaction, useBalance, useWaitForTransactionReceipt } from 'wagmi';
-import { formatEther, parseEther, Address, zeroAddress } from 'viem';
+import { useAccount, useContractRead, useContractWrite, useTransaction, useBalance, useWaitForTransactionReceipt, useWriteContract, useSimulateContract } from 'wagmi';
+import { formatEther, parseEther, Address, zeroAddress, type Hex } from 'viem';
 import { CONTRACT_ADDRESSES, MINING_CONTROLLER_ABI, ERC20_ABI, APECHAIN_ID, MAIN_CONTRACT_ABI } from '../config/contracts';
 import { useEffect, useState, useMemo } from 'react';
 
@@ -63,7 +63,7 @@ export interface GameState {
   purchaseFacility: () => Promise<void>;
   getStarterMiner: (x: number, y: number) => Promise<void>;
   claimReward: () => Promise<void>;
-  upgradeFacility: () => void;
+  upgradeFacility: () => Promise<void>;
   
   // Loading states
   isPurchasingFacility: boolean;
@@ -148,8 +148,10 @@ export function useGameState(): GameState {
     address: CONTRACT_ADDRESSES.MAIN,
     abi: MAIN_CONTRACT_ABI,
     functionName: 'getPlayerFacility',
-    args: [address],
-    watch: true,
+    args: [address || zeroAddress],
+    query: {
+      enabled: !!address,
+    },
   }) as { data: PlayerFacility | undefined };
 
   // Check if player has initialized facility
@@ -205,38 +207,95 @@ export function useGameState(): GameState {
   }, [hasInitializedFacility]);
 
   // Contract write functions
-  const { data: purchaseFacilityData, write: purchaseFacility } = useContractWrite({
-    address: CONTRACT_ADDRESSES.MAIN,
+  const { write: purchaseFacilityWrite } = useContractWrite({
+    address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
     abi: MAIN_CONTRACT_ABI,
-    functionName: 'purchaseInitialFacility'
+    functionName: 'purchaseInitialFacility',
   });
 
-  const { data: getStarterMinerData, write: getStarterMinerWrite } = useContractWrite({
-    address: CONTRACT_ADDRESSES.MAIN,
+  const { write: getStarterMinerWrite } = useContractWrite({
+    address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
     abi: MAIN_CONTRACT_ABI,
-    functionName: 'getFreeStarterMiner'
+    functionName: 'getFreeStarterMiner',
   });
 
-  const { data: claimRewardData, write: claimRewardWrite } = useContractWrite({
-    address: CONTRACT_ADDRESSES.MINING_CONTROLLER,
+  const { write: claimRewardWrite } = useContractWrite({
+    address: CONTRACT_ADDRESSES.MINING_CONTROLLER as `0x${string}`,
     abi: MINING_CONTROLLER_ABI,
-    functionName: 'claimReward'
+    functionName: 'claimReward',
   });
 
-  const { writeAsync: upgradeFacilityWrite } = useContractWrite({
-    address: CONTRACT_ADDRESSES.MAIN,
+  const { write: upgradeFacilityWrite } = useContractWrite({
+    address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
     abi: MAIN_CONTRACT_ABI,
     functionName: 'upgradeFacility',
   });
 
-  const upgradeFacility = async () => {
-    if (!upgradeFacilityWrite) return;
-    setIsUpgrading(true);
+  const handlePurchaseFacility = async () => {
+    if (!address) return;
     try {
-      const tx = await upgradeFacilityWrite();
-      setTxHash(tx.hash);
+      setIsPurchasingFacility(true);
+      const result = await purchaseFacilityWrite({
+        args: [zeroAddress as `0x${string}`],
+        value: parseEther('10')
+      });
+      if (result?.hash) {
+        setTxHash(result.hash);
+        await refetchStats();
+      }
+    } catch (error) {
+      console.error('Error purchasing facility:', error);
+    } finally {
+      setIsPurchasingFacility(false);
+    }
+  };
+
+  const handleGetStarterMiner = async (x: number, y: number) => {
+    if (!address) return;
+    try {
+      setIsGettingStarterMiner(true);
+      const result = await getStarterMinerWrite({
+        args: [BigInt(x), BigInt(y)]
+      });
+      if (result?.hash) {
+        setTxHash(result.hash);
+        await refetchStats();
+      }
+    } catch (error) {
+      console.error('Error getting starter miner:', error);
+    } finally {
+      setIsGettingStarterMiner(false);
+    }
+  };
+
+  const handleClaimReward = async () => {
+    if (!address) return;
+    try {
+      setIsClaimingReward(true);
+      const result = await claimRewardWrite();
+      if (result?.hash) {
+        setTxHash(result.hash);
+        await refetchStats();
+      }
+    } catch (error) {
+      console.error('Error claiming reward:', error);
+    } finally {
+      setIsClaimingReward(false);
+    }
+  };
+
+  const handleUpgradeFacility = async () => {
+    if (!address) return;
+    try {
+      setIsUpgrading(true);
+      const result = await upgradeFacilityWrite();
+      if (result?.hash) {
+        setTxHash(result.hash);
+        await refetchStats();
+      }
     } catch (error) {
       console.error('Error upgrading facility:', error);
+    } finally {
       setIsUpgrading(false);
     }
   };
@@ -291,21 +350,10 @@ export function useGameState(): GameState {
       miningRate: BigInt(0),
       networkShare: BigInt(0),
     },
-    purchaseFacility: async () => {
-      if (!purchaseFacility) return;
-      return purchaseFacility();
-    },
-    getStarterMiner: async (x: number, y: number) => {
-      if (!getStarterMinerWrite) return;
-      return getStarterMinerWrite({
-        args: [BigInt(x), BigInt(y)]
-      });
-    },
-    claimReward: async () => {
-      if (!claimRewardWrite) return;
-      return claimRewardWrite();
-    },
-    upgradeFacility,
+    purchaseFacility: handlePurchaseFacility,
+    getStarterMiner: handleGetStarterMiner,
+    claimReward: handleClaimReward,
+    upgradeFacility: handleUpgradeFacility,
     isPurchasingFacility,
     isGettingStarterMiner,
     isClaimingReward,
