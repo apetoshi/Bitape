@@ -36,14 +36,7 @@ const GameLayout: React.FC = () => {
   const renderTabContent = () => {
     switch (activeTab) {
       case 'RESOURCES':
-        return (
-          <ResourcesPanel 
-            apeBalance={gameState.apeBalance}
-            bitBalance={gameState.bitBalance}
-            spacesLeft={gameState.spacesLeft}
-            gigawattsAvailable={gameState.gigawattsAvailable}
-          />
-        );
+        return <ResourcesPanel />;
       case 'SPACE':
         return (
           <div className="game-panel bg-[#001420] p-4 md:p-6 rounded-lg border-2 border-banana">
