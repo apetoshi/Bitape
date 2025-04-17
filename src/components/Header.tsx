@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
@@ -10,6 +10,7 @@ import AccountModal from './AccountModal';
 import { useGameState } from '@/hooks/useGameState';
 import { useAccount } from 'wagmi';
 import { FaChevronDown } from 'react-icons/fa';
+import ReferralModal from './ReferralModal';
 
 const ConnectButton = dynamic(() => import('@rainbow-me/rainbowkit').then(mod => mod.ConnectButton), {
   ssr: false
@@ -30,8 +31,9 @@ CustomLink.displayName = 'CustomLink';
 const Header: React.FC = () => {
   const router = useRouter();
   const { isOpen: isProfileOpen, onOpen: onProfileOpen, onClose: onProfileClose } = useDisclosure();
+  const { isOpen: isReferralOpen, onOpen: onReferralOpen, onClose: onReferralClose } = useDisclosure();
   const { address, isConnected } = useAccount();
-  const { apeBalance, bitBalance } = useGameState();
+  const { apeBalance, bitBalance, totalReferrals, totalBitEarned } = useGameState();
 
   useEffect(() => {
     if (isConnected && address) {
@@ -40,56 +42,65 @@ const Header: React.FC = () => {
   }, [isConnected, address, router]);
 
   return (
-    <header className="nav-bar flex justify-between items-center px-6 py-4">
-      <div className="flex items-center gap-8">
+    <header className="nav-bar flex justify-between items-center px-3 sm:px-6 py-4 relative z-30">
+      <div className="flex items-center">
         <Link href="/" className="flex items-center">
           <Image
             src="/bitape.png"
             alt="BitApe Logo"
-            width={80}
-            height={80}
+            width={60}
+            height={60}
             className="hover:opacity-80 transition-opacity"
             priority
           />
         </Link>
-        
-        <nav className="hidden md:flex">
-          <Link href="/about" className="font-press-start text-white mx-3 hover:text-banana">
-            ABOUT
-          </Link>
-          <Link href="/trade" className="font-press-start text-white mx-3 hover:text-banana">
-            TRADE $BIT
-          </Link>
-          <span className="font-press-start text-gray-500 mx-3 cursor-not-allowed">
-            LEADERBOARD
-          </span>
-        </nav>
       </div>
       
-      <div className="flex items-center gap-4">
-        <Link href="/announcements" className="pixel-button hidden md:block">
-          ANNOUNCEMENTS
-        </Link>
-        <Link href="/refer" className="pixel-button hidden md:block">
-          REFER A FRIEND
-        </Link>
-        {isConnected && address && (
-          <div className="flex items-center">
-            <div className="mr-4 text-right">
-              <div className="text-white font-press-start text-sm">{apeBalance} APE</div>
-              <div className="text-gray-400 font-mono text-sm">{address.slice(0, 6)}...{address.slice(-4)}</div>
+      {/* Connect wallet button - always visible */}
+      <div className="flex items-center">
+        {isConnected && address ? (
+          <button
+            onClick={onProfileOpen}
+            className="flex items-center px-2 py-1 bg-[#001420] rounded-lg border border-yellow-400 hover:bg-[#001F33]"
+            aria-label="Open profile"
+          >
+            <div className="mr-2 text-right hidden sm:block">
+              <div className="text-white font-press-start text-xs">{apeBalance} APE</div>
+              <div className="text-gray-400 font-mono text-xs">{address.slice(0, 4)}...{address.slice(-4)}</div>
             </div>
-            <button
-              onClick={onProfileOpen}
-              className="bg-[#FFD700] hover:bg-[#FFE55C] rounded-full p-2 transition-colors"
-              aria-label="Open profile"
-            >
-              <FaChevronDown className="w-4 h-4 text-black" />
-            </button>
+            <div className="block sm:hidden mr-1 text-white font-mono text-xs">
+              {address.slice(0, 4)}...{address.slice(-4)}
+            </div>
+            <FaChevronDown className="w-3 h-3 text-yellow-400" />
+          </button>
+        ) : (
+          <div className="scale-90 transform-origin-right">
+            <ConnectButton />
           </div>
         )}
-        {!isConnected && <ConnectButton />}
       </div>
+      
+      {/* Desktop navigation - hidden on mobile since we use dock menu there */}
+      <nav className="hidden md:flex items-center ml-8 space-x-4">
+        <Link href="/about" className="font-press-start text-white text-sm hover:text-banana">
+          ABOUT
+        </Link>
+        <Link href="/trade" className="font-press-start text-white text-sm hover:text-banana">
+          TRADE $BIT
+        </Link>
+        <span className="font-press-start text-gray-500 text-sm cursor-not-allowed">
+          LEADERBOARD
+        </span>
+        <button 
+          onClick={onReferralOpen}
+          className="pixel-button text-sm"
+        >
+          REFER A FRIEND
+        </button>
+        <Link href="/announcements" className="pixel-button text-sm">
+          ANNOUNCEMENTS
+        </Link>
+      </nav>
 
       {isConnected && address && (
         <AccountModal
@@ -100,6 +111,13 @@ const Header: React.FC = () => {
           bitBalance={bitBalance?.toString() || '0'}
         />
       )}
+      
+      <ReferralModal
+        isOpen={isReferralOpen}
+        onClose={onReferralClose}
+        totalReferrals={totalReferrals || 0}
+        totalBitEarned={totalBitEarned || '0'}
+      />
     </header>
   );
 };

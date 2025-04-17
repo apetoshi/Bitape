@@ -1,0 +1,35 @@
+{
+  "name": "BitApe Mining",
+  "short_name": "BitApe",
+  "description": "Mine BitApe tokens with your virtual mining facility on ApeChain",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#001420",
+  "theme_color": "#FFDD00",
+  "orientation": "portrait",
+  "scope": "/",
+  "prefer_related_applications": false,
+  "categories": ["games", "finance", "cryptocurrency"],
+  "screenshots": [
+    {
+      "src": "/images/screenshot1.png",
+      "sizes": "1280x720",
+      "type": "image/png"
+    }
+  ],
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "splash_pages": null
+} 

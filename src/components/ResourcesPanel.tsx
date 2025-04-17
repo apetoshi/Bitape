@@ -18,23 +18,23 @@ export const ResourcesPanel: React.FC<ResourcesPanelProps> = ({
   const displayGigawatts = isNaN(Number(gigawattsAvailable)) ? 0 : gigawattsAvailable;
 
   return (
-    <div className="bg-royal px-2 py-2">
+    <div className="game-panel bg-[#001420] p-3 md:p-4 rounded-lg border-2 border-banana">
       <div className="space-y-3">
         <div className="flex justify-between items-center py-1 border-b border-white/20">
-          <span className="pixel-text text-white/80 text-sm">APE BALANCE</span>
-          <span className="pixel-text text-white text-sm">{apeBalance} APE</span>
+          <span className="pixel-text text-white/80 text-xs md:text-sm">APE BALANCE</span>
+          <span className="pixel-text text-white text-xs md:text-sm font-medium">{apeBalance} APE</span>
         </div>
         <div className="flex justify-between items-center py-1 border-b border-white/20">
-          <span className="pixel-text text-white/80 text-sm">BIT BALANCE</span>
-          <span className="pixel-text text-white text-sm">{bitBalance} BIT</span>
+          <span className="pixel-text text-white/80 text-xs md:text-sm">BIT BALANCE</span>
+          <span className="pixel-text text-white text-xs md:text-sm font-medium">{bitBalance} BIT</span>
         </div>
         <div className="flex justify-between items-center py-1 border-b border-white/20">
-          <span className="pixel-text text-white/80 text-sm">SPACES LEFT</span>
-          <span className="pixel-text text-white text-sm">{displaySpaces} SPACES</span>
+          <span className="pixel-text text-white/80 text-xs md:text-sm">SPACES LEFT</span>
+          <span className="pixel-text text-white text-xs md:text-sm font-medium">{displaySpaces} SPACES</span>
         </div>
         <div className="flex justify-between items-center py-1">
-          <span className="pixel-text text-white/80 text-sm">GIGAWATTS AVAILABLE</span>
-          <span className="pixel-text text-white text-sm">{displayGigawatts} GW</span>
+          <span className="pixel-text text-white/80 text-xs md:text-sm">GIGAWATTS AVAILABLE</span>
+          <span className="pixel-text text-white text-xs md:text-sm font-medium">{displayGigawatts} GW</span>
         </div>
       </div>
     </div>

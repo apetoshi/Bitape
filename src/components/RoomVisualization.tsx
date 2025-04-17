@@ -4,7 +4,6 @@ import { useContractRead } from 'wagmi';
 import { CONTRACT_ADDRESSES, MAIN_CONTRACT_ABI } from '../config/contracts';
 import { MINERS, MinerType } from '../config/miners';
 import { Address, zeroAddress } from 'viem';
-import { Button } from '@/components/ui/button';
 import StarterMinerModal from './StarterMinerModal';
 
 // Add keyframes for the pulse animation
@@ -174,15 +173,12 @@ export function RoomVisualization({
     if (!isGridMode) return null;
 
     // Grid coordinates for the four mining spaces
-    // x:0 y:0 = top right
-    // x:1 y:0 = top left
-    // x:0 y:1 = bottom right
-    // x:1 y:1 = bottom left
+    // Adjusted grid positions for better mobile compatibility
     const gridPositions = [
-      { x: 0, y: 0, top: '47%', left: '40%', width: '10%', height: '10%' }, // top right
-      { x: 1, y: 0, top: '55%', left: '30%', width: '10%', height: '10%' }, // top left
-      { x: 0, y: 1, top: '53%', left: '55%', width: '10%', height: '10%' }, // bottom right
-      { x: 1, y: 1, top: '65%', left: '35%', width: '10%', height: '10%' }  // bottom left
+      { x: 0, y: 0, top: '42%', left: '40%', width: '15%', height: '15%' }, // top right
+      { x: 1, y: 0, top: '50%', left: '30%', width: '15%', height: '15%' }, // top left
+      { x: 0, y: 1, top: '50%', left: '55%', width: '15%', height: '15%' }, // bottom right
+      { x: 1, y: 1, top: '62%', left: '35%', width: '15%', height: '15%' }  // bottom left
     ];
 
     // Get all claimed miner positions 
@@ -210,7 +206,7 @@ export function RoomVisualization({
               key={`${pos.x}-${pos.y}`}
               onClick={() => handleTileClick(pos.x, pos.y)}
               className={`absolute pointer-events-auto transition-all duration-200 cursor-pointer z-10 ${
-                isSelected ? 'ring-2 ring-banana' : 'hover:ring-2 hover:ring-[#FFD70066]'
+                isSelected ? 'ring-2 ring-[#FFD700]' : 'hover:ring-2 hover:ring-[#FFD70066]'
               } ${isOccupied ? 'opacity-70' : ''}`}
               style={{
                 top: pos.top,
@@ -291,7 +287,7 @@ export function RoomVisualization({
                       }}
                     />
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="bg-banana/60 text-royal px-2 py-1 text-xs font-press-start rounded transform -rotate-12">
+                      <div className="bg-[#FFD700]/60 text-[#0c1c31] px-2 py-1 text-xs font-press-start rounded transform -rotate-12">
                         Preview
                       </div>
                     </div>
@@ -308,7 +304,7 @@ export function RoomVisualization({
   return (
     <>
       <style jsx global>{pulseStyle}</style>
-      <div className="relative w-full h-[690px] bg-[#001420] rounded-lg border-2 border-banana overflow-hidden">
+      <div className="relative w-full aspect-square overflow-hidden bg-[#0c1c31] pb-12">
         {hasFacility ? (
           <div className="relative w-full h-full flex flex-col">
             <div className="relative flex-grow">
@@ -317,7 +313,7 @@ export function RoomVisualization({
                 alt="Mining Facility"
                 fill
                 style={{ 
-                  objectFit: 'contain',
+                  objectFit: 'cover',
                   objectPosition: 'center',
                   imageRendering: 'pixelated'
                 }}
@@ -325,23 +321,23 @@ export function RoomVisualization({
               />
               {renderMiningSpaces()}
             </div>
-            <div className="relative w-full bg-[#001420] border-t-2 border-banana p-4">
-              <div className="flex justify-between items-center">
+            
+            {/* Bottom control panel */}
+            <div className="absolute left-0 right-0 bottom-0 flex justify-between">
+              <div>
                 <button
                   onClick={toggleGridMode}
-                  className={`pixel-button font-press-start ${
-                    isGridMode 
-                      ? 'bg-banana text-royal' 
-                      : 'bg-transparent text-banana border-2 border-banana hover:bg-banana hover:text-royal'
-                  }`}
-                  disabled={isPurchasingFacility || isGettingStarterMiner || isUpgradingFacility}
+                  className="bigcoin-button"
                 >
                   {isGridMode ? 'HIDE GRID' : 'SHOW GRID'}
                 </button>
+              </div>
+              
+              <div className="flex">
                 {!hasClaimedStarterMiner && (
                   <button
                     onClick={() => setIsStarterMinerModalOpen(true)}
-                    className="pixel-button font-press-start bg-banana text-royal hover:bg-[#FFE55C] mx-2"
+                    className="bigcoin-button mx-1"
                     disabled={isGettingStarterMiner}
                   >
                     {isGettingStarterMiner ? 'CLAIMING...' : 'CLAIM FREE MINER'}
@@ -349,29 +345,21 @@ export function RoomVisualization({
                 )}
                 <button
                   onClick={onUpgradeFacility}
-                  className={`pixel-button font-press-start ${
-                    isUpgradingFacility 
-                      ? 'bg-gray-500 text-white cursor-not-allowed' 
-                      : 'bg-banana text-royal hover:bg-[#FFE55C]'
-                  }`}
-                  disabled={isPurchasingFacility || isGettingStarterMiner || isUpgradingFacility}
+                  className="bigcoin-button"
+                  disabled={isUpgradingFacility}
                 >
-                  {isUpgradingFacility ? 'UPGRADING...' : 'UPGRADE'}
+                  {isUpgradingFacility ? 'UPGRADING...' : 'UPGRADE FACILITY'}
                 </button>
               </div>
             </div>
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-center p-4">
-            <p className="font-press-start text-banana mb-6">You don't have any mining space yet.</p>
+            <p className="font-press-start text-xs text-[#FFD700] mb-6">You don't have any mining space yet.</p>
             <button
               onClick={onPurchaseFacility}
               disabled={isPurchasingFacility}
-              className={`pixel-button font-press-start ${
-                isPurchasingFacility 
-                  ? 'bg-gray-500 text-white cursor-not-allowed' 
-                  : 'bg-banana text-royal hover:bg-[#FFE55C]'
-              }`}
+              className="bigcoin-button"
             >
               {isPurchasingFacility ? 'PURCHASING...' : 'PURCHASE FACILITY'}
             </button>

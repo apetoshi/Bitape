@@ -17,6 +17,9 @@
   --border-color: #2D3748;
   --background-dark: #001B44;
   --background-darker: #001433;
+  --bigcoin-blue: #0c1c31;
+  --bigcoin-dark-blue: #091525;
+  --bigcoin-gold: #FFD700;
 }
 
 @tailwind base;
@@ -24,12 +27,71 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    height: 100%;
+  }
+  
   body {
     @apply bg-royal text-white;
     background-image: linear-gradient(rgba(0, 27, 68, 0.95), rgba(0, 27, 68, 0.95)),
       repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255, 255, 255, 0.1) 2px, rgba(255, 255, 255, 0.1) 4px);
     min-height: 100vh;
     image-rendering: pixelated;
+    overflow-x: hidden;
+    font-size: 16px;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    /* Add padding bottom for dock menu */
+    padding-bottom: env(safe-area-inset-bottom, 70px);
+  }
+  
+  /* Grid background pattern */
+  .grid-background {
+    background-color: var(--bigcoin-blue);
+    background-image: 
+      linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 20px 20px;
+    background-position: center center;
+  }
+  
+  @media (max-width: 768px) {
+    body {
+      font-size: 14px;
+    }
+    
+    /* Adjust font sizes for better mobile display */
+    h1 {
+      font-size: 1.5rem !important;
+      line-height: 1.3 !important;
+    }
+    
+    h2, h3 {
+      font-size: 1.2rem !important;
+    }
+    
+    p, span, div {
+      font-size: 0.875rem;
+    }
+  }
+  
+  /* Optimize mobile input fields */
+  input, button, textarea, select {
+    font-size: 16px; /* Prevents iOS zoom on focus */
+    appearance: none;
+    -webkit-appearance: none;
+    border-radius: 0;
+  }
+  
+  /* Ensure flex column layouts fill the screen on mobile */
+  #__next, main {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
   }
 }
 
@@ -89,6 +151,128 @@
 
   .nav-bar {
     @apply bg-royal border-b border-banana/20;
+  }
+
+  /* BigCoin style UI */
+  .bigcoin-panel {
+    background-color: var(--bigcoin-blue);
+    border: 2px solid var(--bigcoin-gold);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  }
+  
+  .bigcoin-tab {
+    @apply font-press-start px-4 py-2 text-sm uppercase;
+    color: var(--bigcoin-gold);
+    background-color: transparent;
+    transition: all 0.2s ease;
+  }
+  
+  .bigcoin-tab.active {
+    background-color: var(--bigcoin-gold);
+    color: var(--bigcoin-blue);
+  }
+  
+  .bigcoin-button {
+    @apply font-press-start px-4 py-2 text-xs uppercase;
+    background-color: var(--bigcoin-gold);
+    color: var(--bigcoin-blue);
+    border: none;
+    transition: all 0.2s ease;
+  }
+  
+  .bigcoin-button:disabled {
+    opacity: 0.5;
+  }
+  
+  .bigcoin-text {
+    @apply font-press-start text-xs uppercase;
+    color: white;
+  }
+  
+  .bigcoin-value {
+    color: var(--bigcoin-gold);
+  }
+  
+  /* Mobile dashboard layout */
+  .mobile-dashboard {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background-color: var(--bigcoin-blue);
+  }
+  
+  .mobile-dashboard-header {
+    padding: 0.5rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 215, 0, 0.3);
+  }
+  
+  .mobile-dashboard-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    max-height: none;
+    min-height: 100vh;
+    padding-bottom: 120px; /* Increased padding to prevent content from being hidden behind the fixed footer */
+  }
+  
+  .mobile-dashboard-footer {
+    border-top: 3px solid var(--bigcoin-gold);
+    display: flex;
+    justify-content: space-around;
+    background-color: #061426;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+  }
+  
+  .mobile-dashboard-tab {
+    flex: 1;
+    text-align: center;
+    padding: 1rem 0;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.8);
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .mobile-dashboard-tab.active {
+    color: var(--bigcoin-gold);
+    border-top: 4px solid var(--bigcoin-gold);
+    background-color: #0a1e38;
+    font-weight: bold;
+  }
+  
+  .mobile-dashboard-tab.active::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background-color: var(--bigcoin-gold);
+    animation: tabGlow 1.5s infinite alternate;
+  }
+  
+  @keyframes tabGlow {
+    0% { opacity: 0.5; }
+    100% { opacity: 1; }
   }
 
   .panel {
@@ -206,6 +390,47 @@
   .modal-close {
     @apply bg-transparent border-none text-white cursor-pointer text-2xl;
   }
+  
+  /* Dock Menu Styles */
+  .dock-menu {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-around;
+    background-color: var(--royal-dark);
+    border-top: 2px solid var(--banana);
+    padding: 8px;
+    z-index: 50;
+  }
+  
+  .dock-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 0;
+    min-width: 60px;
+    color: #9e9e9e;
+    transition: all 0.2s;
+  }
+  
+  .dock-item.active {
+    color: var(--banana);
+  }
+  
+  .dock-icon {
+    font-size: 22px;
+    margin-bottom: 4px;
+  }
+  
+  .dock-text {
+    font-size: 10px;
+    text-transform: uppercase;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    font-family: 'Press Start 2P', monospace;
+  }
 }
 
 @layer utilities {
@@ -239,6 +464,49 @@
   .miner {
     animation: mine 2s infinite;
   }
+  
+  /* Custom scrollbar for webkit browsers */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: rgba(0, 20, 32, 0.5);
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 215, 0, 0.5);
+    border-radius: 4px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 215, 0, 0.7);
+  }
+
+  /* Mobile-specific flex utilities */
+  .mobile-row {
+    @apply flex flex-row items-center;
+  }
+  
+  .mobile-col {
+    @apply flex flex-col;
+  }
+  
+  /* Responsive container for game panels */
+  .mobile-container {
+    @apply flex-1 overflow-hidden;
+  }
+  
+  /* Dock menu icon animations */
+  .dock-bounce {
+    animation: dock-bounce 0.5s;
+  }
+  
+  @keyframes dock-bounce {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+  }
 }
 
 /* Responsive adjustments */
@@ -248,11 +516,99 @@
   }
   
   .game-button, .claim-button {
-    padding: 0.3rem 0.6rem;
-    font-size: 0.7rem;
+    font-size: 0.75rem;
+    padding: 0.5rem 1rem;
+  }
+  
+  .pixel-button {
+    font-size: 0.75rem;
+    padding: 0.5rem 1rem;
   }
   
   .stats-panel, .room-container {
-    padding: 0.5rem;
+    padding: 0.75rem;
+  }
+  
+  .font-press-start {
+    font-size: 0.75rem;
+    line-height: 1.4;
+  }
+  
+  .modal-title {
+    font-size: 1rem;
+  }
+  
+  /* Fix tap target sizes for mobile */
+  button, a, input[type="button"], input[type="submit"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Fix modal content on small screens */
+  .modal-content {
+    padding: 1rem;
+    max-height: 80vh;
+  }
+  
+  /* Adjust game layout padding for mobile */
+  main.flex-grow {
+    padding: 0.75rem !important;
+  }
+  
+  /* Ensure grid panels stack properly */
+  .grid.grid-cols-1 {
+    gap: 0.75rem !important;
+  }
+  
+  /* Adjust spacing for stacked elements */
+  .space-y-6 {
+    margin-bottom: 0.75rem;
+  }
+  
+  /* Ensure content fits in viewport */
+  .min-h-screen {
+    min-height: 100vh;
+    height: auto;
+  }
+  
+  /* Add bottom padding for dock menu */
+  main {
+    padding-bottom: 70px !important; 
+  }
+}
+
+/* iOS specific fixes */
+@supports (-webkit-touch-callout: none) {
+  /* iOS-specific styles */
+  .pixel-button:active, .game-button:active, .claim-button:active {
+    transform: none;
+  }
+  
+  /* Disable fixed background for iOS */
+  body {
+    background-attachment: scroll;
+  }
+  
+  /* Additional iOS viewport fixes */
+  .min-h-screen {
+    min-height: -webkit-fill-available;
+  }
+  
+  html {
+    height: -webkit-fill-available;
+  }
+  
+  /* Dock menu iOS fixes */
+  .dock-menu {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+    height: auto;
+    box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.2);
+  }
+}
+
+/* Add padding to body to prevent content from being covered by dock */
+@media (max-width: 768px) {
+  body {
+    padding-bottom: calc(70px + env(safe-area-inset-bottom, 0px));
   }
 }

@@ -40,43 +40,48 @@ const LandingPage = () => {
   return (
     <div className="min-h-screen flex flex-col bg-royal">
       {/* Header */}
-      <header className="nav-bar flex justify-between items-center px-6 py-4">
-        <div className="flex items-center gap-8">
-          <div className="flex items-center">
+      <header className="nav-bar flex justify-between items-center px-3 sm:px-6 py-3 relative z-30">
+        <div className="flex items-center">
+          <Link href="/" className="flex items-center">
             <Image
               src="/bitape.png"
               alt="BitApe Logo"
-              width={100}
-              height={100}
+              width={70}
+              height={70}
               className="hover:opacity-80 transition-opacity"
               priority
             />
-          </div>
-          <nav className="flex gap-8">
-            <Link href="/about" className="font-press-start text-white hover:text-banana">
-              ABOUT
-            </Link>
-            <Link href="/trade" className="font-press-start text-white hover:text-banana">
-              TRADE $BIT
-            </Link>
-            <span className="font-press-start text-gray-500 cursor-not-allowed">
-              LEADERBOARD
-            </span>
-          </nav>
+          </Link>
         </div>
-        <div className="flex gap-4">
-          <button className="font-press-start text-banana border-2 border-banana px-4 py-2 hover:bg-banana hover:text-royal pixel-button">
+        
+        {/* Desktop navigation - hidden on mobile */}
+        <nav className="hidden md:flex items-center gap-4">
+          <Link href="/about" className="font-press-start text-white text-xs md:text-sm hover:text-banana">
+            ABOUT
+          </Link>
+          <Link href="/trade" className="font-press-start text-white text-xs md:text-sm hover:text-banana">
+            TRADE $BIT
+          </Link>
+          <span className="font-press-start text-gray-500 text-xs md:text-sm cursor-not-allowed">
+            LEADERBOARD
+          </span>
+          <Link href="/announcements" className="pixel-button text-xs md:text-sm">
             ANNOUNCEMENTS
-          </button>
-          <button className="font-press-start text-banana border-2 border-banana px-4 py-2 hover:bg-banana hover:text-royal pixel-button">
+          </Link>
+          <Link href="/refer" className="pixel-button text-xs md:text-sm">
             REFER A FRIEND
-          </button>
-          <ConnectWalletButton className="px-4 py-2" />
+          </Link>
+          <ConnectWalletButton className="scale-90" />
+        </nav>
+        
+        {/* Mobile connect button */}
+        <div className="md:hidden">
+          <ConnectWalletButton className="scale-90" />
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-grow flex flex-col items-center justify-center p-4 relative">
+      <main className="flex-grow flex flex-col items-center justify-center p-4 relative overflow-hidden">
         {/* Grid Background */}
         <div className="absolute inset-0"
           style={{
@@ -84,26 +89,28 @@ const LandingPage = () => {
               linear-gradient(to right, rgba(255,255,255,0.05) 1px, transparent 1px),
               linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px)
             `,
-            backgroundSize: '24px 24px',
+            backgroundSize: '16px 16px',
             imageRendering: 'pixelated'
           }}
         />
 
-        <div className="relative z-10 max-w-4xl mx-auto text-center space-y-8">
-          <h1 className="text-4xl md:text-6xl font-press-start text-banana pixel-text">
-            <span className="text-banana">BITAPE:</span> A PEER-TO-PEER APE CASH SYSTEM
+        <div className="relative z-10 w-full max-w-4xl mx-auto text-center space-y-4 md:space-y-8 py-4 md:py-8">
+          <h1 className="text-2xl sm:text-3xl md:text-5xl font-press-start text-banana pixel-text leading-relaxed">
+            <span className="text-banana block sm:inline">BITAPE:</span> 
+            <span className="block sm:inline"> A PEER-TO-PEER</span>
+            <span className="block"> APE CASH SYSTEM</span>
           </h1>
           
-          <p className="text-2xl md:text-3xl font-press-start text-banana pixel-text">
+          <p className="text-lg sm:text-xl md:text-3xl font-press-start text-banana pixel-text mt-6">
             {minedBit} $BIT HAS ALREADY BEEN MINED.
           </p>
           
-          <p className="text-xl md:text-2xl font-press-start text-white pixel-text">
+          <p className="text-base sm:text-lg md:text-xl font-press-start text-white pixel-text mt-4">
             START EARNING TODAY.
           </p>
 
-          <div className="mb-12">
-            <div className="relative w-[200px] h-[200px] mx-auto border-2 border-banana">
+          <div className="my-6 md:my-10">
+            <div className="relative w-[150px] h-[150px] md:w-[200px] md:h-[200px] mx-auto border-2 border-banana">
               <Image
                 src="/globe.svg"
                 alt="Globe Animation"
@@ -114,8 +121,8 @@ const LandingPage = () => {
             </div>
           </div>
 
-          <div className="w-full max-w-md mx-auto">
-            <ConnectWalletButton className="w-full font-press-start text-xl py-4 px-8 bg-transparent border-2 border-banana text-banana hover:bg-banana hover:text-royal transition-colors pixel-button" />
+          <div className="w-full max-w-sm mx-auto">
+            <ConnectWalletButton className="w-full font-press-start text-sm md:text-lg py-3 md:py-4 px-6 md:px-8 bg-transparent border-2 border-banana text-banana hover:bg-banana hover:text-royal transition-colors pixel-button" />
           </div>
         </div>
       </main>

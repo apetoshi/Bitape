@@ -21,6 +21,9 @@ import FacilityPurchaseModal from '@/components/FacilityPurchaseModal';
 import MinerPurchaseModal from '@/components/MinerPurchaseModal';
 import { Address } from 'viem';
 
+// Mobile tabs for bottom navigation
+type MobileTab = 'actions' | 'stats' | 'mining';
+// Desktop tabs for resources panel
 type Tab = 'resources' | 'space' | 'selectedTile';
 
 interface SelectedTile {
@@ -55,6 +58,7 @@ export default function RoomPage() {
   const gameState = useGameState();
   const { apeBalance, bitBalance } = useTokenBalance();
   const [activeTab, setActiveTab] = useState<Tab>('resources');
+  const [activeMobileTab, setActiveMobileTab] = useState<MobileTab>('actions');
   const [isBuyModalOpen, setIsBuyModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
@@ -155,11 +159,11 @@ export default function RoomPage() {
     if (!gameState.hasFacility) {
       return (
         <div className="text-center p-4">
-          <p>Purchase a facility to view details</p>
+          <p className="bigcoin-text">Purchase a facility to view details</p>
           <div className="mt-6">
             <button 
               onClick={() => setIsBuyModalOpen(true)}
-              className="pixel-button"
+              className="bigcoin-button"
             >
               BUY FACILITY
             </button>
@@ -171,32 +175,48 @@ export default function RoomPage() {
     switch (activeTab) {
       case 'resources':
         return (
-          <ResourcesPanel
-            apeBalance={apeBalance}
-            bitBalance={bitBalance}
-            spacesLeft={facility && !isNaN(Number(facility.capacity)) ? Number(facility.capacity) : 4}
-            gigawattsAvailable={facility && !isNaN(Number(facility.power)) ? Number(facility.power) : 28}
-          />
+          <div className="p-3">
+            <div className="flex justify-between items-center mb-2">
+              <span className="bigcoin-text">APE BALANCE</span>
+              <span className="bigcoin-value font-press-start">{apeBalance || '0'} APE</span>
+            </div>
+            <div className="flex justify-between items-center mb-2">
+              <span className="bigcoin-text">BIT BALANCE</span>
+              <span className="bigcoin-value font-press-start">{bitBalance || '0'} BIT</span>
+            </div>
+            <div className="flex justify-between items-center mb-2">
+              <span className="bigcoin-text">SPACES LEFT</span>
+              <span className="bigcoin-value font-press-start">
+                {facility && !isNaN(Number(facility.capacity)) ? Number(facility.capacity) : 4} SPACES
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="bigcoin-text">GIGAWATTS AVAILABLE</span>
+              <span className="bigcoin-value font-press-start">
+                {facility && !isNaN(Number(facility.power)) ? Number(facility.power) : 28} GW
+              </span>
+            </div>
+          </div>
         );
         
       case 'space':
         return (
-          <div className="p-2 space-y-3">
-            <div className="flex justify-between items-center py-1 border-b border-white/20">
-              <span className="text-white/80 text-sm">YOUR MINING ROOM</span>
-              <span className="text-white font-semibold text-sm">1</span>
+          <div className="p-3 space-y-2">
+            <div className="flex justify-between items-center border-b border-white/20 pb-2">
+              <span className="bigcoin-text">YOUR MINING ROOM</span>
+              <span className="bigcoin-value font-press-start">1</span>
             </div>
             
-            <div className="flex justify-between items-center py-1 border-b border-white/20">
-              <span className="text-white/80 text-sm">TOTAL SPACES</span>
-              <span className="text-white font-semibold text-sm">
+            <div className="flex justify-between items-center border-b border-white/20 pb-2">
+              <span className="bigcoin-text">TOTAL SPACES</span>
+              <span className="bigcoin-value font-press-start">
                 {facility && !isNaN(Number(facility.capacity)) ? Number(facility.capacity) : 4} SPACES
               </span>
             </div>
             
-            <div className="flex justify-between items-center py-1">
-              <span className="text-white/80 text-sm">TOTAL GIGAWATTS</span>
-              <span className="text-white font-semibold text-sm">
+            <div className="flex justify-between items-center pb-2">
+              <span className="bigcoin-text">TOTAL GIGAWATTS</span>
+              <span className="bigcoin-value font-press-start">
                 {facility && !isNaN(Number(facility.power)) ? Number(facility.power) : 28} GW
               </span>
             </div>
@@ -204,7 +224,7 @@ export default function RoomPage() {
             <div className="mt-3">
               <button
                 onClick={() => setIsUpgradeModalOpen(true)}
-                className="w-full pixel-button bg-royal text-white text-xs py-1"
+                className="w-full bigcoin-button"
               >
                 UPGRADE FACILITY
               </button>
@@ -214,39 +234,39 @@ export default function RoomPage() {
         
       case 'selectedTile':
         return (
-          <div className="p-2">
+          <div className="p-3">
             {selectedTile ? (
               <div className="space-y-2">
-                <div className="text-center">
-                  <h3 className="text-base font-press-start font-semibold mb-1">GRID SPACE X:{selectedTile.x} Y:{selectedTile.y}</h3>
+                <div className="text-center pb-2 border-b border-white/20">
+                  <h3 className="bigcoin-text mb-1">GRID SPACE X:{selectedTile.x} Y:{selectedTile.y}</h3>
                 </div>
                 
                 {selectedTileHasMiner(selectedTile.x, selectedTile.y) ? (
-                  <div className="space-y-1 text-sm">
-                    <div className="flex justify-between items-center py-1 border-b border-white/20">
-                      <span className="text-white/80">MINER TYPE</span>
-                      <span className="text-white font-semibold">BASIC MINER</span>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center border-b border-white/20 pb-2">
+                      <span className="bigcoin-text">MINER TYPE</span>
+                      <span className="bigcoin-value font-press-start">BASIC MINER</span>
                     </div>
-                    <div className="flex justify-between items-center py-1 border-b border-white/20">
-                      <span className="text-white/80">HASHRATE</span>
-                      <span className="text-white font-semibold">100 H/s</span>
+                    <div className="flex justify-between items-center border-b border-white/20 pb-2">
+                      <span className="bigcoin-text">HASHRATE</span>
+                      <span className="bigcoin-value font-press-start">100 H/s</span>
                     </div>
-                    <div className="flex justify-between items-center py-1">
-                      <span className="text-white/80">POWER USAGE</span>
-                      <span className="text-white font-semibold">1 GW</span>
+                    <div className="flex justify-between items-center pb-2">
+                      <span className="bigcoin-text">POWER USAGE</span>
+                      <span className="bigcoin-value font-press-start">1 GW</span>
                     </div>
                     <button
-                      className="w-full mt-2 pixel-button bg-banana text-royal text-xs py-1"
+                      className="w-full mt-2 bigcoin-button"
                     >
                       UPGRADE MINER
                     </button>
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <p className="text-center text-white/80 text-xs">This space is empty. Add a miner to start mining $BIT.</p>
+                    <p className="text-center bigcoin-text opacity-70">This space is empty. Add a miner to start mining BIT.</p>
                     <button
                       onClick={() => setShowMinerModal(true)}
-                      className="w-full mt-1 pixel-button bg-banana text-royal text-xs py-1"
+                      className="w-full mt-3 bigcoin-button"
                     >
                       BUY MINER
                     </button>
@@ -255,8 +275,8 @@ export default function RoomPage() {
               </div>
             ) : (
               <div className="text-center p-2">
-                <p className="text-sm">Select a tile to view or add miners</p>
-                <p className="text-xs text-white/60 mt-1">Click GRID button then select a space</p>
+                <p className="bigcoin-text opacity-80">Select a tile to view or add miners</p>
+                <p className="bigcoin-text opacity-50 mt-2">Click GRID button then select a space</p>
               </div>
             )}
           </div>
@@ -264,6 +284,77 @@ export default function RoomPage() {
         
       default:
         return <div>Select a tab</div>;
+    }
+  };
+
+  // Render content based on the active mobile tab
+  const renderMobileTabContent = () => {
+    switch (activeMobileTab) {
+      case 'actions':
+        return (
+          <div className="bigcoin-panel mb-5" id="actions-tab-content">
+            <div className="flex border-b-2 border-banana">
+              <button
+                className={`px-3 py-1 flex-1 bigcoin-tab ${activeTab === 'resources' ? 'active' : ''}`}
+                onClick={() => setActiveTab('resources')}
+              >
+                RESOURCES
+              </button>
+              <button
+                className={`px-3 py-1 flex-1 bigcoin-tab ${activeTab === 'space' ? 'active' : ''}`}
+                onClick={() => setActiveTab('space')}
+              >
+                SPACE
+              </button>
+              <button
+                className={`px-3 py-1 flex-1 bigcoin-tab ${activeTab === 'selectedTile' ? 'active' : ''}`}
+                onClick={() => setActiveTab('selectedTile')}
+              >
+                SELECTED TILE
+              </button>
+            </div>
+            {renderTabContent()}
+          </div>
+        );
+        
+      case 'stats':
+        return (
+          <div className="bigcoin-panel mb-5" id="stats-tab-content">
+            <div className="flex border-b-2 border-[#FFD700] p-2">
+              <button className="bigcoin-text mr-4 bigcoin-value">SIMPLE</button>
+              <button className="bigcoin-text opacity-50">/</button>
+              <button className="bigcoin-text ml-4 opacity-50">PRO</button>
+            </div>
+            <div className="p-3 space-y-2 font-press-start">
+              <p className="bigcoin-text">- YOU ARE MINING <span className="bigcoin-value">{gameState.miningRate || 0} BIT</span> A DAY</p>
+              <p className="bigcoin-text">- YOUR HASH RATE IS <span className="bigcoin-value">{gameState.hashRate || 0} GH/S</span></p>
+              <p className="bigcoin-text">- <span className="bigcoin-value">{gameState.blocksUntilHalving || 0} BLOCKS</span> UNTIL NEXT HALVENING</p>
+              <p className="bigcoin-text">- YOU HAVE <span className="bigcoin-value">{gameState.networkHashRatePercentage || 0}%</span> OF THE TOTAL NETWORK HASH RATE (<span className="bigcoin-value">{gameState.totalNetworkHashRate || 0} GH/S</span>)</p>
+            </div>
+          </div>
+        );
+        
+      case 'mining':
+        return (
+          <div className="bigcoin-panel mb-5" id="mining-tab-content">
+            <div className="flex border-b-2 border-[#FFD700] p-2">
+              <span className="bigcoin-text bigcoin-value">MINED BIT</span>
+            </div>
+            <div className="p-3 text-center">
+              <p className="bigcoin-text mb-3">YOU HAVE MINED <span className="bigcoin-value">{gameState.minedBit || 0} BIT</span></p>
+              <button 
+                onClick={() => gameState.claimReward()}
+                disabled={gameState.isClaimingReward || !gameState.hasFacility}
+                className="w-full bigcoin-button"
+              >
+                CLAIM MINED BIT
+              </button>
+            </div>
+          </div>
+        );
+        
+      default:
+        return <div className="bigcoin-panel">Select a tab</div>;
     }
   };
 
@@ -310,110 +401,36 @@ export default function RoomPage() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-royal overflow-hidden">
-      {/* Header - smaller and more compact */}
-      <header className="nav-bar flex justify-between items-center px-4 py-2">
-        <div className="flex items-center">
+    <div className="h-screen flex flex-col grid-background overflow-hidden">
+      {/* Mobile layout */}
+      <div className="md:hidden mobile-dashboard">
+        {/* Header with logo and menu */}
+        <div className="mobile-dashboard-header">
           <Link href="/">
             <Image
               src="/bitape.png"
               alt="BitApe Logo"
-              width={64}
-              height={64}
+              width={40}
+              height={40}
               className="hover:opacity-80 transition-opacity"
               priority
             />
           </Link>
-        </div>
-        <nav className="flex items-center gap-2">
-          <Link href="/about" className="font-press-start text-sm text-white hover:text-banana">
-            ABOUT
-          </Link>
-          <Link href="/trade" className="font-press-start text-sm text-white hover:text-banana">
-            TRADE $BIT
-          </Link>
-          <Link href="/leaderboard" className="font-press-start text-sm text-[#4A5568] hover:text-banana">
-            LEADERBOARD
-          </Link>
-          <button className="font-press-start text-sm text-banana border-2 border-banana px-3 py-1 hover:bg-banana hover:text-royal pixel-button">
-            ANNOUNCEMENTS
-          </button>
-          <button 
-            onClick={() => setIsReferralModalOpen(true)}
-            className="font-press-start text-sm text-banana border-2 border-banana px-3 py-1 hover:bg-banana hover:text-royal pixel-button"
-          >
-            REFER A FRIEND
-          </button>
           <button 
             onClick={() => setIsProfileModalOpen(true)}
-            className="font-press-start text-sm text-banana border-2 border-banana px-3 py-1 hover:bg-banana hover:text-royal pixel-button"
+            className="bigcoin-button"
           >
             PROFILE
           </button>
-        </nav>
-      </header>
-
-      {/* Main content - fills available height */}
-      <div className="flex-grow grid grid-cols-12 gap-2 p-2 max-h-[calc(100vh-56px)] overflow-hidden">
-        {/* Left Column */}
-        <div className="col-span-4 flex flex-col gap-2 overflow-y-auto">
-          {/* Tabs */}
-          <div className="bg-royal border-2 border-banana rounded-lg overflow-hidden">
-            <div className="flex border-b-2 border-banana">
-              <button
-                className={`px-3 py-1 flex-1 font-press-start text-xs ${activeTab === 'resources' ? 'bg-banana text-royal' : 'text-banana'}`}
-                onClick={() => setActiveTab('resources')}
-              >
-                RESOURCES
-              </button>
-              <button
-                className={`px-3 py-1 flex-1 font-press-start text-xs ${activeTab === 'space' ? 'bg-banana text-royal' : 'text-banana'}`}
-                onClick={() => setActiveTab('space')}
-              >
-                SPACE
-              </button>
-              <button
-                className={`px-3 py-1 flex-1 font-press-start text-xs ${activeTab === 'selectedTile' ? 'bg-banana text-royal' : 'text-banana'}`}
-                onClick={() => setActiveTab('selectedTile')}
-              >
-                SELECTED TILE
-              </button>
-            </div>
-            {renderTabContent()}
-          </div>
-
-          {/* Stats Panel */}
-          <div className="bg-royal border-2 border-banana rounded-lg overflow-hidden">
-            <div className="flex border-b-2 border-banana px-3 py-1">
-              <button className="font-press-start text-xs text-banana mr-4">SIMPLE</button>
-              <button className="font-press-start text-xs text-[#4A5568]">PRO</button>
-            </div>
-            <div className="p-3 space-y-1 font-press-start text-white text-xs">
-              <p>- YOU ARE MINING {gameState.miningRate || 0} BitApe A DAY</p>
-              <p>- YOUR HASH RATE IS {gameState.hashRate || 0} GH/S</p>
-              <p>- {gameState.blocksUntilHalving || 0} BLOCKS UNTIL NEXT HALVENING</p>
-              <p>- YOU HAVE {gameState.networkHashRatePercentage || 0}% OF THE TOTAL NETWORK HASH RATE ({gameState.totalNetworkHashRate || 0} GH/S)</p>
-            </div>
-          </div>
-
-          {/* Mining Panel */}
-          <div className="bg-royal border-2 border-banana rounded-lg overflow-hidden">
-            <div className="p-3 text-center font-press-start">
-              <p className="text-white mb-2 text-sm">YOU HAVE MINED {gameState.minedBit || 0} $BIT</p>
-              <button 
-                onClick={() => gameState.claimReward()}
-                disabled={gameState.isClaimingReward || !gameState.hasFacility}
-                className="w-full bg-dark-blue text-banana py-1 px-3 text-sm hover:bg-opacity-80 disabled:opacity-50 border-2 border-banana"
-              >
-                CLAIM MINED $BIT
-              </button>
-            </div>
-          </div>
         </div>
-
-        {/* Main Room Area */}
-        <div className="col-span-8 flex flex-col items-center justify-center">
-          <div className="relative w-[700px] h-[700px] border border-banana overflow-hidden p-1.5">
+        
+        {/* Main content area - add padding-bottom to account for fixed footer */}
+        <div className="mobile-dashboard-content pb-24">
+          {/* Mobile tab content */}
+          {renderMobileTabContent()}
+          
+          {/* Room visualization */}
+          <div className="bigcoin-panel">
             <RoomVisualization 
               hasFacility={hasFacility}
               facilityData={facility ? {
@@ -441,9 +458,166 @@ export default function RoomPage() {
             />
           </div>
         </div>
+        
+        {/* Bottom tab navigation */}
+        <div className="mobile-dashboard-footer">
+          <button 
+            className={`mobile-dashboard-tab ${activeMobileTab === 'actions' ? 'active' : ''}`}
+            onClick={() => setActiveMobileTab('actions')}
+          >
+            ACTIONS
+          </button>
+          <button 
+            className={`mobile-dashboard-tab ${activeMobileTab === 'stats' ? 'active' : ''}`}
+            onClick={() => setActiveMobileTab('stats')}
+          >
+            STATS
+          </button>
+          <button 
+            className={`mobile-dashboard-tab ${activeMobileTab === 'mining' ? 'active' : ''}`}
+            onClick={() => setActiveMobileTab('mining')}
+          >
+            MINING
+          </button>
+        </div>
+      </div>
+      
+      {/* Desktop layout - hidden on mobile */}
+      <div className="hidden md:flex flex-col h-screen bg-royal overflow-hidden">
+        {/* Header */}
+        <header className="nav-bar flex justify-between items-center px-4 py-2">
+          <div className="flex items-center">
+            <Link href="/">
+              <Image
+                src="/bitape.png"
+                alt="BitApe Logo"
+                width={64}
+                height={64}
+                className="hover:opacity-80 transition-opacity"
+                priority
+              />
+            </Link>
+          </div>
+          <nav className="flex items-center gap-2">
+            <Link href="/about" className="font-press-start text-sm text-white hover:text-banana">
+              ABOUT
+            </Link>
+            <Link href="/trade" className="font-press-start text-sm text-white hover:text-banana">
+              TRADE $BIT
+            </Link>
+            <Link href="/leaderboard" className="font-press-start text-sm text-[#4A5568] hover:text-banana">
+              LEADERBOARD
+            </Link>
+            <button className="font-press-start text-sm text-banana border-2 border-banana px-3 py-1 hover:bg-banana hover:text-royal pixel-button">
+              ANNOUNCEMENTS
+            </button>
+            <button 
+              onClick={() => setIsReferralModalOpen(true)}
+              className="font-press-start text-sm text-banana border-2 border-banana px-3 py-1 hover:bg-banana hover:text-royal pixel-button"
+            >
+              REFER A FRIEND
+            </button>
+            <button 
+              onClick={() => setIsProfileModalOpen(true)}
+              className="font-press-start text-sm text-banana border-2 border-banana px-3 py-1 hover:bg-banana hover:text-royal pixel-button"
+            >
+              PROFILE
+            </button>
+          </nav>
+        </header>
+
+        {/* Main content - fills available height */}
+        <div className="flex-grow grid grid-cols-12 gap-2 p-2 max-h-[calc(100vh-56px)] overflow-hidden">
+          {/* Left Column */}
+          <div className="col-span-4 flex flex-col gap-2 overflow-y-auto">
+            {/* Tabs */}
+            <div className="bg-royal border-2 border-banana rounded-lg overflow-hidden">
+              <div className="flex border-b-2 border-banana">
+                <button
+                  className={`px-3 py-1 flex-1 font-press-start text-xs ${activeTab === 'resources' ? 'bg-banana text-royal' : 'text-banana'}`}
+                  onClick={() => setActiveTab('resources')}
+                >
+                  RESOURCES
+                </button>
+                <button
+                  className={`px-3 py-1 flex-1 font-press-start text-xs ${activeTab === 'space' ? 'bg-banana text-royal' : 'text-banana'}`}
+                  onClick={() => setActiveTab('space')}
+                >
+                  SPACE
+                </button>
+                <button
+                  className={`px-3 py-1 flex-1 font-press-start text-xs ${activeTab === 'selectedTile' ? 'bg-banana text-royal' : 'text-banana'}`}
+                  onClick={() => setActiveTab('selectedTile')}
+                >
+                  SELECTED TILE
+                </button>
+              </div>
+              {renderTabContent()}
+            </div>
+
+            {/* Stats Panel */}
+            <div className="bg-royal border-2 border-banana rounded-lg overflow-hidden">
+              <div className="flex border-b-2 border-banana px-3 py-1">
+                <button className="font-press-start text-xs text-banana mr-4">SIMPLE</button>
+                <button className="font-press-start text-xs text-[#4A5568]">PRO</button>
+              </div>
+              <div className="p-3 space-y-1 font-press-start text-white text-xs">
+                <p>- YOU ARE MINING {gameState.miningRate || 0} BIT A DAY</p>
+                <p>- YOUR HASH RATE IS {gameState.hashRate || 0} GH/S</p>
+                <p>- {gameState.blocksUntilHalving || 0} BLOCKS UNTIL NEXT HALVENING</p>
+                <p>- YOU HAVE {gameState.networkHashRatePercentage || 0}% OF THE TOTAL NETWORK HASH RATE ({gameState.totalNetworkHashRate || 0} GH/S)</p>
+              </div>
+            </div>
+
+            {/* Mining Panel */}
+            <div className="bg-royal border-2 border-banana rounded-lg overflow-hidden">
+              <div className="p-3 text-center font-press-start">
+                <p className="text-white mb-2 text-sm">YOU HAVE MINED {gameState.minedBit || 0} BIT</p>
+                <button 
+                  onClick={() => gameState.claimReward()}
+                  disabled={gameState.isClaimingReward || !gameState.hasFacility}
+                  className="w-full bg-dark-blue text-banana py-1 px-3 text-sm hover:bg-opacity-80 disabled:opacity-50 border-2 border-banana"
+                >
+                  CLAIM MINED BIT
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Main Room Area */}
+          <div className="col-span-8 flex flex-col items-center justify-center">
+            <div className="relative w-[700px] h-[700px] border border-banana overflow-hidden p-1.5">
+              <RoomVisualization 
+                hasFacility={hasFacility}
+                facilityData={facility ? {
+                  power: Number(facility.power),
+                  level: Number(facility.level),
+                  miners: Number(facility.miners),
+                  capacity: Number(facility.capacity),
+                  used: Number(facility.used),
+                  resources: Number(facility.resources),
+                  spaces: Number(facility.spaces)
+                } : undefined}
+                onPurchaseFacility={handlePurchaseFacility}
+                onGetStarterMiner={gameState.getStarterMiner}
+                onUpgradeFacility={handleUpgradeFacility}
+                onPurchaseMiner={gameState.purchaseMiner}
+                isPurchasingFacility={gameState.isPurchasingFacility}
+                isGettingStarterMiner={gameState.isGettingStarterMiner}
+                isUpgradingFacility={gameState.isUpgradingFacility}
+                onTileSelect={handleTileSelect}
+                address={address as Address}
+                isGridMode={isGridModeActive}
+                toggleGridMode={toggleGridMode}
+                hasClaimedStarterMiner={gameState.hasClaimedStarterMiner}
+                miners={gameState.miners}
+              />
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Buy Facility Modal */}
+      {/* Modals */}
       <BuyFacilityModal 
         isOpen={isBuyModalOpen}
         onClose={() => setIsBuyModalOpen(false)}
