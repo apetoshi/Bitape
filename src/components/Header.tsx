@@ -11,8 +11,9 @@ import { useGameState } from '@/hooks/useGameState';
 import { useAccount } from 'wagmi';
 import { FaChevronDown } from 'react-icons/fa';
 import ReferralModal from './ReferralModal';
+import AnnouncementsModal from './AnnouncementsModal';
 
-const ConnectButton = dynamic(() => import('@rainbow-me/rainbowkit').then(mod => mod.ConnectButton), {
+const ConnectButton = dynamic(() => import('@/components/ConnectWalletButton'), {
   ssr: false
 });
 
@@ -32,6 +33,7 @@ const Header: React.FC = () => {
   const router = useRouter();
   const { isOpen: isProfileOpen, onOpen: onProfileOpen, onClose: onProfileClose } = useDisclosure();
   const { isOpen: isReferralOpen, onOpen: onReferralOpen, onClose: onReferralClose } = useDisclosure();
+  const { isOpen: isAnnouncementsOpen, onOpen: onAnnouncementsOpen, onClose: onAnnouncementsClose } = useDisclosure();
   const { address, isConnected } = useAccount();
   const { apeBalance, bitBalance, totalReferrals, totalBitEarned } = useGameState();
 
@@ -85,9 +87,9 @@ const Header: React.FC = () => {
         <Link href="/about" className="font-press-start text-white text-sm hover:text-banana">
           ABOUT
         </Link>
-        <Link href="/trade" className="font-press-start text-white text-sm hover:text-banana">
+        <span className="font-press-start text-gray-500 text-sm cursor-not-allowed">
           TRADE $BIT
-        </Link>
+        </span>
         <span className="font-press-start text-gray-500 text-sm cursor-not-allowed">
           LEADERBOARD
         </span>
@@ -95,11 +97,17 @@ const Header: React.FC = () => {
           onClick={onReferralOpen}
           className="pixel-button text-sm"
         >
-          REFER A FRIEND
+          REFER
         </button>
-        <Link href="/announcements" className="pixel-button text-sm">
+        <button 
+          onClick={onAnnouncementsOpen}
+          className="pixel-button text-sm"
+        >
           ANNOUNCEMENTS
-        </Link>
+        </button>
+        <span className="font-press-start text-gray-500 text-sm cursor-not-allowed">
+          DISCLAIMER
+        </span>
       </nav>
 
       {isConnected && address && (
@@ -117,6 +125,11 @@ const Header: React.FC = () => {
         onClose={onReferralClose}
         totalReferrals={totalReferrals || 0}
         totalBitEarned={totalBitEarned || '0'}
+      />
+
+      <AnnouncementsModal
+        isOpen={isAnnouncementsOpen}
+        onClose={onAnnouncementsClose}
       />
     </header>
   );

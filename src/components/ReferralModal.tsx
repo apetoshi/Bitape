@@ -37,7 +37,7 @@ const ReferralModal: React.FC<ReferralModalProps> = ({
             </Dialog.Title>
             
             <p className="text-xs md:text-sm font-press-start text-center text-white mb-6 md:mb-8">
-              SHARE YOUR REFERRAL LINK WITH FRIENDS AND EARN A 2.5% BONUS OF WHATEVER BITCOIN THEY MINE!
+              SHARE YOUR REFERRAL LINK WITH FRIENDS AND EARN A 2.5% BONUS OF WHATEVER $BIT THEY MINE!
             </p>
 
             <div className="bg-royal-dark p-3 md:p-4 mb-6 md:mb-8 rounded">
