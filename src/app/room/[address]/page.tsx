@@ -345,6 +345,15 @@ export default function RoomPage() {
     }
   }, [gameState.hasClaimedStarterMiner, selectedTileHasMiner, selectedTile]);
 
+  // Force a re-render of the mining tab when miners change
+  useEffect(() => {
+    if (activeMobileTab === 'mining' && (gameState.miners || gameState.hasClaimedStarterMiner)) {
+      // Force a refresh by setting the active tab again
+      setActiveMobileTab('mining');
+      console.log('Refreshing mining tab due to miner changes');
+    }
+  }, [gameState.miners, gameState.hasClaimedStarterMiner, activeMobileTab]);
+
   // Redirect if not connected or trying to access someone else's room
   useEffect(() => {
     if (!isConnected) {
@@ -662,6 +671,40 @@ export default function RoomPage() {
           </div>
         );
       case 'mining':
+        // Get all miners including any from localStorage if needed
+        let displayedMiners = [...(gameState.miners || [])];
+        
+        // If no miners in gameState but user has claimed starter miner, check localStorage
+        if (displayedMiners.length === 0 && gameState.hasClaimedStarterMiner && typeof window !== 'undefined') {
+          try {
+            const savedPositionStr = localStorage.getItem('claimedMinerPosition');
+            if (savedPositionStr) {
+              const position = JSON.parse(savedPositionStr);
+              // Add the starter miner from localStorage
+              displayedMiners.push({
+                id: 0,
+                minerType: MinerType.BANANA_MINER,
+                x: Number(position.x),
+                y: Number(position.y)
+              });
+              console.log('Added miner from localStorage for mobile mining tab:', position);
+            }
+          } catch (e) {
+            console.error("Error parsing miner position for mobile tab:", e);
+          }
+        }
+        
+        // If still no miners but we know starter miner is claimed, add default at 0,0
+        if (displayedMiners.length === 0 && gameState.hasClaimedStarterMiner) {
+          displayedMiners.push({
+            id: 0,
+            minerType: MinerType.BANANA_MINER,
+            x: 0,
+            y: 0
+          });
+          console.log('Added default starter miner at (0,0) for mobile mining tab');
+        }
+
         return (
           <div className="p-4">
             <div className="flex justify-between items-center mb-2">
@@ -691,9 +734,9 @@ export default function RoomPage() {
             
             <div className="mt-4">
               <h3 className="text-lg font-bold mb-2">Your Miners</h3>
-              {gameState.miners && gameState.miners.length > 0 ? (
+              {displayedMiners.length > 0 ? (
                 <div className="grid grid-cols-1 gap-4">
-                  {gameState.miners.map((miner, index) => (
+                  {displayedMiners.map((miner, index) => (
                     <div key={index} className="border border-white/20 p-3 rounded">
                       <div className="flex justify-between items-center">
                         <span className="text-xs">Miner #{miner.id}</span>
@@ -701,6 +744,9 @@ export default function RoomPage() {
                       </div>
                       <div className="mt-2">
                         <span className="text-xs">Mining rate: {getMinerMiningRate(miner.minerType)} BIT/day</span>
+                      </div>
+                      <div className="mt-2">
+                        <span className="text-xs">Position: X:{miner.x}, Y:{miner.y}</span>
                       </div>
                     </div>
                   ))}
