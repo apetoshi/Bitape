@@ -676,12 +676,19 @@ export default function RoomPage() {
                 {parsedFacility ? `${parsedFacility.miners} SPACES` : '0 SPACES'}
               </span>
             </div>
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center mb-3">
               <span className="bigcoin-text">TOTAL GIGAWATTS</span>
               <span className="bigcoin-value font-press-start">
                 {parsedFacility ? `${parsedFacility.power} GW` : '0 GW'}
               </span>
             </div>
+            
+            {/* Mining stats with improved mobile styling */}
+            <div className="border-t border-white/20 pt-3 mb-3">
+              <p className="font-press-start text-white text-xs mb-1">- MINING {gameState.miningRate || 0} BIT/DAY</p>
+              <p className="font-press-start text-white text-xs mb-1">- HASH RATE: {gameState.hashRate || 0} GH/S</p>
+            </div>
+            
             <div className="mt-4">
               <h3 className="text-lg font-bold mb-2">Your Miners</h3>
               {gameState.miners && gameState.miners.length > 0 ? (
@@ -689,17 +696,17 @@ export default function RoomPage() {
                   {gameState.miners.map((miner, index) => (
                     <div key={index} className="border border-white/20 p-3 rounded">
                       <div className="flex justify-between items-center">
-                        <span>Miner #{miner.id}</span>
-                        <span>Type: {getMinerTypeName(miner.minerType)}</span>
+                        <span className="text-xs">Miner #{miner.id}</span>
+                        <span className="text-xs">Type: {getMinerTypeName(miner.minerType)}</span>
                       </div>
                       <div className="mt-2">
-                        <span>Mining rate: {getMinerMiningRate(miner.minerType)} BIT/day</span>
+                        <span className="text-xs">Mining rate: {getMinerMiningRate(miner.minerType)} BIT/day</span>
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-4">No miners yet</div>
+                <div className="text-center py-4 text-sm">No miners yet</div>
               )}
             </div>
           </div>

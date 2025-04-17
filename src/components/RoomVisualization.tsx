@@ -206,6 +206,25 @@ export function RoomVisualization({
     { x: 1, y: 1, top: '62%', left: '35%', width: '15%', height: '15%' }  // bottom left
   ];
 
+  // Function to adjust positioning for mobile screens
+  const useIsMobile = () => {
+    const [isMobile, setIsMobile] = useState(false);
+    
+    useEffect(() => {
+      const checkMobile = () => {
+        setIsMobile(window.innerWidth < 768);
+      };
+      
+      checkMobile();
+      window.addEventListener('resize', checkMobile);
+      return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+    
+    return isMobile;
+  };
+  
+  const isMobile = useIsMobile();
+
   // Function to render the mining spaces overlay and miners
   const renderMiningSpaces = () => {
     // Get all claimed miner positions 
@@ -253,6 +272,10 @@ export function RoomVisualization({
           const pos = gridPositions.find(p => p.x === miner.x && p.y === miner.y);
           if (!pos) return null;
           
+          // Adjust scaling for mobile
+          const scaleValue = isMobile ? '2.2' : '2.5';
+          const translateValue = isMobile ? '-5%, -10%' : '-10%, -15%';
+          
           return (
             <div 
               key={`miner-${index}`}
@@ -270,9 +293,9 @@ export function RoomVisualization({
                   src={miner.image}
                   alt={`Miner at ${miner.x},${miner.y}`}
                   fill
-                  className="object-contain miner-pulse"
+                  className={`object-contain miner-pulse ${isMobile ? 'mobile-miner' : ''}`}
                   style={{ 
-                    transform: 'skew(24deg, -14deg) scale(2.5) translate(-10%, -15%)',
+                    transform: `skew(24deg, -14deg) scale(${scaleValue}) translate(${translateValue})`,
                     imageRendering: 'pixelated'
                   }}
                 />
@@ -286,18 +309,22 @@ export function RoomVisualization({
           const isSelected = selectedTile?.x === pos.x && selectedTile?.y === pos.y;
           const isOccupied = isTileOccupied(pos.x, pos.y);
           
+          // Adjust grid size for mobile
+          const width = isMobile ? '20%' : pos.width;
+          const height = isMobile ? '20%' : pos.height;
+          
           return (
             <div
               key={`${pos.x}-${pos.y}`}
               onClick={() => handleTileClick(pos.x, pos.y)}
               className={`absolute pointer-events-auto transition-all duration-200 cursor-pointer z-10 ${
                 isSelected ? 'ring-2 ring-[#FFD700]' : 'hover:ring-2 hover:ring-[#FFD70066]'
-              } ${isOccupied ? 'opacity-70' : ''}`}
+              } ${isOccupied ? 'opacity-70' : ''} ${isMobile ? 'mobile-grid-cell' : ''}`}
               style={{
                 top: pos.top,
                 left: pos.left,
-                width: pos.width,
-                height: pos.height,
+                width: width,
+                height: height,
                 background: isSelected ? 'rgba(255, 215, 0, 0.3)' : 'rgba(255, 215, 0, 0.1)',
                 transform: 'skew(-24deg, 14deg)',
                 borderRadius: '2px'
@@ -320,7 +347,12 @@ export function RoomVisualization({
           alt="Mining Room" 
           fill
           priority
-          className="object-contain"
+          className={`object-contain ${isMobile ? 'mobile-room-bg' : ''}`}
+          style={{
+            objectFit: 'contain',
+            maxWidth: '100%',
+            maxHeight: '100%'
+          }}
         />
         
         {/* Grid Mode Toggle Button (Top Left Corner) */}
@@ -329,7 +361,7 @@ export function RoomVisualization({
             onClick={toggleGridMode}
             className={`absolute top-2 left-2 z-30 px-2 py-1 font-press-start text-xs transition-all ${
               isGridMode ? 'bg-banana text-royal' : 'bg-transparent text-banana border border-banana'
-            }`}
+            } ${isMobile ? 'mobile-grid-btn' : ''}`}
           >
             {isGridMode ? 'HIDE GRID' : 'SHOW GRID'}
           </button>
@@ -340,7 +372,7 @@ export function RoomVisualization({
           <button
             onClick={onUpgradeFacility}
             disabled={isUpgradingFacility}
-            className="absolute top-2 right-2 z-30 px-2 py-1 font-press-start text-xs bg-transparent text-banana border border-banana hover:bg-banana hover:text-royal transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`absolute top-2 right-2 z-30 px-2 py-1 font-press-start text-xs bg-transparent text-banana border border-banana hover:bg-banana hover:text-royal transition-all disabled:opacity-50 disabled:cursor-not-allowed ${isMobile ? 'mobile-upgrade-btn' : ''}`}
           >
             {isUpgradingFacility ? 'UPGRADING...' : 'UPGRADE FACILITY'}
           </button>

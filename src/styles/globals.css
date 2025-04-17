@@ -612,3 +612,78 @@
     padding-bottom: calc(70px + env(safe-area-inset-bottom, 0px));
   }
 }
+
+/* Mobile specific styles for room visualization */
+@media (max-width: 768px) {
+  .mobile-dashboard-content .bigcoin-panel {
+    aspect-ratio: 1 / 1;
+    position: relative;
+    overflow: hidden;
+    max-height: 80vh;
+    margin-bottom: 1rem;
+  }
+  
+  /* Ensure images display properly on mobile */
+  .mobile-dashboard-content .bigcoin-panel img {
+    object-fit: contain !important;
+    width: 100% !important;
+    height: 100% !important;
+  }
+  
+  /* Fix mobile specific positioning issues */
+  .mobile-dashboard-content .relative {
+    width: 100% !important;
+    height: 100% !important;
+  }
+  
+  /* Ensure miner images display properly on mobile */
+  .mobile-dashboard-content .miner-pulse {
+    object-fit: contain !important;
+    transform: skew(24deg, -14deg) scale(2) translate(-10%, -15%) !important;
+  }
+  
+  /* Adjust grid positions for mobile screens */
+  .mobile-dashboard-content .absolute.pointer-events-auto {
+    width: 20% !important;
+    height: 20% !important;
+  }
+  
+  /* Ensure buttons in the room visualization are visible and accessible */
+  .mobile-dashboard-content .absolute.z-30 {
+    font-size: 0.6rem !important;
+    padding: 0.25rem 0.5rem !important;
+  }
+
+  /* Mobile-specific classes for room visualization */
+  .mobile-room-bg {
+    object-position: center !important;
+  }
+
+  .mobile-miner {
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+
+  .mobile-grid-btn, .mobile-upgrade-btn {
+    font-size: 0.5rem !important;
+    padding: 0.2rem 0.4rem !important;
+    border-width: 1px !important;
+  }
+
+  .mobile-grid-cell {
+    border-width: 1px !important;
+  }
+
+  /* Fix mining data display */
+  .mobile-dashboard .bigcoin-text,
+  .mobile-dashboard .bigcoin-value {
+    font-size: 0.6rem !important;
+    line-height: 1.2 !important;
+  }
+
+  /* Ensure mining statistics are visible */
+  .mobile-dashboard .font-press-start {
+    font-size: 0.6rem !important;
+    line-height: 1.3 !important;
+  }
+}
