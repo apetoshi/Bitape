@@ -148,84 +148,124 @@ export default function RoomPage() {
     console.log('Checking for miner at position:', { x, y });
     console.log('Available miners:', gameState.miners);
     
-    if (!gameState.miners || gameState.miners.length === 0) {
-      console.log('No miners available in gameState');
-      
-      // Fallback check using localStorage for starter miner
-      if (gameState.hasClaimedStarterMiner && typeof window !== 'undefined') {
-        try {
-          const savedPositionStr = localStorage.getItem('claimedMinerPosition');
-          if (savedPositionStr) {
-            const position = JSON.parse(savedPositionStr);
-            const matches = Number(position.x) === Number(x) && Number(position.y) === Number(y);
-            console.log(`Fallback check using localStorage. Match: ${matches}`);
-            return matches;
-          }
-        } catch (e) {
-          console.error("Error parsing miner position:", e);
-        }
-      }
-      
-      return false;
-    }
-    
-    // Convert coordinates to numbers to ensure consistent comparison
+    // Convert coordinates to numbers early to ensure consistent comparison throughout
     const targetX = Number(x);
     const targetY = Number(y);
     
-    // Check if any miner in the array has the given coordinates
-    const hasMiner = gameState.miners.some(miner => {
-      const minerX = Number(miner.x);
-      const minerY = Number(miner.y);
-      const matches = minerX === targetX && minerY === targetY;
-      console.log(`Miner at (${minerX}, ${minerY}) matches selected (${targetX}, ${targetY}): ${matches}`);
-      return matches;
-    });
+    // First, check the miners array from the contract
+    if (gameState.miners && gameState.miners.length > 0) {
+      // Check if any miner in the array has the given coordinates
+      const hasMiner = gameState.miners.some(miner => {
+        const minerX = Number(miner.x);
+        const minerY = Number(miner.y);
+        const matches = minerX === targetX && minerY === targetY;
+        console.log(`Miner at (${minerX}, ${minerY}) matches selected (${targetX}, ${targetY}): ${matches}`);
+        return matches;
+      });
+      
+      if (hasMiner) {
+        console.log(`Found miner in gameState.miners at (${targetX}, ${targetY})`);
+        return true;
+      }
+    } else {
+      console.log('No miners available in gameState');
+    }
     
-    console.log(`Result: ${hasMiner ? 'Miner found' : 'No miner found'} at (${targetX}, ${targetY})`);
-    return hasMiner;
+    // Second, check localStorage as a fallback - especially for position (0,0) which is common for starter miners
+    if (gameState.hasClaimedStarterMiner && typeof window !== 'undefined') {
+      try {
+        const savedPositionStr = localStorage.getItem('claimedMinerPosition');
+        if (savedPositionStr) {
+          const position = JSON.parse(savedPositionStr);
+          const posX = Number(position.x);
+          const posY = Number(position.y);
+          const matches = posX === targetX && posY === targetY;
+          console.log(`Fallback check using localStorage. Position: (${posX}, ${posY}) matches (${targetX}, ${targetY}): ${matches}`);
+          
+          if (matches) {
+            console.log(`Found miner in localStorage at (${targetX}, ${targetY})`);
+            return true;
+          }
+        } else {
+          console.log('No saved position found in localStorage');
+          
+          // Special case for starter miner at (0,0) when claimed but position not saved
+          if (targetX === 0 && targetY === 0 && gameState.hasClaimedStarterMiner) {
+            console.log('Special case: Position is (0,0) and user has claimed starter miner. Assuming miner exists.');
+            return true;
+          }
+        }
+      } catch (e) {
+        console.error("Error parsing miner position from localStorage:", e);
+      }
+    }
+    
+    console.log(`No miner found at (${targetX}, ${targetY}) in any source`);
+    return false;
   }, [gameState.miners, gameState.hasClaimedStarterMiner]);
 
   // Get miner at selected tile
   const getMinerAtTile = useCallback((x: number, y: number) => {
-    if (!gameState.miners || gameState.miners.length === 0) {
-      console.log('No miners available in gameState, checking localStorage fallback');
-      
-      // Fallback for starter miner using localStorage
-      if (gameState.hasClaimedStarterMiner && typeof window !== 'undefined') {
-        try {
-          const savedPositionStr = localStorage.getItem('claimedMinerPosition');
-          if (savedPositionStr) {
-            const position = JSON.parse(savedPositionStr);
-            if (Number(position.x) === Number(x) && Number(position.y) === Number(y)) {
-              console.log('Found miner in localStorage');
-              return {
-                id: 0,
-                minerType: MinerType.BANANA_MINER,
-                x: Number(position.x),
-                y: Number(position.y)
-              };
-            }
-          }
-        } catch (e) {
-          console.error("Error parsing miner position:", e);
-        }
-      }
-      
-      return null;
-    }
+    console.log('Getting miner at position:', { x, y });
     
-    // Convert coordinates to numbers to ensure consistent comparison
+    // Convert coordinates to numbers early for consistent comparison
     const targetX = Number(x);
     const targetY = Number(y);
     
-    // Find the miner at the specified coordinates
-    const miner = gameState.miners.find(miner => 
-      Number(miner.x) === targetX && Number(miner.y) === targetY
-    );
+    // First, check the miners array from the contract
+    if (gameState.miners && gameState.miners.length > 0) {
+      // Find the miner at the specified coordinates
+      const miner = gameState.miners.find(miner => 
+        Number(miner.x) === targetX && Number(miner.y) === targetY
+      );
+      
+      if (miner) {
+        console.log('Found miner at selected position in gameState:', miner);
+        return miner;
+      }
+    } else {
+      console.log('No miners available in gameState, checking localStorage fallback');
+    }
     
-    console.log('Found miner at selected position:', miner);
-    return miner || null;
+    // Fallback for starter miner using localStorage
+    if (gameState.hasClaimedStarterMiner && typeof window !== 'undefined') {
+      try {
+        const savedPositionStr = localStorage.getItem('claimedMinerPosition');
+        if (savedPositionStr) {
+          const position = JSON.parse(savedPositionStr);
+          const posX = Number(position.x);
+          const posY = Number(position.y);
+          
+          if (posX === targetX && posY === targetY) {
+            console.log('Found miner in localStorage at', {x: posX, y: posY});
+            return {
+              id: 0,
+              minerType: MinerType.BANANA_MINER,
+              x: posX,
+              y: posY
+            };
+          }
+        } else {
+          console.log('No saved position found in localStorage');
+          
+          // Special case for starter miner at (0,0) when claimed but position not saved
+          if (targetX === 0 && targetY === 0 && gameState.hasClaimedStarterMiner) {
+            console.log('Special case: Position is (0,0) and user has claimed starter miner. Creating default miner.');
+            return {
+              id: 0,
+              minerType: MinerType.BANANA_MINER,
+              x: 0,
+              y: 0
+            };
+          }
+        }
+      } catch (e) {
+        console.error("Error parsing miner position from localStorage:", e);
+      }
+    }
+    
+    console.log(`No miner found at (${targetX}, ${targetY}) in any source`);
+    return null;
   }, [gameState.miners, gameState.hasClaimedStarterMiner]);
 
   // Add global debugging object to persist across renders
@@ -280,6 +320,30 @@ export default function RoomPage() {
     
     return () => clearTimeout(checkTimer);
   }, [selectedTile, selectedTileHasMiner, getMinerAtTile]);
+
+  // Special check for position (0,0) which is commonly used for starter miners
+  useEffect(() => {
+    if (gameState.hasClaimedStarterMiner) {
+      console.log('🔍 Special check for starter miner at position (0,0)');
+      
+      // Check if there's a miner at 0,0
+      const hasMinerAt00 = selectedTileHasMiner(0, 0);
+      console.log(`🔍 Has miner at (0,0): ${hasMinerAt00}`);
+      
+      // If the current selected tile is at 0,0, force a refresh
+      if (selectedTile && selectedTile.x === 0 && selectedTile.y === 0) {
+        console.log('🔍 Current selected tile is at (0,0), forcing refresh');
+        setSelectedTile({...selectedTile});
+      }
+      
+      // If there's no selected tile but we know there's a miner at 0,0, select it
+      if (!selectedTile && hasMinerAt00) {
+        console.log('🔍 Auto-selecting tile (0,0) where miner exists');
+        setSelectedTile({x: 0, y: 0});
+        setActiveTab('selectedTile');
+      }
+    }
+  }, [gameState.hasClaimedStarterMiner, selectedTileHasMiner, selectedTile]);
 
   // Redirect if not connected or trying to access someone else's room
   useEffect(() => {
@@ -407,6 +471,8 @@ export default function RoomPage() {
                   // DIRECT LOCALSTORAGE CHECK (highest priority)
                   let minerFromLocalStorage = null;
                   
+                  console.log('DEBUG: Checking for miner at', selectedTile);
+                  
                   // Only do this if the user has claimed a starter miner but we don't have it in gameState
                   if (gameState.hasClaimedStarterMiner && 
                      (!gameState.miners || gameState.miners.length === 0) && 
@@ -438,11 +504,38 @@ export default function RoomPage() {
                     } catch (e) {
                       console.error("Error accessing localStorage:", e);
                     }
+                  } else {
+                    console.log('DEBUG: Skipping localStorage check because:', {
+                      hasClaimedStarterMiner: gameState.hasClaimedStarterMiner,
+                      hasMinersArray: !!(gameState.miners && gameState.miners.length > 0),
+                      browserEnvironment: typeof window !== 'undefined'
+                    });
                   }
                   
                   // Get miner using our helper method
                   const miner = getMinerAtTile(selectedTile.x, selectedTile.y);
                   console.log('Miner found by getMinerAtTile:', miner);
+                  
+                  // Always check localStorage as a fallback regardless of gameState.miners
+                  if (!miner && typeof window !== 'undefined' && gameState.hasClaimedStarterMiner) {
+                    try {
+                      const savedPositionStr = localStorage.getItem('claimedMinerPosition');
+                      if (savedPositionStr) {
+                        const position = JSON.parse(savedPositionStr);
+                        if (Number(position.x) === Number(selectedTile.x) && Number(position.y) === Number(selectedTile.y)) {
+                          console.log('FALLBACK: Found miner in localStorage after getMinerAtTile returned null');
+                          minerFromLocalStorage = {
+                            id: 0,
+                            minerType: MinerType.BANANA_MINER,
+                            x: Number(position.x),
+                            y: Number(position.y)
+                          };
+                        }
+                      }
+                    } catch (e) {
+                      console.error("Error in fallback localStorage check:", e);
+                    }
+                  }
                   
                   // Use either the contract miner or localStorage miner
                   const finalMiner = miner || minerFromLocalStorage;
@@ -672,15 +765,16 @@ export default function RoomPage() {
   };
 
   const handleGetStarterMiner = async () => {
-    if (!selectedTile) return;
+    // If no tile is selected, default to position (0,0) for the starter miner
+    const tileToUse = selectedTile || { x: 0, y: 0 };
     
-    console.log('Claiming starter miner at position:', selectedTile);
+    console.log('Claiming starter miner at position:', tileToUse);
     
     // Save position to localStorage for UI persistence
     if (typeof window !== 'undefined') {
       localStorage.setItem('claimedMinerPosition', JSON.stringify({
-        x: selectedTile.x,
-        y: selectedTile.y
+        x: tileToUse.x,
+        y: tileToUse.y
       }));
       console.log('Saved miner position to localStorage');
       
@@ -689,14 +783,14 @@ export default function RoomPage() {
       window.__BITAPE_DEBUG = window.__BITAPE_DEBUG || {};
       // @ts-ignore
       window.__BITAPE_DEBUG.claimedPosition = {
-        x: selectedTile.x, 
-        y: selectedTile.y
+        x: tileToUse.x, 
+        y: tileToUse.y
       };
     }
     
     try {
       // Call the contract method to claim the starter miner
-      await gameState.getStarterMiner(selectedTile.x, selectedTile.y);
+      await gameState.getStarterMiner(tileToUse.x, tileToUse.y);
       console.log('Starter miner claimed successfully');
       
       // Force refresh game state to update miners list
@@ -709,8 +803,8 @@ export default function RoomPage() {
       const newMiner = {
         id: gameState.miners?.length ? gameState.miners.length : 0,
         minerType: MinerType.BANANA_MINER,
-        x: selectedTile.x,
-        y: selectedTile.y
+        x: tileToUse.x,
+        y: tileToUse.y
       };
       
       // Debug log the new miner
@@ -719,20 +813,21 @@ export default function RoomPage() {
       setIsBuyModalOpen(false);
       
       // Re-check if the tile has a miner after the operation
-      const hasMinerNow = selectedTileHasMiner(selectedTile.x, selectedTile.y);
+      const hasMinerNow = selectedTileHasMiner(tileToUse.x, tileToUse.y);
       console.log(`Tile has miner after claiming: ${hasMinerNow}`);
       
       // Force a re-render by updating the selected tile (with the same values)
-      setSelectedTile({...selectedTile});
+      setSelectedTile({...tileToUse});
+      setActiveTab('selectedTile');
       
       // Wait a moment and then check again (async refresh might take time)
       setTimeout(() => {
         console.log('Delayed check for miner presence');
-        const hasMinerDelayed = selectedTileHasMiner(selectedTile.x, selectedTile.y);
+        const hasMinerDelayed = selectedTileHasMiner(tileToUse.x, tileToUse.y);
         console.log(`Tile has miner after delay: ${hasMinerDelayed}`);
         
         // Force another re-render if needed
-        setSelectedTile({...selectedTile});
+        setSelectedTile({...tileToUse});
       }, 2000);
     } catch (error) {
       console.error('Error claiming starter miner:', error);
@@ -755,6 +850,31 @@ export default function RoomPage() {
       2: "100"
     };
     return powerConsumptions[minerType as keyof typeof powerConsumptions] || "0";
+  };
+
+  // Render statistics panel function
+  const renderStatistics = (minerType: number) => {
+    if (minerType === undefined) return null;
+
+    // Get different statistics based on miner type
+    // Since these aren't actual properties on the PlayerMiner type, we get them from constants based on miner type
+    
+    return (
+      <div className="mt-2 space-y-2">
+        <div className="flex justify-between">
+          <span className="text-xs opacity-80">Hash Rate:</span>
+          <span className="text-xs font-bold">{getMinerHashRate(minerType)} GH/s</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-xs opacity-80">Mining Rate:</span>
+          <span className="text-xs font-bold">{getMinerMiningRate(minerType)} BIT/day</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-xs opacity-80">Power Consumption:</span>
+          <span className="text-xs font-bold">{getMinerPowerConsumption(minerType)} GW</span>
+        </div>
+      </div>
+    );
   };
 
   if (!isMounted) {
