@@ -17,6 +17,16 @@ const pulseStyle = `
   .miner-pulse {
     animation: pulse 2s infinite;
   }
+
+  @keyframes preview-pulse {
+    0% { filter: drop-shadow(0 0 1px #FFDD00); opacity: 0.7; }
+    50% { filter: drop-shadow(0 0 12px #FFDD00); opacity: 0.9; }
+    100% { filter: drop-shadow(0 0 1px #FFDD00); opacity: 0.7; }
+  }
+
+  .miner-preview {
+    animation: preview-pulse 1.5s infinite;
+  }
 `;
 
 export interface RoomVisualizationProps {
@@ -118,8 +128,14 @@ export function RoomVisualization({
       { x: 1, y: 1, top: '65%', left: '35%', width: '10%', height: '10%' }  // bottom left
     ];
 
+    // Get all claimed miner positions 
+    const claimedPositions = hasClaimedStarterMiner && facilityData && facilityData.miners > 0
+      ? getClaimedMinerPositions()
+      : [];
+
     return (
       <div className="absolute inset-0 pointer-events-none">
+        {/* Grid tiles */}
         {gridPositions.map((pos) => {
           const isSelected = selectedTile?.x === pos.x && selectedTile?.y === pos.y;
           
@@ -143,17 +159,50 @@ export function RoomVisualization({
           );
         })}
         
-        {/* Show miners on the grid */}
-        {hasClaimedStarterMiner && facilityData && facilityData.miners > 0 && (
-          <div className="absolute inset-0">
-            {getClaimedMinerPositions().map((minerPos, index) => {
-              // Find the grid position data for this miner
-              const pos = gridPositions.find(p => p.x === minerPos.x && p.y === minerPos.y);
+        {/* Show existing miners on the grid */}
+        {claimedPositions.map((minerPos, index) => {
+          // Find the grid position data for this miner
+          const pos = gridPositions.find(p => p.x === minerPos.x && p.y === minerPos.y);
+          if (!pos) return null;
+          
+          return (
+            <div 
+              key={`miner-${index}`}
+              className="absolute pointer-events-none z-20"
+              style={{
+                top: pos.top,
+                left: pos.left,
+                width: pos.width,
+                height: pos.height,
+                transform: 'skew(-24deg, 14deg)',
+              }}
+            >
+              <div className="relative w-full h-full">
+                <Image
+                  src="/banana-miner.gif"
+                  alt="Banana Miner"
+                  fill
+                  className="object-contain miner-pulse"
+                  style={{ 
+                    transform: 'skew(24deg, -14deg) scale(2.5) translate(-10%, -15%)',
+                    imageRendering: 'pixelated'
+                  }}
+                />
+              </div>
+            </div>
+          );
+        })}
+        
+        {/* Show preview of miner on selection (only when not already claimed) */}
+        {selectedTile && !hasClaimedStarterMiner && (
+          <>
+            {/* Find the selected grid position */}
+            {(() => {
+              const pos = gridPositions.find(p => p.x === selectedTile.x && p.y === selectedTile.y);
               if (!pos) return null;
               
               return (
                 <div 
-                  key={`miner-${index}`}
                   className="absolute pointer-events-none z-20"
                   style={{
                     top: pos.top,
@@ -166,19 +215,25 @@ export function RoomVisualization({
                   <div className="relative w-full h-full">
                     <Image
                       src="/banana-miner.gif"
-                      alt="Banana Miner"
+                      alt="Banana Miner Preview"
                       fill
-                      className="object-contain miner-pulse"
+                      className="object-contain miner-preview"
                       style={{ 
                         transform: 'skew(24deg, -14deg) scale(2.5) translate(-10%, -15%)',
-                        imageRendering: 'pixelated'
+                        imageRendering: 'pixelated',
+                        opacity: 0.7, // Make it slightly transparent to indicate it's a preview
                       }}
                     />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="bg-banana/60 text-royal px-2 py-1 text-xs font-press-start rounded transform -rotate-12">
+                        Preview
+                      </div>
+                    </div>
                   </div>
                 </div>
               );
-            })}
-          </div>
+            })()}
+          </>
         )}
       </div>
     );

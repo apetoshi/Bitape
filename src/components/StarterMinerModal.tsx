@@ -10,6 +10,21 @@ interface StarterMinerModalProps {
   isProcessing: boolean;
 }
 
+// Add keyframes for the modal miner animation
+const minerPreviewStyle = `
+  @keyframes float {
+    0% { transform: translateY(0px) rotate(0deg); }
+    25% { transform: translateY(-5px) rotate(-3deg); }
+    50% { transform: translateY(0px) rotate(0deg); }
+    75% { transform: translateY(5px) rotate(3deg); }
+    100% { transform: translateY(0px) rotate(0deg); }
+  }
+
+  .miner-float {
+    animation: float 3s ease-in-out infinite;
+  }
+`;
+
 const StarterMinerModal: React.FC<StarterMinerModalProps> = ({
   isOpen,
   onClose,
@@ -25,6 +40,7 @@ const StarterMinerModal: React.FC<StarterMinerModalProps> = ({
       onClose={onClose}
       className="relative z-50"
     >
+      <style jsx global>{minerPreviewStyle}</style>
       <div className="fixed inset-0 bg-black/70" aria-hidden="true" />
       <div className="fixed inset-0 flex items-center justify-center p-4">
         <Dialog.Panel className="relative bg-royal border-2 border-banana p-6 max-w-lg w-full m-4">
@@ -44,13 +60,27 @@ const StarterMinerModal: React.FC<StarterMinerModalProps> = ({
                 </p>
               )}
               
-              <div className="relative w-32 h-32 mx-auto mb-6">
-                <Image
-                  src="/banana-miner.gif"
-                  alt="Banana Miner"
-                  fill
-                  className="object-contain"
-                />
+              <div className="relative w-48 h-48 mx-auto mb-6">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className={`relative w-40 h-40 ${selectedTile ? "miner-float" : ""}`}>
+                    <Image
+                      src="/banana-miner.gif"
+                      alt="Banana Miner"
+                      fill
+                      className="object-contain"
+                      style={{
+                        filter: selectedTile ? 'drop-shadow(0 0 10px #FFDD00)' : 'none'
+                      }}
+                    />
+                  </div>
+                </div>
+                {selectedTile && (
+                  <div className="absolute bottom-0 w-full">
+                    <div className="bg-royal border border-banana rounded-full w-24 h-6 mx-auto flex items-center justify-center">
+                      <p className="text-banana text-xs font-press-start">POSITION {selectedTile.x},{selectedTile.y}</p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2 text-white">
