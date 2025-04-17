@@ -13,6 +13,15 @@ interface MinerPurchaseModalProps {
   hasClaimedStarterMiner: boolean;
 }
 
+// Add styles for mobile scrolling
+const modalScrollStyle = `
+  .miner-purchase-modal {
+    max-height: 90vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+`;
+
 const MinerPurchaseModal: React.FC<MinerPurchaseModalProps> = ({
   isOpen,
   onClose,
@@ -57,9 +66,10 @@ const MinerPurchaseModal: React.FC<MinerPurchaseModalProps> = ({
       onClose={onClose}
       className="relative z-50"
     >
+      <style jsx global>{modalScrollStyle}</style>
       <div className="fixed inset-0 bg-black/70" aria-hidden="true" />
-      <div className="fixed inset-0 flex items-center justify-center p-4">
-        <Dialog.Panel className="relative bg-royal border-2 border-banana p-6 max-w-4xl w-full m-4">
+      <div className="fixed inset-0 flex items-center justify-center p-4 overflow-y-auto">
+        <Dialog.Panel className="relative bg-royal border-2 border-banana p-6 max-w-4xl w-full m-4 miner-purchase-modal">
           <Dialog.Title className="font-press-start text-2xl text-banana mb-6 text-center">
             PURCHASE MINER
           </Dialog.Title>

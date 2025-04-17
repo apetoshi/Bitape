@@ -22,11 +22,22 @@ const apechain = {
   },
 };
 
-// 1. Create wagmi config
+// 1. Create wagmi config with enhanced mobile support
 export const config = createConfig({
   chains: [apechain],
   connectors: [
-    injected({ target: 'metaMask', shimDisconnect: true }),
+    // Better MetaMask support with more detection options
+    injected({
+      target: 'metaMask',
+      shimDisconnect: true,
+    }),
+    
+    // Fallback to other browser extensions/injected wallets
+    injected({
+      shimDisconnect: true,
+    }),
+    
+    // Enhanced WalletConnect for mobile
     walletConnect({
       projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'YOUR_WEB3MODAL_PROJECT_ID',
       metadata: {
@@ -37,6 +48,8 @@ export const config = createConfig({
       },
       showQrModal: true,
     }),
+    
+    // Coinbase Wallet
     coinbaseWallet({
       appName: 'BitApe',
       appLogoUrl: 'https://bitape.org/bitape.png'
@@ -48,7 +61,7 @@ export const config = createConfig({
 });
 
 // 2. Web3Modal project ID
-export const projectId = 'YOUR_WEB3MODAL_PROJECT_ID'; // Replace with your Web3Modal project ID
+export const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'YOUR_WEB3MODAL_PROJECT_ID';
 
 // 3. Create QueryClient
 export const queryClient = new QueryClient();

@@ -30,16 +30,37 @@ const ConnectWalletButton: React.FC<ConnectWalletButtonProps> = ({ className }) 
       setIsModalOpen(true);
     } else {
       try {
-        // Check if we're on mobile and MetaMask is available through deep linking
+        // Check if we're on mobile
         const isMobile = typeof window !== 'undefined' && 
           /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         
+        // Check for specific mobile wallet support
+        const hasMetaMaskInBrowser = typeof window !== 'undefined' && 
+          typeof window.ethereum !== 'undefined' && 
+          window.ethereum.isMetaMask;
+        
+        // Open the appropriate web3modal view based on device and available wallets
         if (isMobile) {
-          // Try to open MetaMask mobile app directly if available
-          await open({
-            view: 'Connect',
-          });
+          if (hasMetaMaskInBrowser) {
+            // Use injected MetaMask if available in browser
+            await open({
+              view: 'Connect'
+            });
+          } else {
+            // Launch WalletConnect QR or deep link options for mobile
+            await open({
+              view: 'Connect'
+            });
+            
+            // For MetaMask app - direct deep link if Web3Modal fails to open it
+            if (isMobile && !hasMetaMaskInBrowser) {
+              // Try direct deep linking to MetaMask as fallback
+              const mmDeepLink = `https://metamask.app.link/dapp/${window.location.host}${window.location.pathname}`;
+              window.open(mmDeepLink, '_blank');
+            }
+          }
         } else {
+          // Standard flow for desktop
           await open();
         }
       } catch (error) {

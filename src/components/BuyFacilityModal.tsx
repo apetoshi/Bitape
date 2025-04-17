@@ -10,6 +10,15 @@ interface BuyFacilityModalProps {
   onConfirm?: () => void;
 }
 
+// Add styles for mobile scrolling
+const modalScrollStyle = `
+  .facility-modal-content {
+    max-height: 90vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+`;
+
 export function BuyFacilityModal({ isOpen, onClose, onConfirm }: BuyFacilityModalProps) {
   const { 
     purchaseFacility, 
@@ -31,9 +40,10 @@ export function BuyFacilityModal({ isOpen, onClose, onConfirm }: BuyFacilityModa
       onClose={onClose}
       className="relative z-50"
     >
+      <style jsx global>{modalScrollStyle}</style>
       <div className="fixed inset-0 bg-black/70 transition-opacity duration-300" aria-hidden="true" />
-      <div className="fixed inset-0 flex items-center justify-center p-4">
-        <Dialog.Panel className="w-full max-w-md bg-royal border-2 border-banana p-6 shadow-lg shadow-black/25 transform transition-all">
+      <div className="fixed inset-0 flex items-center justify-center p-4 overflow-y-auto">
+        <Dialog.Panel className="w-full max-w-md bg-royal border-2 border-banana p-6 shadow-lg shadow-black/25 transform transition-all facility-modal-content">
           <Dialog.Title className="font-press-start text-xl text-banana mb-6 text-center">
             PURCHASE INITIAL FACILITY
           </Dialog.Title>
