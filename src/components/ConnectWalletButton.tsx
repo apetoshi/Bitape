@@ -37,7 +37,7 @@ const ConnectWalletButton: React.FC<ConnectWalletButtonProps> = ({ className }) 
         if (isMobile) {
           // Try to open MetaMask mobile app directly if available
           await open({
-            view: 'Mobile',
+            view: 'Connect',
           });
         } else {
           await open();
