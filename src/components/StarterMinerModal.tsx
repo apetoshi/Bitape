@@ -23,6 +23,13 @@ const minerPreviewStyle = `
   .miner-float {
     animation: float 3s ease-in-out infinite;
   }
+  
+  /* Ensure modal is scrollable on mobile */
+  .starter-miner-modal {
+    max-height: 90vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
 `;
 
 const StarterMinerModal: React.FC<StarterMinerModalProps> = ({
@@ -42,8 +49,8 @@ const StarterMinerModal: React.FC<StarterMinerModalProps> = ({
     >
       <style jsx global>{minerPreviewStyle}</style>
       <div className="fixed inset-0 bg-black/70" aria-hidden="true" />
-      <div className="fixed inset-0 flex items-center justify-center p-4">
-        <Dialog.Panel className="relative bg-royal border-2 border-banana p-6 max-w-lg w-full m-4">
+      <div className="fixed inset-0 flex items-center justify-center p-4 overflow-y-auto">
+        <Dialog.Panel className="relative bg-royal border-2 border-banana p-6 max-w-lg w-full m-4 starter-miner-modal">
           <Dialog.Title className="font-press-start text-2xl text-banana mb-6 text-center">
             CLAIM YOUR FREE BANANA MINER
           </Dialog.Title>

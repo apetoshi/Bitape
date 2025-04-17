@@ -30,7 +30,18 @@ const ConnectWalletButton: React.FC<ConnectWalletButtonProps> = ({ className }) 
       setIsModalOpen(true);
     } else {
       try {
-        await open();
+        // Check if we're on mobile and MetaMask is available through deep linking
+        const isMobile = typeof window !== 'undefined' && 
+          /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        if (isMobile) {
+          // Try to open MetaMask mobile app directly if available
+          await open({
+            view: 'Mobile',
+          });
+        } else {
+          await open();
+        }
       } catch (error) {
         console.error('Failed to connect wallet:', error);
       }

@@ -1,5 +1,6 @@
 import { createConfig, http } from 'wagmi';
 import { QueryClient } from '@tanstack/react-query';
+import { coinbaseWallet, injected, walletConnect } from 'wagmi/connectors';
 
 // Define ApeChain as a custom chain
 const apechain = {
@@ -24,7 +25,23 @@ const apechain = {
 // 1. Create wagmi config
 export const config = createConfig({
   chains: [apechain],
-  connectors: [], // Add your connectors here
+  connectors: [
+    injected({ target: 'metaMask', shimDisconnect: true }),
+    walletConnect({
+      projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'YOUR_WEB3MODAL_PROJECT_ID',
+      metadata: {
+        name: 'BitApe',
+        description: 'Mine BIT tokens on ApeChain',
+        url: 'https://bitape.org',
+        icons: ['https://bitape.org/bitape.png'],
+      },
+      showQrModal: true,
+    }),
+    coinbaseWallet({
+      appName: 'BitApe',
+      appLogoUrl: 'https://bitape.org/bitape.png'
+    })
+  ],
   transports: {
     [apechain.id]: http(),
   },
