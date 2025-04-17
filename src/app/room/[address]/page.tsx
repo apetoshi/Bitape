@@ -33,12 +33,12 @@ interface SelectedTile {
 
 interface FacilityData {
   level: bigint;
-  power: bigint;
-  miners: bigint;
   capacity: bigint;
+  miners: bigint;
+  power: bigint;
   used: bigint;
-  resources: bigint;
-  spaces: bigint;
+  x: bigint;
+  y: bigint;
 }
 
 interface MinerData {
@@ -62,7 +62,9 @@ export default function RoomPage() {
   const [isBuyModalOpen, setIsBuyModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
-  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState<boolean>(false);
+  const [isStarterMinerModalOpen, setIsStarterMinerModalOpen] = useState<boolean>(false);
+  const [isPurchaseMinerModalOpen, setIsPurchaseMinerModalOpen] = useState<boolean>(false);
   const [selectedTile, setSelectedTile] = useState<SelectedTile | null>(null);
   const [showMinerModal, setShowMinerModal] = useState(false);
   const [isGridModeActive, setIsGridModeActive] = useState(false);
@@ -95,8 +97,37 @@ export default function RoomPage() {
   };
 
   // Process facility data
-  const facility = facilityData as FacilityData | undefined;
+  const facility = facilityData as bigint[] | undefined;
   
+  // Create a parsed version of facility data with proper Number conversions
+  const parsedFacility = facility ? {
+    level: Number(facility[0]),         // level
+    capacity: Number(facility[1]),      // maxMiners
+    miners: Number(facility[2]),        // currMiners
+    power: Number(facility[3]),         // totalPowerOutput
+    used: Number(facility[4]),          // currPowerOutput
+    x: Number(facility[5]),             // grid X
+    y: Number(facility[6])              // grid Y
+  } : null;
+
+  // Create a compatible version for RoomVisualization component
+  const compatibleFacilityData = parsedFacility ? {
+    level: parsedFacility.level,
+    capacity: parsedFacility.capacity,
+    miners: parsedFacility.miners,
+    power: parsedFacility.power,
+    used: parsedFacility.used,
+    resources: 0,                       // Not used but required by the component
+    spaces: parsedFacility.capacity     // For backward compatibility
+  } : undefined;
+
+  // Calculate derived values for displaying in UI
+  const spacesLeft = parsedFacility ? 
+    (parsedFacility.capacity - parsedFacility.miners) : 0;
+
+  const gigawattsAvailable = parsedFacility ? 
+    (parsedFacility.power - parsedFacility.used) : 0;
+
   // Check if facility is initialized by using initializedStarterFacility function result
   const { data: initializedFacility } = useContractRead({
     address: CONTRACT_ADDRESSES.MAIN,
@@ -111,34 +142,102 @@ export default function RoomPage() {
   // Explicitly convert to boolean
   const hasFacility = Boolean(initializedFacility);
 
+  // Add global debugging object to persist across renders
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // @ts-ignore - Add debug object to window
+      window.__BITAPE_DEBUG = window.__BITAPE_DEBUG || {};
+      // @ts-ignore - Track miners
+      window.__BITAPE_DEBUG.miners = gameState.miners;
+      // @ts-ignore - Track selected tile
+      window.__BITAPE_DEBUG.selectedTile = selectedTile;
+    }
+  }, [gameState.miners, selectedTile]);
+
   // Check if selected tile has a miner
   const selectedTileHasMiner = (x: number, y: number): boolean => {
-    if (!gameState.hasClaimedStarterMiner) {
-      return false;
-    }
+    // Add debugging to understand the state of miners
+    console.log('Checking for miner at position:', { x, y });
+    console.log('Available miners:', gameState.miners);
     
-    // Check localStorage for miner position
-    if (typeof window !== 'undefined') {
-      const savedPositionStr = localStorage.getItem('claimedMinerPosition');
-      if (savedPositionStr) {
+    if (!gameState.miners || gameState.miners.length === 0) {
+      console.log('No miners available in gameState');
+      
+      // Fallback check using localStorage for starter miner
+      if (gameState.hasClaimedStarterMiner && typeof window !== 'undefined') {
         try {
-          const position = JSON.parse(savedPositionStr);
-          return position.x === x && position.y === y;
+          const savedPositionStr = localStorage.getItem('claimedMinerPosition');
+          if (savedPositionStr) {
+            const position = JSON.parse(savedPositionStr);
+            const matches = Number(position.x) === Number(x) && Number(position.y) === Number(y);
+            console.log(`Fallback check using localStorage. Match: ${matches}`);
+            return matches;
+          }
         } catch (e) {
           console.error("Error parsing miner position:", e);
         }
       }
+      
+      return false;
     }
     
-    // Fallback check based on facility miners count
-    const hasFacilityWithMiner = 
-      gameState.facilityData !== null && 
-      gameState.facilityData !== undefined &&
-      typeof gameState.facilityData === 'object' &&
-      'miners' in gameState.facilityData &&
-      gameState.facilityData.miners > 0;
+    // Convert coordinates to numbers to ensure consistent comparison
+    const targetX = Number(x);
+    const targetY = Number(y);
     
-    return hasFacilityWithMiner && playerMiners.length > 0;
+    // Check if any miner in the array has the given coordinates
+    const hasMiner = gameState.miners.some(miner => {
+      const minerX = Number(miner.x);
+      const minerY = Number(miner.y);
+      const matches = minerX === targetX && minerY === targetY;
+      console.log(`Miner at (${minerX}, ${minerY}) matches selected (${targetX}, ${targetY}): ${matches}`);
+      return matches;
+    });
+    
+    console.log(`Result: ${hasMiner ? 'Miner found' : 'No miner found'} at (${targetX}, ${targetY})`);
+    return hasMiner;
+  };
+
+  // Get miner at selected tile
+  const getMinerAtTile = (x: number, y: number) => {
+    if (!gameState.miners || gameState.miners.length === 0) {
+      console.log('No miners available in gameState, checking localStorage fallback');
+      
+      // Fallback for starter miner using localStorage
+      if (gameState.hasClaimedStarterMiner && typeof window !== 'undefined') {
+        try {
+          const savedPositionStr = localStorage.getItem('claimedMinerPosition');
+          if (savedPositionStr) {
+            const position = JSON.parse(savedPositionStr);
+            if (Number(position.x) === Number(x) && Number(position.y) === Number(y)) {
+              console.log('Found miner in localStorage');
+              return {
+                id: 0,
+                minerType: MinerType.BANANA_MINER,
+                x: Number(position.x),
+                y: Number(position.y)
+              };
+            }
+          }
+        } catch (e) {
+          console.error("Error parsing miner position:", e);
+        }
+      }
+      
+      return null;
+    }
+    
+    // Convert coordinates to numbers to ensure consistent comparison
+    const targetX = Number(x);
+    const targetY = Number(y);
+    
+    // Find the miner at the specified coordinates
+    const miner = gameState.miners.find(miner => 
+      Number(miner.x) === targetX && Number(miner.y) === targetY
+    );
+    
+    console.log('Found miner at selected position:', miner);
+    return miner || null;
   };
 
   // Redirect if not connected or trying to access someone else's room
@@ -157,7 +256,7 @@ export default function RoomPage() {
   }
 
   const renderTabContent = () => {
-    if (!gameState.hasFacility) {
+    if (!gameState.hasFacility && !hasFacility) {
       return (
         <div className="text-center p-4">
           <p className="bigcoin-text">Purchase a facility to view details</p>
@@ -188,14 +287,13 @@ export default function RoomPage() {
             <div className="flex justify-between items-center mb-2">
               <span className="bigcoin-text">SPACES LEFT</span>
               <span className="bigcoin-value font-press-start">
-                {facility ? 
-                  (Number(facility.spaces) - (gameState.miners?.length || 0)) : 4} SPACES
+                {parsedFacility ? `${parsedFacility.capacity - parsedFacility.miners} SPACES` : '0 SPACES'}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="bigcoin-text">GIGAWATTS AVAILABLE</span>
               <span className="bigcoin-value font-press-start">
-                {facility && !isNaN(Number(facility.power)) ? Number(facility.power) : 28} GW
+                {parsedFacility ? `${parsedFacility.power - parsedFacility.used} GW` : '0 GW'}
               </span>
             </div>
           </div>
@@ -212,21 +310,21 @@ export default function RoomPage() {
             <div className="flex justify-between items-center border-b border-white/20 pb-2">
               <span className="bigcoin-text">TOTAL SPACES</span>
               <span className="bigcoin-value font-press-start">
-                {facility && !isNaN(Number(facility.spaces)) ? Number(facility.spaces) : 4} SPACES
+                {parsedFacility ? `${parsedFacility.capacity} SPACES` : '0 SPACES'}
               </span>
             </div>
             
             <div className="flex justify-between items-center border-b border-white/20 pb-2">
               <span className="bigcoin-text">USED SPACES</span>
               <span className="bigcoin-value font-press-start">
-                {gameState.miners?.length || 0} SPACES
+                {parsedFacility ? `${parsedFacility.miners} SPACES` : '0 SPACES'}
               </span>
             </div>
             
             <div className="flex justify-between items-center pb-2">
               <span className="bigcoin-text">TOTAL GIGAWATTS</span>
               <span className="bigcoin-value font-press-start">
-                {facility && !isNaN(Number(facility.power)) ? Number(facility.power) : 28} GW
+                {parsedFacility ? `${parsedFacility.power} GW` : '0 GW'}
               </span>
             </div>
 
@@ -242,6 +340,18 @@ export default function RoomPage() {
         );
         
       case 'selectedTile':
+        // Additional debugging to understand what's happening during render
+        console.log('Rendering selectedTile tab. Selected tile:', selectedTile);
+        if (selectedTile) {
+          console.log('Checking for miner at selected tile during render');
+          const hasMiner = selectedTileHasMiner(selectedTile.x, selectedTile.y);
+          console.log('Has miner during render:', hasMiner);
+          if (hasMiner) {
+            const miner = getMinerAtTile(selectedTile.x, selectedTile.y);
+            console.log('Miner details during render:', miner);
+          }
+        }
+
         return (
           <div className="p-3 space-y-2">
             {selectedTile ? (
@@ -249,49 +359,103 @@ export default function RoomPage() {
                 <div className="border-b border-white/20 pb-2 mb-3">
                   <span className="bigcoin-text">LOCATION:</span>
                   <span className="bigcoin-value block mt-1">{getLocationDescription(selectedTile)}</span>
+                  <span className="bigcoin-text text-xs mt-1">POSITION: X: {selectedTile.x}, Y: {selectedTile.y}</span>
                 </div>
                 
-                {selectedTileHasMiner(selectedTile.x, selectedTile.y) ? (
-                  <div className="space-y-3">
-                    <p className="bigcoin-text">ACTIVE MINER:</p>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-16 h-16 relative">
-                        <Image
-                          src="/banana-miner.gif"
-                          alt="Banana Miner"
-                          fill
-                          className="object-contain"
-                        />
+                {(() => {
+                  // DIRECT LOCALSTORAGE CHECK (highest priority)
+                  let minerFromLocalStorage = null;
+                  
+                  // Only do this if the user has claimed a starter miner but we don't have it in gameState
+                  if (gameState.hasClaimedStarterMiner && 
+                     (!gameState.miners || gameState.miners.length === 0) && 
+                     typeof window !== 'undefined') {
+                    try {
+                      const savedPositionStr = localStorage.getItem('claimedMinerPosition');
+                      console.log('Direct localStorage check, saved position:', savedPositionStr);
+                      
+                      if (savedPositionStr) {
+                        const position = JSON.parse(savedPositionStr);
+                        console.log('Comparing localStorage position with selected tile:', {
+                          positionX: Number(position.x),
+                          positionY: Number(position.y),
+                          selectedX: Number(selectedTile.x),
+                          selectedY: Number(selectedTile.y)
+                        });
+                        
+                        if (Number(position.x) === Number(selectedTile.x) && 
+                            Number(position.y) === Number(selectedTile.y)) {
+                          console.log('MATCH FOUND in localStorage!');
+                          minerFromLocalStorage = {
+                            id: 0,
+                            minerType: MinerType.BANANA_MINER,
+                            x: Number(position.x),
+                            y: Number(position.y)
+                          };
+                        }
+                      }
+                    } catch (e) {
+                      console.error("Error accessing localStorage:", e);
+                    }
+                  }
+                  
+                  // Get miner using our helper method
+                  const miner = getMinerAtTile(selectedTile.x, selectedTile.y);
+                  console.log('Miner found by getMinerAtTile:', miner);
+                  
+                  // Use either the contract miner or localStorage miner
+                  const finalMiner = miner || minerFromLocalStorage;
+                  console.log('Final miner to display:', finalMiner);
+                  
+                  if (finalMiner) {
+                    return (
+                      <div className="space-y-3">
+                        <p className="bigcoin-text">MINER DETAILS:</p>
+                        <p className="bigcoin-text text-xs">Source: {miner ? 'Contract Data' : 'LocalStorage'}</p>
+                        <div className="flex items-center space-x-2">
+                          <div className="w-16 h-16 relative">
+                            <Image
+                              src="/banana-miner.gif"
+                              alt="Banana Miner"
+                              fill
+                              className="object-contain"
+                            />
+                          </div>
+                          <div>
+                            <p className="bigcoin-value">{getMinerTypeName(finalMiner.minerType)}</p>
+                            <p className="bigcoin-text text-xs opacity-80">HASH RATE: {getMinerHashRate(finalMiner.minerType)} GH/s</p>
+                            <p className="bigcoin-text text-xs opacity-80">ENERGY: {getMinerPowerConsumption(finalMiner.minerType)} WATTS</p>
+                          </div>
+                        </div>
+                        <div className="mt-4">
+                          <button
+                            onClick={() => setShowMinerModal(true)}
+                            className="w-full bigcoin-button"
+                          >
+                            UPGRADE MINER
+                          </button>
+                        </div>
                       </div>
+                    );
+                  } else {
+                    // No miner found at this location
+                    return (
                       <div>
-                        <p className="bigcoin-value">BANANA MINER</p>
-                        <p className="bigcoin-text text-xs opacity-80">100 GH/s · 1 WATT</p>
+                        <p className="bigcoin-text mb-3">NO MINER INSTALLED</p>
+                        {hasFacility && (
+                          <div className="mt-4">
+                            <button
+                              onClick={() => setShowMinerModal(true)}
+                              className="w-full bigcoin-button"
+                            >
+                              BUY MINER
+                            </button>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                    <div className="mt-4">
-                      <button
-                        onClick={() => setShowMinerModal(true)}
-                        className="w-full bigcoin-button"
-                      >
-                        UPGRADE MINER
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div>
-                    <p className="bigcoin-text mb-3">NO MINER INSTALLED</p>
-                    {hasFacility && (
-                      <div className="mt-4">
-                        <button
-                          onClick={() => setShowMinerModal(true)}
-                          className="w-full bigcoin-button"
-                        >
-                          BUY MINER
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
+                    );
+                  }
+                })()}
               </div>
             ) : (
               <div className="text-center p-2">
@@ -312,89 +476,121 @@ export default function RoomPage() {
     switch (activeMobileTab) {
       case 'actions':
         return (
-          <div className="bigcoin-panel mb-5" id="actions-tab-content">
-            <div className="flex border-b-2 border-banana">
+          <div className="p-4">
+            <div className="grid grid-cols-1 gap-4">
               <button
-                className={`px-3 py-1 flex-1 bigcoin-tab ${activeTab === 'resources' ? 'active' : ''}`}
-                onClick={() => setActiveTab('resources')}
+                className="bigcoin-button"
+                onClick={() => setIsUpgradeModalOpen(true)}
               >
-                RESOURCES
+                UPGRADE FACILITY
               </button>
+              {!gameState.hasClaimedStarterMiner && (
+                <button
+                  className="bigcoin-button"
+                  onClick={() => setIsStarterMinerModalOpen(true)}
+                  disabled={gameState.isGettingStarterMiner}
+                >
+                  {gameState.isGettingStarterMiner ? "PROCESSING..." : "CLAIM STARTER MINER"}
+                </button>
+              )}
               <button
-                className={`px-3 py-1 flex-1 bigcoin-tab ${activeTab === 'space' ? 'active' : ''}`}
-                onClick={() => setActiveTab('space')}
+                className="bigcoin-button"
+                onClick={() => setIsPurchaseMinerModalOpen(true)}
               >
-                SPACE
-              </button>
-              <button
-                className={`px-3 py-1 flex-1 bigcoin-tab ${activeTab === 'selectedTile' ? 'active' : ''}`}
-                onClick={() => setActiveTab('selectedTile')}
-              >
-                SELECTED TILE
+                PURCHASE MINER
               </button>
             </div>
-            {renderTabContent()}
           </div>
         );
-        
       case 'stats':
         return (
-          <div className="bigcoin-panel mb-5" id="stats-tab-content">
-            <div className="flex border-b-2 border-[#FFD700] p-2">
-              <button 
-                onClick={() => setStatsView("simple")}
-                className={`bigcoin-text mr-4 ${statsView === "simple" ? "bigcoin-value" : "opacity-50"}`}
-              >
-                SIMPLE
-              </button>
-              <button className="bigcoin-text opacity-50">/</button>
-              <button 
-                onClick={() => setStatsView("pro")}
-                className={`bigcoin-text ml-4 ${statsView === "pro" ? "bigcoin-value" : "opacity-50"}`}
-              >
-                PRO
-              </button>
+          <div className="p-4">
+            <div className="flex justify-between items-center mb-2">
+              <span className="bigcoin-text">APE BALANCE</span>
+              <span className="bigcoin-value font-press-start">{apeBalance || '0'} APE</span>
             </div>
-            
-            {statsView === "simple" ? (
-              <div className="p-3 space-y-2 font-press-start">
-                <p className="bigcoin-text">- YOU ARE MINING <span className="bigcoin-value">{gameState.miningRate || '0'} BIT</span> A DAY</p>
-                <p className="bigcoin-text">- YOUR HASH RATE IS <span className="bigcoin-value">{gameState.hashRate || '0'} GH/S</span></p>
-                <p className="bigcoin-text">- <span className="bigcoin-value">{gameState.blocksUntilHalving || '0'} BLOCKS</span> UNTIL NEXT HALVENING</p>
-                <p className="bigcoin-text">- YOU HAVE <span className="bigcoin-value">{gameState.networkHashRatePercentage || '0'}%</span> OF THE TOTAL NETWORK HASH RATE (<span className="bigcoin-value">{gameState.totalNetworkHashRate || '0'} GH/S</span>)</p>
-              </div>
-            ) : (
-              <div className="p-3 space-y-2 font-press-start">
-                <p className="bigcoin-text">- <span className="bigcoin-value">{gameState.rewardPerBlock || '0'}</span> TOTAL BIT MINED PER BLOCK</p>
-                <p className="bigcoin-text">- <span className="bigcoin-value">{gameState.totalMinedBit || '0'}</span> $BIT HAS EVER BEEN MINED</p>
-                <p className="bigcoin-text">- <span className="bigcoin-value">{gameState.burnedBit || '0'}</span> $BIT HAS BEEN BURNED</p>
-              </div>
-            )}
+            <div className="flex justify-between items-center mb-2">
+              <span className="bigcoin-text">BIT BALANCE</span>
+              <span className="bigcoin-value font-press-start">{bitBalance || '0'} BIT</span>
+            </div>
+            <div className="flex justify-between items-center mb-2">
+              <span className="bigcoin-text">SPACES LEFT</span>
+              <span className="bigcoin-value font-press-start">
+                {parsedFacility ? `${parsedFacility.capacity - parsedFacility.miners} SPACES` : '0 SPACES'}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="bigcoin-text">GIGAWATTS AVAILABLE</span>
+              <span className="bigcoin-value font-press-start">
+                {parsedFacility ? `${parsedFacility.power - parsedFacility.used} GW` : '0 GW'}
+              </span>
+            </div>
           </div>
         );
-        
       case 'mining':
         return (
-          <div className="bigcoin-panel mb-5" id="mining-tab-content">
-            <div className="flex border-b-2 border-[#FFD700] p-2">
-              <span className="bigcoin-text bigcoin-value">MINED BIT</span>
+          <div className="p-4">
+            <div className="flex justify-between items-center mb-2">
+              <span className="bigcoin-text">TOTAL SPACES</span>
+              <span className="bigcoin-value font-press-start">
+                {parsedFacility ? `${parsedFacility.capacity} SPACES` : '0 SPACES'}
+              </span>
             </div>
-            <div className="p-3 text-center">
-              <p className="bigcoin-text mb-3">YOU HAVE MINED <span className="bigcoin-value">{gameState.minedBit || 0} BIT</span></p>
-              <button 
-                onClick={() => gameState.claimReward()}
-                disabled={gameState.isClaimingReward || !gameState.hasFacility}
-                className="w-full bigcoin-button"
-              >
-                CLAIM MINED BIT
-              </button>
+            <div className="flex justify-between items-center mb-2">
+              <span className="bigcoin-text">USED SPACES</span>
+              <span className="bigcoin-value font-press-start">
+                {parsedFacility ? `${parsedFacility.miners} SPACES` : '0 SPACES'}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="bigcoin-text">TOTAL GIGAWATTS</span>
+              <span className="bigcoin-value font-press-start">
+                {parsedFacility ? `${parsedFacility.power} GW` : '0 GW'}
+              </span>
+            </div>
+            <div className="mt-4">
+              <h3 className="text-lg font-bold mb-2">Your Miners</h3>
+              {gameState.miners && gameState.miners.length > 0 ? (
+                <div className="grid grid-cols-1 gap-4">
+                  {gameState.miners.map((miner, index) => (
+                    <div key={index} className="border border-white/20 p-3 rounded">
+                      <div className="flex justify-between items-center">
+                        <span>Miner #{miner.id}</span>
+                        <span>Type: {getMinerTypeName(miner.minerType)}</span>
+                      </div>
+                      <div className="mt-2">
+                        <span>Mining rate: {getMinerMiningRate(miner.minerType)} BIT/day</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-4">No miners yet</div>
+              )}
             </div>
           </div>
         );
-        
       default:
-        return <div className="bigcoin-panel">Select a tab</div>;
+        return null;
     }
+  };
+
+  const getMinerTypeName = (minerType: number) => {
+    const minerTypes = {
+      0: "BANANA MINER",
+      1: "APE MINER",
+      2: "ROYAL APE MINER"
+    };
+    return minerTypes[minerType as keyof typeof minerTypes] || "UNKNOWN";
+  };
+
+  const getMinerMiningRate = (minerType: number) => {
+    const miningRates = {
+      0: "1",
+      1: "10",
+      2: "100"
+    };
+    return miningRates[minerType as keyof typeof miningRates] || "0";
   };
 
   const getLocationDescription = (tile: SelectedTile) => {
@@ -406,8 +602,13 @@ export default function RoomPage() {
   };
 
   const handleTileSelect = (x: number, y: number) => {
+    console.log(`Tile selected at (${x}, ${y})`);
     setSelectedTile({ x, y });
     setActiveTab('selectedTile');
+    
+    // Check if there's a miner at this position immediately after selection
+    const hasMiner = selectedTileHasMiner(x, y);
+    console.log(`Tile has miner: ${hasMiner}`);
   };
 
   const handlePurchaseFacility = async () => {
@@ -431,9 +632,130 @@ export default function RoomPage() {
 
   const handleGetStarterMiner = async () => {
     if (!selectedTile) return;
-    await gameState.getStarterMiner(selectedTile.x, selectedTile.y);
-    setIsBuyModalOpen(false);
+    
+    console.log('Claiming starter miner at position:', selectedTile);
+    
+    // Save position to localStorage for UI persistence
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('claimedMinerPosition', JSON.stringify({
+        x: selectedTile.x,
+        y: selectedTile.y
+      }));
+      console.log('Saved miner position to localStorage');
+      
+      // Add to our debug object for inspection
+      // @ts-ignore
+      window.__BITAPE_DEBUG = window.__BITAPE_DEBUG || {};
+      // @ts-ignore
+      window.__BITAPE_DEBUG.claimedPosition = {
+        x: selectedTile.x, 
+        y: selectedTile.y
+      };
+    }
+    
+    try {
+      // Call the contract method to claim the starter miner
+      await gameState.getStarterMiner(selectedTile.x, selectedTile.y);
+      console.log('Starter miner claimed successfully');
+      
+      // Force refresh game state to update miners list
+      if (gameState.refetch) {
+        console.log('Refreshing game state after claiming miner');
+        await gameState.refetch();
+      }
+      
+      // Manually update miners array if needed as a fallback
+      const newMiner = {
+        id: gameState.miners?.length ? gameState.miners.length : 0,
+        minerType: MinerType.BANANA_MINER,
+        x: selectedTile.x,
+        y: selectedTile.y
+      };
+      
+      // Debug log the new miner
+      console.log('Created new miner object:', newMiner);
+      
+      setIsBuyModalOpen(false);
+      
+      // Re-check if the tile has a miner after the operation
+      const hasMinerNow = selectedTileHasMiner(selectedTile.x, selectedTile.y);
+      console.log(`Tile has miner after claiming: ${hasMinerNow}`);
+      
+      // Force a re-render by updating the selected tile (with the same values)
+      setSelectedTile({...selectedTile});
+      
+      // Wait a moment and then check again (async refresh might take time)
+      setTimeout(() => {
+        console.log('Delayed check for miner presence');
+        const hasMinerDelayed = selectedTileHasMiner(selectedTile.x, selectedTile.y);
+        console.log(`Tile has miner after delay: ${hasMinerDelayed}`);
+        
+        // Force another re-render if needed
+        setSelectedTile({...selectedTile});
+      }, 2000);
+    } catch (error) {
+      console.error('Error claiming starter miner:', error);
+    }
   };
+
+  const getMinerHashRate = (minerType: number) => {
+    const hashRates = {
+      0: "100",
+      1: "1000",
+      2: "10000"
+    };
+    return hashRates[minerType as keyof typeof hashRates] || "0";
+  };
+
+  const getMinerPowerConsumption = (minerType: number) => {
+    const powerConsumptions = {
+      0: "1",
+      1: "10",
+      2: "100"
+    };
+    return powerConsumptions[minerType as keyof typeof powerConsumptions] || "0";
+  };
+
+  // Add a useEffect to log miners whenever they change
+  useEffect(() => {
+    if (gameState.miners && gameState.miners.length > 0) {
+      console.log('Miners updated:', gameState.miners);
+    }
+  }, [gameState.miners]);
+
+  // Force a re-render when selectedTile or miners change
+  useEffect(() => {
+    if (selectedTile) {
+      console.log('Selected tile or miners changed, checking for miner...');
+      const hasMiner = selectedTileHasMiner(selectedTile.x, selectedTile.y);
+      console.log(`Selected tile has miner: ${hasMiner}`);
+      
+      // Force re-render by updating state slightly
+      setSelectedTile(prev => prev ? {...prev} : null);
+    }
+  }, [selectedTile, gameState.miners, gameState.hasClaimedStarterMiner]);
+
+  // Force a check after component mount to make sure we're detecting miners
+  useEffect(() => {
+    const checkTimer = setTimeout(() => {
+      if (selectedTile) {
+        console.log('⭐ Delayed check for miner at selected tile');
+        const hasMiner = selectedTileHasMiner(selectedTile.x, selectedTile.y);
+        console.log(`⭐ Has miner: ${hasMiner}`);
+        
+        // Get detailed miner info
+        if (hasMiner) {
+          const miner = getMinerAtTile(selectedTile.x, selectedTile.y);
+          console.log('⭐ Miner details:', miner);
+        }
+        
+        // Refresh the UI
+        setSelectedTile(prev => prev ? {...prev} : null);
+      }
+    }, 1000);
+    
+    return () => clearTimeout(checkTimer);
+  }, []);
 
   if (!isMounted) {
     return null;
@@ -472,17 +794,9 @@ export default function RoomPage() {
           <div className="bigcoin-panel">
             <RoomVisualization 
               hasFacility={hasFacility}
-              facilityData={facility ? {
-                power: Number(facility.power),
-                level: Number(facility.level),
-                miners: Number(facility.miners),
-                capacity: Number(facility.capacity),
-                used: Number(facility.used),
-                resources: Number(facility.resources),
-                spaces: Number(facility.spaces)
-              } : undefined}
+              facilityData={compatibleFacilityData}
               onPurchaseFacility={handlePurchaseFacility}
-              onGetStarterMiner={gameState.getStarterMiner}
+              onGetStarterMiner={handleGetStarterMiner}
               onUpgradeFacility={handleUpgradeFacility}
               onPurchaseMiner={gameState.purchaseMiner}
               isPurchasingFacility={gameState.isPurchasingFacility}
@@ -628,17 +942,9 @@ export default function RoomPage() {
             <div className="relative w-[700px] h-[700px] border border-banana overflow-hidden p-1.5">
               <RoomVisualization 
                 hasFacility={hasFacility}
-                facilityData={facility ? {
-                  power: Number(facility.power),
-                  level: Number(facility.level),
-                  miners: Number(facility.miners),
-                  capacity: Number(facility.capacity),
-                  used: Number(facility.used),
-                  resources: Number(facility.resources),
-                  spaces: Number(facility.spaces)
-                } : undefined}
+                facilityData={compatibleFacilityData}
                 onPurchaseFacility={handlePurchaseFacility}
-                onGetStarterMiner={gameState.getStarterMiner}
+                onGetStarterMiner={handleGetStarterMiner}
                 onUpgradeFacility={handleUpgradeFacility}
                 onPurchaseMiner={gameState.purchaseMiner}
                 isPurchasingFacility={gameState.isPurchasingFacility}

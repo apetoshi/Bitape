@@ -111,43 +111,71 @@ export function RoomVisualization({
   };
 
   const handleClaimStarterMiner = async (x: number, y: number) => {
+    console.log(`Claiming starter miner at position (${x}, ${y})`);
+    
     // Save position to local storage for UI persistence
     if (typeof window !== 'undefined') {
-      localStorage.setItem('claimedMinerPosition', JSON.stringify({x, y}));
+      const positionData = { x: Number(x), y: Number(y) };
+      localStorage.setItem('claimedMinerPosition', JSON.stringify(positionData));
+      console.log('Saved miner position to localStorage:', positionData);
     }
     
-    if (onPurchaseMiner) {
-      await onPurchaseMiner(MinerType.BANANA_MINER, x, y);
-    } else {
-      await onGetStarterMiner(x, y);
-    }
-    
-    setIsStarterMinerModalOpen(false);
-    // Enable grid mode after claiming to show the user their miner
-    if (toggleGridMode && !isGridMode) {
-      toggleGridMode();
+    try {
+      if (onPurchaseMiner) {
+        console.log('Using onPurchaseMiner to claim starter miner');
+        await onPurchaseMiner(MinerType.BANANA_MINER, x, y);
+      } else {
+        console.log('Using onGetStarterMiner to claim starter miner');
+        await onGetStarterMiner(x, y);
+      }
+      
+      console.log('Starter miner claimed successfully');
+      setIsStarterMinerModalOpen(false);
+      
+      // Enable grid mode after claiming to show the user their miner
+      if (toggleGridMode && !isGridMode) {
+        console.log('Enabling grid mode after claiming miner');
+        toggleGridMode();
+      }
+    } catch (error) {
+      console.error('Error claiming starter miner:', error);
     }
   };
 
   // Function to get all miner positions, either from contract or localStorage (for starter miner)
   const getAllMinerPositions = () => {
+    console.log('Getting all miner positions in RoomVisualization');
+    console.log('Miners from props:', miners);
+    console.log('Has claimed starter miner:', hasClaimedStarterMiner);
+    
     // Get miners from props (contract data)
-    const contractMiners = miners.map(miner => ({
-      ...miner,
-      image: MINERS[miner.minerType]?.image || '/banana-miner.gif'
-    }));
+    const contractMiners = miners.map(miner => {
+      console.log('Processing miner:', miner);
+      return {
+        ...miner,
+        x: Number(miner.x), // Ensure x is a number
+        y: Number(miner.y), // Ensure y is a number
+        image: MINERS[miner.minerType]?.image || '/banana-miner.gif'
+      };
+    });
+    
+    console.log('Processed contract miners:', contractMiners);
     
     // If no contract miners but user has claimed starter miner, try getting from localStorage
     if (contractMiners.length === 0 && hasClaimedStarterMiner && typeof window !== 'undefined') {
+      console.log('No contract miners, checking localStorage');
       const savedPositionStr = localStorage.getItem('claimedMinerPosition');
+      console.log('Saved position from localStorage:', savedPositionStr);
+      
       if (savedPositionStr) {
         try {
           const position = JSON.parse(savedPositionStr);
+          console.log('Parsed position from localStorage:', position);
           return [{
             id: 0,
             minerType: MinerType.BANANA_MINER,
-            x: position.x,
-            y: position.y,
+            x: Number(position.x), // Ensure x is a number
+            y: Number(position.y), // Ensure y is a number
             image: MINERS[MinerType.BANANA_MINER].image
           }];
         } catch (e) {
@@ -156,6 +184,7 @@ export function RoomVisualization({
       }
       
       // Default fallback for starter miner if nothing in localStorage
+      console.log('Using default fallback position for starter miner');
       return [{
         id: 0,
         minerType: MinerType.BANANA_MINER,
@@ -184,12 +213,36 @@ export function RoomVisualization({
     
     // Check if a tile is occupied by a miner
     const isTileOccupied = (x: number, y: number) => {
-      return allMiners.some(miner => miner.x === x && miner.y === y);
+      console.log(`Checking if tile (${x}, ${y}) is occupied`);
+      const targetX = Number(x);
+      const targetY = Number(y);
+      
+      const result = allMiners.some(miner => {
+        const minerX = Number(miner.x);
+        const minerY = Number(miner.y);
+        const matches = minerX === targetX && minerY === targetY;
+        console.log(`Comparing miner at (${minerX}, ${minerY}) with target (${targetX}, ${targetY}): ${matches}`);
+        return matches;
+      });
+      
+      console.log(`Tile (${x}, ${y}) occupied: ${result}`);
+      return result;
     };
     
     // Get miner at a specific tile
     const getMinerAtTile = (x: number, y: number) => {
-      return allMiners.find(miner => miner.x === x && miner.y === y);
+      console.log(`Getting miner at tile (${x}, ${y})`);
+      const targetX = Number(x);
+      const targetY = Number(y);
+      
+      const miner = allMiners.find(miner => {
+        const minerX = Number(miner.x);
+        const minerY = Number(miner.y);
+        return minerX === targetX && minerY === targetY;
+      });
+      
+      console.log(`Miner at tile (${x}, ${y}):`, miner);
+      return miner;
     };
 
     return (
