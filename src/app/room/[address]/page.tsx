@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -142,20 +142,8 @@ export default function RoomPage() {
   // Explicitly convert to boolean
   const hasFacility = Boolean(initializedFacility);
 
-  // Add global debugging object to persist across renders
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      // @ts-ignore - Add debug object to window
-      window.__BITAPE_DEBUG = window.__BITAPE_DEBUG || {};
-      // @ts-ignore - Track miners
-      window.__BITAPE_DEBUG.miners = gameState.miners;
-      // @ts-ignore - Track selected tile
-      window.__BITAPE_DEBUG.selectedTile = selectedTile;
-    }
-  }, [gameState.miners, selectedTile]);
-
   // Check if selected tile has a miner
-  const selectedTileHasMiner = (x: number, y: number): boolean => {
+  const selectedTileHasMiner = useCallback((x: number, y: number): boolean => {
     // Add debugging to understand the state of miners
     console.log('Checking for miner at position:', { x, y });
     console.log('Available miners:', gameState.miners);
@@ -196,10 +184,10 @@ export default function RoomPage() {
     
     console.log(`Result: ${hasMiner ? 'Miner found' : 'No miner found'} at (${targetX}, ${targetY})`);
     return hasMiner;
-  };
+  }, [gameState.miners, gameState.hasClaimedStarterMiner]);
 
   // Get miner at selected tile
-  const getMinerAtTile = (x: number, y: number) => {
+  const getMinerAtTile = useCallback((x: number, y: number) => {
     if (!gameState.miners || gameState.miners.length === 0) {
       console.log('No miners available in gameState, checking localStorage fallback');
       
@@ -238,7 +226,60 @@ export default function RoomPage() {
     
     console.log('Found miner at selected position:', miner);
     return miner || null;
-  };
+  }, [gameState.miners, gameState.hasClaimedStarterMiner]);
+
+  // Add global debugging object to persist across renders
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // @ts-ignore - Add debug object to window
+      window.__BITAPE_DEBUG = window.__BITAPE_DEBUG || {};
+      // @ts-ignore - Track miners
+      window.__BITAPE_DEBUG.miners = gameState.miners;
+      // @ts-ignore - Track selected tile
+      window.__BITAPE_DEBUG.selectedTile = selectedTile;
+    }
+  }, [gameState.miners, selectedTile]);
+
+  // Add a useEffect to log miners whenever they change
+  useEffect(() => {
+    if (gameState.miners && gameState.miners.length > 0) {
+      console.log('Miners updated:', gameState.miners);
+    }
+  }, [gameState.miners]);
+
+  // Force a re-render when selectedTile or miners change
+  useEffect(() => {
+    if (selectedTile) {
+      console.log('Selected tile or miners changed, checking for miner...');
+      const hasMiner = selectedTileHasMiner(selectedTile.x, selectedTile.y);
+      console.log(`Selected tile has miner: ${hasMiner}`);
+      
+      // Force re-render by updating state slightly
+      setSelectedTile(prev => prev ? {...prev} : null);
+    }
+  }, [selectedTile, gameState.miners, gameState.hasClaimedStarterMiner, selectedTileHasMiner]);
+
+  // Force a check after component mount to make sure we're detecting miners
+  useEffect(() => {
+    const checkTimer = setTimeout(() => {
+      if (selectedTile) {
+        console.log('⭐ Delayed check for miner at selected tile');
+        const hasMiner = selectedTileHasMiner(selectedTile.x, selectedTile.y);
+        console.log(`⭐ Has miner: ${hasMiner}`);
+        
+        // Get detailed miner info
+        if (hasMiner) {
+          const miner = getMinerAtTile(selectedTile.x, selectedTile.y);
+          console.log('⭐ Miner details:', miner);
+        }
+        
+        // Refresh the UI
+        setSelectedTile(prev => prev ? {...prev} : null);
+      }
+    }, 1000);
+    
+    return () => clearTimeout(checkTimer);
+  }, [selectedTile, selectedTileHasMiner, getMinerAtTile]);
 
   // Redirect if not connected or trying to access someone else's room
   useEffect(() => {
@@ -715,47 +756,6 @@ export default function RoomPage() {
     };
     return powerConsumptions[minerType as keyof typeof powerConsumptions] || "0";
   };
-
-  // Add a useEffect to log miners whenever they change
-  useEffect(() => {
-    if (gameState.miners && gameState.miners.length > 0) {
-      console.log('Miners updated:', gameState.miners);
-    }
-  }, [gameState.miners]);
-
-  // Force a re-render when selectedTile or miners change
-  useEffect(() => {
-    if (selectedTile) {
-      console.log('Selected tile or miners changed, checking for miner...');
-      const hasMiner = selectedTileHasMiner(selectedTile.x, selectedTile.y);
-      console.log(`Selected tile has miner: ${hasMiner}`);
-      
-      // Force re-render by updating state slightly
-      setSelectedTile(prev => prev ? {...prev} : null);
-    }
-  }, [selectedTile, gameState.miners, gameState.hasClaimedStarterMiner]);
-
-  // Force a check after component mount to make sure we're detecting miners
-  useEffect(() => {
-    const checkTimer = setTimeout(() => {
-      if (selectedTile) {
-        console.log('⭐ Delayed check for miner at selected tile');
-        const hasMiner = selectedTileHasMiner(selectedTile.x, selectedTile.y);
-        console.log(`⭐ Has miner: ${hasMiner}`);
-        
-        // Get detailed miner info
-        if (hasMiner) {
-          const miner = getMinerAtTile(selectedTile.x, selectedTile.y);
-          console.log('⭐ Miner details:', miner);
-        }
-        
-        // Refresh the UI
-        setSelectedTile(prev => prev ? {...prev} : null);
-      }
-    }, 1000);
-    
-    return () => clearTimeout(checkTimer);
-  }, []);
 
   if (!isMounted) {
     return null;
