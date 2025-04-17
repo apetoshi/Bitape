@@ -97,10 +97,49 @@ export const MAIN_CONTRACT_ABI = [
     type: 'function',
   },
   {
+    inputs: [
+      { name: 'minerType', type: 'uint256' },
+      { name: 'x', type: 'uint256' },
+      { name: 'y', type: 'uint256' }
+    ],
+    name: 'purchaseMiner',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
     inputs: [],
     name: 'upgradeFacility',
     outputs: [],
     stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [{ name: 'user', type: 'address' }],
+    name: 'getUserMiners',
+    outputs: [
+      { name: 'minerIds', type: 'uint256[]' },
+      { name: 'minerTypes', type: 'uint256[]' },
+      { name: 'positions', type: 'uint256[]' }
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [{ name: 'minerType', type: 'uint256' }],
+    name: 'getMinerPrice',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [{ name: 'minerType', type: 'uint256' }],
+    name: 'getMinerSpecs',
+    outputs: [
+      { name: 'hashrate', type: 'uint256' },
+      { name: 'powerConsumption', type: 'uint256' }
+    ],
+    stateMutability: 'view',
     type: 'function',
   },
 ] as const;

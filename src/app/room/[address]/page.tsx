@@ -9,6 +9,7 @@ import { zeroAddress } from 'viem';
 import { useGameState } from '@/hooks/useGameState';
 import { useTokenBalance } from '@/hooks/useTokenBalance';
 import { CONTRACT_ADDRESSES, MAIN_CONTRACT_ABI } from '@/config/contracts';
+import { MinerType } from '@/config/miners';
 import BuyFacilityModal from '@/components/BuyFacilityModal';
 import AccountModal from '@/components/AccountModal';
 import ReferralModal from '@/components/ReferralModal';
@@ -17,7 +18,7 @@ import { ResourcesPanel } from '@/components/ResourcesPanel';
 import { MiningClaimSection } from '@/components/MiningClaimSection';
 import { useIsMounted } from '@/hooks/useIsMounted';
 import FacilityPurchaseModal from '@/components/FacilityPurchaseModal';
-import { useDisclosure } from '@chakra-ui/react';
+import MinerPurchaseModal from '@/components/MinerPurchaseModal';
 import { Address } from 'viem';
 
 type Tab = 'resources' | 'space' | 'selectedTile';
@@ -288,9 +289,9 @@ export default function RoomPage() {
     setIsUpgradeModalOpen(true);
   };
 
-  const handleMinerPurchase = async (x: number, y: number) => {
+  const handleMinerPurchase = async (minerType: MinerType, x: number, y: number) => {
     if (!selectedTile) return;
-    await gameState.getStarterMiner(x, y);
+    await gameState.purchaseMiner(minerType, x, y);
     setShowMinerModal(false);
   };
   
@@ -427,6 +428,7 @@ export default function RoomPage() {
               onPurchaseFacility={handlePurchaseFacility}
               onGetStarterMiner={gameState.getStarterMiner}
               onUpgradeFacility={handleUpgradeFacility}
+              onPurchaseMiner={gameState.purchaseMiner}
               isPurchasingFacility={gameState.isPurchasingFacility}
               isGettingStarterMiner={gameState.isGettingStarterMiner}
               isUpgradingFacility={gameState.isUpgradingFacility}
@@ -434,6 +436,8 @@ export default function RoomPage() {
               address={address as Address}
               isGridMode={isGridModeActive}
               toggleGridMode={toggleGridMode}
+              hasClaimedStarterMiner={gameState.hasClaimedStarterMiner}
+              miners={gameState.miners}
             />
           </div>
         </div>
@@ -445,7 +449,6 @@ export default function RoomPage() {
         onClose={() => setIsBuyModalOpen(false)}
         onConfirm={() => {
           setIsBuyModalOpen(false);
-          // Refresh the game state after purchase
           gameState.refetch?.();
         }}
       />
@@ -470,107 +473,15 @@ export default function RoomPage() {
       />
 
       {/* Miner Purchase Modal */}
-      {showMinerModal && selectedTile && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-royal border-2 border-banana p-4 rounded-lg max-w-2xl w-full">
-            <h2 className="text-banana font-press-start text-xl mb-4 text-center">BUY MINER</h2>
-            
-            {/* Tabs */}
-            <div className="flex mb-3 border-b border-banana">
-              <button className="bg-banana text-royal font-press-start text-xs px-6 py-1 mr-2">
-                MINERS
-              </button>
-              <button className="text-white opacity-50 font-press-start text-xs px-6 py-1 mr-2">
-                FLEX
-              </button>
-              <button className="text-white opacity-50 font-press-start text-xs px-6 py-1">
-                SHOP
-              </button>
-            </div>
-            
-            <div className="bg-dark-blue p-2 mb-3 rounded">
-              <p className="text-white font-press-start text-xs">SELECTED LOCATION: ({selectedTile.x}, {selectedTile.y})</p>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="border-r border-banana pr-3">
-                <div className="bg-dark-blue p-2 mb-2 flex items-center rounded border-l-4 border-banana">
-                  <div className="w-8 h-8 mr-2">
-                    <Image src="/banana-miner.gif" alt="Banana Miner" width={32} height={32} className="object-contain" />
-                  </div>
-                  <span className="text-banana font-press-start text-xs">BANANA MINER</span>
-                </div>
-                <div className="bg-dark-blue p-2 mb-2 flex items-center opacity-50 rounded">
-                  <div className="w-8 h-8 mr-2">
-                    <Image src="/monkey-toaster.gif" alt="Monkey Toaster" width={32} height={32} className="object-contain" />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-banana font-press-start text-xs">MONKEY TOASTER</span>
-                    <span className="text-red-400 font-press-start text-[10px]">COMING SOON</span>
-                  </div>
-                </div>
-                <div className="bg-dark-blue p-2 mb-2 flex items-center opacity-50 rounded">
-                  <div className="w-8 h-8 mr-2">
-                    <Image
-                      src="/gorilla-gadget.gif"
-                      alt="Gorilla Gadget"
-                      width={32}
-                      height={32}
-                      className="object-contain"
-                    />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-banana font-press-start text-xs">GORILLA GADGET</span>
-                    <span className="text-red-400 font-press-start text-[10px]">COMING SOON</span>
-                  </div>
-                </div>
-                <div className="bg-dark-blue p-2 mb-2 flex items-center opacity-50 rounded">
-                  <div className="w-8 h-8 mr-2">
-                    <Image src="/apepad.png" alt="ApePad Mini" width={32} height={32} className="object-contain" />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-banana font-press-start text-xs">APEPAD MINI</span>
-                    <span className="text-red-400 font-press-start text-[10px]">COMING SOON</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div>
-                <h3 className="text-banana font-press-start mb-3 text-center text-sm">BANANA MINER</h3>
-                <div className="w-36 h-36 mx-auto mb-4 relative">
-                  <Image 
-                    src="/banana-miner.gif" 
-                    alt="Banana Miner" 
-                    width={144}
-                    height={144}
-                    className="object-contain" 
-                  />
-                </div>
-                <p className="text-white font-press-start mb-1 text-xs">- HASH RATE: {Number(freeMinerData.hashrate)} GH/S</p>
-                <p className="text-white font-press-start mb-1 text-xs">- PRICE: 0 $BIT</p>
-                <p className="text-white font-press-start mb-1 text-xs">- ENERGY: 1 WATT</p>
-                <p className="text-green-400 font-press-start mt-3 text-center text-xs">YOUR FIRST BANANA MINER IS FREE!</p>
-              </div>
-            </div>
-            
-            <div className="flex justify-between mt-4">
-              <button 
-                className="pixel-button bg-transparent border border-banana text-banana text-xs py-1"
-                onClick={() => setShowMinerModal(false)}
-              >
-                CANCEL
-              </button>
-              <button 
-                className="pixel-button bg-banana text-royal text-xs py-1"
-                onClick={() => handleMinerPurchase(selectedTile.x, selectedTile.y)}
-                disabled={gameState.isGettingStarterMiner}
-              >
-                {gameState.isGettingStarterMiner ? 'CONNECTING...' : 'GET FREE MINER'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <MinerPurchaseModal
+        isOpen={showMinerModal}
+        onClose={() => setShowMinerModal(false)}
+        onPurchase={handleMinerPurchase}
+        selectedTile={selectedTile || undefined}
+        isPurchasing={gameState.isPurchasingMiner}
+        bitBalance={bitBalance}
+        hasClaimedStarterMiner={gameState.hasClaimedStarterMiner}
+      />
 
       {/* Upgrade Facility Modal */}
       <FacilityPurchaseModal 
@@ -578,7 +489,6 @@ export default function RoomPage() {
         onClose={() => setIsUpgradeModalOpen(false)}
         onPurchase={() => {
           setIsUpgradeModalOpen(false);
-          // Call the upgradeFacility function from gameState
           gameState.upgradeFacility();
         }}
         isPurchasing={gameState.isUpgradingFacility}

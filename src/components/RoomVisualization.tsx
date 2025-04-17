@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useContractRead } from 'wagmi';
 import { CONTRACT_ADDRESSES, MAIN_CONTRACT_ABI } from '../config/contracts';
+import { MINERS, MinerType } from '../config/miners';
 import { Address, zeroAddress } from 'viem';
 import { Button } from '@/components/ui/button';
 import StarterMinerModal from './StarterMinerModal';
@@ -29,6 +30,13 @@ const pulseStyle = `
   }
 `;
 
+interface PlayerMiner {
+  id: number;
+  minerType: MinerType;
+  x: number;
+  y: number;
+}
+
 export interface RoomVisualizationProps {
   hasFacility: boolean;
   facilityData?: {
@@ -51,6 +59,8 @@ export interface RoomVisualizationProps {
   isGridMode?: boolean;
   toggleGridMode?: () => void;
   hasClaimedStarterMiner?: boolean;
+  miners?: PlayerMiner[];
+  onPurchaseMiner?: (minerType: MinerType, x: number, y: number) => Promise<void>;
 }
 
 export function RoomVisualization({
@@ -66,10 +76,13 @@ export function RoomVisualization({
   address,
   isGridMode,
   toggleGridMode,
-  hasClaimedStarterMiner
+  hasClaimedStarterMiner,
+  miners = [],
+  onPurchaseMiner
 }: RoomVisualizationProps) {
   const [selectedTile, setSelectedTile] = useState<{x: number, y: number}>();
   const [isStarterMinerModalOpen, setIsStarterMinerModalOpen] = useState(false);
+  const [previewMinerType, setPreviewMinerType] = useState<MinerType>(MinerType.BANANA_MINER);
 
   // Check if user has claimed their free miner
   const { data: minerData } = useContractRead({
@@ -104,12 +117,56 @@ export function RoomVisualization({
       localStorage.setItem('claimedMinerPosition', JSON.stringify({x, y}));
     }
     
-    await onGetStarterMiner(x, y);
+    if (onPurchaseMiner) {
+      await onPurchaseMiner(MinerType.BANANA_MINER, x, y);
+    } else {
+      await onGetStarterMiner(x, y);
+    }
+    
     setIsStarterMinerModalOpen(false);
     // Enable grid mode after claiming to show the user their miner
     if (toggleGridMode && !isGridMode) {
       toggleGridMode();
     }
+  };
+
+  // Function to get all miner positions, either from contract or localStorage (for starter miner)
+  const getAllMinerPositions = () => {
+    // Get miners from props (contract data)
+    const contractMiners = miners.map(miner => ({
+      ...miner,
+      image: MINERS[miner.minerType]?.image || '/banana-miner.gif'
+    }));
+    
+    // If no contract miners but user has claimed starter miner, try getting from localStorage
+    if (contractMiners.length === 0 && hasClaimedStarterMiner && typeof window !== 'undefined') {
+      const savedPositionStr = localStorage.getItem('claimedMinerPosition');
+      if (savedPositionStr) {
+        try {
+          const position = JSON.parse(savedPositionStr);
+          return [{
+            id: 0,
+            minerType: MinerType.BANANA_MINER,
+            x: position.x,
+            y: position.y,
+            image: MINERS[MinerType.BANANA_MINER].image
+          }];
+        } catch (e) {
+          console.error("Error parsing miner position:", e);
+        }
+      }
+      
+      // Default fallback for starter miner if nothing in localStorage
+      return [{
+        id: 0,
+        minerType: MinerType.BANANA_MINER,
+        x: 0, 
+        y: 0,
+        image: MINERS[MinerType.BANANA_MINER].image
+      }];
+    }
+    
+    return contractMiners;
   };
 
   // Function to render the mining spaces overlay
@@ -129,15 +186,24 @@ export function RoomVisualization({
     ];
 
     // Get all claimed miner positions 
-    const claimedPositions = hasClaimedStarterMiner && facilityData && facilityData.miners > 0
-      ? getClaimedMinerPositions()
-      : [];
+    const allMiners = getAllMinerPositions();
+    
+    // Check if a tile is occupied by a miner
+    const isTileOccupied = (x: number, y: number) => {
+      return allMiners.some(miner => miner.x === x && miner.y === y);
+    };
+    
+    // Get miner at a specific tile
+    const getMinerAtTile = (x: number, y: number) => {
+      return allMiners.find(miner => miner.x === x && miner.y === y);
+    };
 
     return (
       <div className="absolute inset-0 pointer-events-none">
         {/* Grid tiles */}
         {gridPositions.map((pos) => {
           const isSelected = selectedTile?.x === pos.x && selectedTile?.y === pos.y;
+          const isOccupied = isTileOccupied(pos.x, pos.y);
           
           return (
             <div
@@ -145,7 +211,7 @@ export function RoomVisualization({
               onClick={() => handleTileClick(pos.x, pos.y)}
               className={`absolute pointer-events-auto transition-all duration-200 cursor-pointer z-10 ${
                 isSelected ? 'ring-2 ring-banana' : 'hover:ring-2 hover:ring-[#FFD70066]'
-              }`}
+              } ${isOccupied ? 'opacity-70' : ''}`}
               style={{
                 top: pos.top,
                 left: pos.left,
@@ -160,9 +226,9 @@ export function RoomVisualization({
         })}
         
         {/* Show existing miners on the grid */}
-        {claimedPositions.map((minerPos, index) => {
+        {allMiners.map((miner, index) => {
           // Find the grid position data for this miner
-          const pos = gridPositions.find(p => p.x === minerPos.x && p.y === minerPos.y);
+          const pos = gridPositions.find(p => p.x === miner.x && p.y === miner.y);
           if (!pos) return null;
           
           return (
@@ -179,8 +245,8 @@ export function RoomVisualization({
             >
               <div className="relative w-full h-full">
                 <Image
-                  src="/banana-miner.gif"
-                  alt="Banana Miner"
+                  src={miner.image}
+                  alt={`Miner at ${miner.x},${miner.y}`}
                   fill
                   className="object-contain miner-pulse"
                   style={{ 
@@ -194,7 +260,7 @@ export function RoomVisualization({
         })}
         
         {/* Show preview of miner on selection (only when not already claimed) */}
-        {selectedTile && !hasClaimedStarterMiner && (
+        {selectedTile && !isTileOccupied(selectedTile.x, selectedTile.y) && (
           <>
             {/* Find the selected grid position */}
             {(() => {
@@ -214,8 +280,8 @@ export function RoomVisualization({
                 >
                   <div className="relative w-full h-full">
                     <Image
-                      src="/banana-miner.gif"
-                      alt="Banana Miner Preview"
+                      src={MINERS[previewMinerType].image}
+                      alt="Miner Preview"
                       fill
                       className="object-contain miner-preview"
                       style={{ 
@@ -237,26 +303,6 @@ export function RoomVisualization({
         )}
       </div>
     );
-  };
-
-  // Function to get the positions of claimed miners
-  // In a full implementation, this would come from contract data
-  const getClaimedMinerPositions = () => {
-    // For now, we'll use local storage to persist the chosen position
-    // In production, this would come from contract data
-    if (typeof window !== 'undefined' && hasClaimedStarterMiner) {
-      const savedPositionStr = localStorage.getItem('claimedMinerPosition');
-      if (savedPositionStr) {
-        try {
-          return [JSON.parse(savedPositionStr)];
-        } catch (e) {
-          console.error("Error parsing miner position:", e);
-        }
-      }
-    }
-    
-    // Default fallback position if nothing is stored yet
-    return [{x: 0, y: 0}]; // Default to top right position
   };
 
   return (

@@ -1,6 +1,7 @@
 import { useAccount, useContractRead, useBalance, useWriteContract } from 'wagmi';
 import { formatEther, parseEther, zeroAddress } from 'viem';
 import { CONTRACT_ADDRESSES, MINING_CONTROLLER_ABI, ERC20_ABI, APECHAIN_ID, MAIN_CONTRACT_ABI } from '../config/contracts';
+import { MINERS, MinerType, MinerData } from '../config/miners';
 import { useEffect, useState } from 'react';
 
 interface PlayerFacility {
@@ -18,6 +19,13 @@ interface PlayerStats {
   hashRate: bigint;
   miningRate: bigint;
   networkShare: bigint;
+}
+
+interface PlayerMiner {
+  id: number;
+  minerType: MinerType;
+  x: number;
+  y: number;
 }
 
 export interface GameState {
@@ -62,12 +70,14 @@ export interface GameState {
   // Actions
   purchaseFacility: () => Promise<void>;
   getStarterMiner: (x: number, y: number) => Promise<void>;
+  purchaseMiner: (minerType: MinerType, x: number, y: number) => Promise<void>;
   claimReward: () => Promise<void>;
   upgradeFacility: () => Promise<void>;
   
   // Loading states
   isPurchasingFacility: boolean;
   isGettingStarterMiner: boolean;
+  isPurchasingMiner: boolean;
   isClaimingReward: boolean;
   isUpgradingFacility: boolean;
 
@@ -91,6 +101,9 @@ export interface GameState {
 
   // Miner status
   hasClaimedStarterMiner: boolean;
+  
+  // Player miners
+  miners: PlayerMiner[];
 }
 
 export function useGameState(): GameState {
@@ -114,6 +127,8 @@ export function useGameState(): GameState {
   const [isUpgrading, setIsUpgrading] = useState(false);
   const [totalReferrals, setTotalReferrals] = useState(0);
   const [totalBitEarned, setTotalBitEarned] = useState('0');
+  const [miners, setMiners] = useState<PlayerMiner[]>([]);
+  const [isPurchasingMiner, setIsPurchasingMiner] = useState(false);
 
   // Contract reads
   const { data: gameActiveState } = useContractRead({
@@ -207,6 +222,17 @@ export function useGameState(): GameState {
     args: [address as `0x${string}`],
     query: {
       enabled: !!address,
+    },
+  });
+
+  // Get user miners
+  const { data: userMinersData, refetch: refetchMiners } = useContractRead({
+    address: CONTRACT_ADDRESSES.MAIN,
+    abi: MAIN_CONTRACT_ABI,
+    functionName: 'getUserMiners' as any,
+    args: [address as `0x${string}`],
+    query: {
+      enabled: !!address && hasFacility,
     },
   });
 
@@ -328,6 +354,69 @@ export function useGameState(): GameState {
     }
   }, [referralData]);
 
+  // Process miner data
+  useEffect(() => {
+    if (userMinersData) {
+      try {
+        const [minerIds, minerTypes, positions] = userMinersData as [bigint[], bigint[], bigint[]];
+        
+        const processedMiners: PlayerMiner[] = minerIds.map((id, index) => {
+          const position = positions[index];
+          const x = Number(position >> BigInt(128)); // Extract x from position
+          const y = Number(position & BigInt((1 << 128) - 1)); // Extract y from position
+          
+          return {
+            id: Number(id),
+            minerType: Number(minerTypes[index]) as MinerType,
+            x,
+            y
+          };
+        });
+        
+        setMiners(processedMiners);
+      } catch (error) {
+        console.error('Error processing miner data:', error);
+      }
+    }
+  }, [userMinersData]);
+
+  // Add purchase miner function
+  const handlePurchaseMiner = async (minerType: MinerType, x: number, y: number) => {
+    if (!address) return;
+    
+    try {
+      setIsPurchasingMiner(true);
+      
+      // Validate that user has a facility
+      if (!hasFacility) {
+        console.error('You must purchase a facility before buying miners');
+        return;
+      }
+      
+      // For the free starter miner
+      if (minerType === MinerType.BANANA_MINER && !hasClaimedStarterMiner) {
+        await handleGetStarterMiner(x, y);
+        return;
+      }
+      
+      // For other miners, call the purchaseMiner function
+      await writeContract({
+        address: CONTRACT_ADDRESSES.MAIN,
+        abi: MAIN_CONTRACT_ABI,
+        functionName: 'purchaseMiner',
+        args: [BigInt(minerType), BigInt(x), BigInt(y)]
+      });
+      
+      // Refetch all relevant data
+      await refetchStats();
+      await refetchMiners();
+    } catch (error) {
+      console.error(`Error purchasing ${MINERS[minerType].name}:`, error);
+    } finally {
+      setIsPurchasingMiner(false);
+    }
+  };
+
   return {
     isConnected,
     address,
@@ -388,5 +477,8 @@ export function useGameState(): GameState {
     },
     initialFacilityPrice: '10',
     hasClaimedStarterMiner: !!hasClaimedStarterMiner,
+    purchaseMiner: handlePurchaseMiner,
+    isPurchasingMiner,
+    miners,
   };
 }
