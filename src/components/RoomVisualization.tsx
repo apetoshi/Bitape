@@ -168,19 +168,17 @@ export function RoomVisualization({
     return contractMiners;
   };
 
-  // Function to render the mining spaces overlay
+  // Grid coordinates for the four mining spaces
+  // Adjusted grid positions for better mobile compatibility
+  const gridPositions = [
+    { x: 0, y: 0, top: '42%', left: '40%', width: '15%', height: '15%' }, // top right
+    { x: 1, y: 0, top: '50%', left: '30%', width: '15%', height: '15%' }, // top left
+    { x: 0, y: 1, top: '50%', left: '55%', width: '15%', height: '15%' }, // bottom right
+    { x: 1, y: 1, top: '62%', left: '35%', width: '15%', height: '15%' }  // bottom left
+  ];
+
+  // Function to render the mining spaces overlay and miners
   const renderMiningSpaces = () => {
-    if (!isGridMode) return null;
-
-    // Grid coordinates for the four mining spaces
-    // Adjusted grid positions for better mobile compatibility
-    const gridPositions = [
-      { x: 0, y: 0, top: '42%', left: '40%', width: '15%', height: '15%' }, // top right
-      { x: 1, y: 0, top: '50%', left: '30%', width: '15%', height: '15%' }, // top left
-      { x: 0, y: 1, top: '50%', left: '55%', width: '15%', height: '15%' }, // bottom right
-      { x: 1, y: 1, top: '62%', left: '35%', width: '15%', height: '15%' }  // bottom left
-    ];
-
     // Get all claimed miner positions 
     const allMiners = getAllMinerPositions();
     
@@ -196,32 +194,7 @@ export function RoomVisualization({
 
     return (
       <div className="absolute inset-0 pointer-events-none">
-        {/* Grid tiles */}
-        {gridPositions.map((pos) => {
-          const isSelected = selectedTile?.x === pos.x && selectedTile?.y === pos.y;
-          const isOccupied = isTileOccupied(pos.x, pos.y);
-          
-          return (
-            <div
-              key={`${pos.x}-${pos.y}`}
-              onClick={() => handleTileClick(pos.x, pos.y)}
-              className={`absolute pointer-events-auto transition-all duration-200 cursor-pointer z-10 ${
-                isSelected ? 'ring-2 ring-[#FFD700]' : 'hover:ring-2 hover:ring-[#FFD70066]'
-              } ${isOccupied ? 'opacity-70' : ''}`}
-              style={{
-                top: pos.top,
-                left: pos.left,
-                width: pos.width,
-                height: pos.height,
-                background: isSelected ? 'rgba(255, 215, 0, 0.3)' : 'rgba(255, 215, 0, 0.1)',
-                transform: 'skew(-24deg, 14deg)',
-                borderRadius: '2px'
-              }}
-            />
-          );
-        })}
-        
-        {/* Show existing miners on the grid */}
+        {/* Always show miners, regardless of grid mode */}
         {allMiners.map((miner, index) => {
           // Find the grid position data for this miner
           const pos = gridPositions.find(p => p.x === miner.x && p.y === miner.y);
@@ -254,49 +227,31 @@ export function RoomVisualization({
             </div>
           );
         })}
-        
-        {/* Show preview of miner on selection (only when not already claimed) */}
-        {selectedTile && !isTileOccupied(selectedTile.x, selectedTile.y) && (
-          <>
-            {/* Find the selected grid position */}
-            {(() => {
-              const pos = gridPositions.find(p => p.x === selectedTile.x && p.y === selectedTile.y);
-              if (!pos) return null;
-              
-              return (
-                <div 
-                  className="absolute pointer-events-none z-20"
-                  style={{
-                    top: pos.top,
-                    left: pos.left,
-                    width: pos.width,
-                    height: pos.height,
-                    transform: 'skew(-24deg, 14deg)',
-                  }}
-                >
-                  <div className="relative w-full h-full">
-                    <Image
-                      src={MINERS[previewMinerType].image}
-                      alt="Miner Preview"
-                      fill
-                      className="object-contain miner-preview"
-                      style={{ 
-                        transform: 'skew(24deg, -14deg) scale(2.5) translate(-10%, -15%)',
-                        imageRendering: 'pixelated',
-                        opacity: 0.7, // Make it slightly transparent to indicate it's a preview
-                      }}
-                    />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="bg-[#FFD700]/60 text-[#0c1c31] px-2 py-1 text-xs font-press-start rounded transform -rotate-12">
-                        Preview
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-          </>
-        )}
+
+        {/* Only show grid tiles when grid mode is active */}
+        {isGridMode && gridPositions.map((pos) => {
+          const isSelected = selectedTile?.x === pos.x && selectedTile?.y === pos.y;
+          const isOccupied = isTileOccupied(pos.x, pos.y);
+          
+          return (
+            <div
+              key={`${pos.x}-${pos.y}`}
+              onClick={() => handleTileClick(pos.x, pos.y)}
+              className={`absolute pointer-events-auto transition-all duration-200 cursor-pointer z-10 ${
+                isSelected ? 'ring-2 ring-[#FFD700]' : 'hover:ring-2 hover:ring-[#FFD70066]'
+              } ${isOccupied ? 'opacity-70' : ''}`}
+              style={{
+                top: pos.top,
+                left: pos.left,
+                width: pos.width,
+                height: pos.height,
+                background: isSelected ? 'rgba(255, 215, 0, 0.3)' : 'rgba(255, 215, 0, 0.1)',
+                transform: 'skew(-24deg, 14deg)',
+                borderRadius: '2px'
+              }}
+            />
+          );
+        })}
       </div>
     );
   };
@@ -304,56 +259,56 @@ export function RoomVisualization({
   return (
     <>
       <style jsx global>{pulseStyle}</style>
-      <div className="relative w-full aspect-square overflow-hidden bg-[#0c1c31] pb-12">
-        {hasFacility ? (
-          <div className="relative w-full h-full flex flex-col">
-            <div className="relative flex-grow">
-              <Image
-                src="/bedroom.png"
-                alt="Mining Facility"
-                fill
-                style={{ 
-                  objectFit: 'cover',
-                  objectPosition: 'center',
-                  imageRendering: 'pixelated'
-                }}
-                priority
-              />
-              {renderMiningSpaces()}
-            </div>
-            
-            {/* Bottom control panel */}
-            <div className="absolute left-0 right-0 bottom-0 flex justify-between">
-              <div>
-                <button
-                  onClick={toggleGridMode}
-                  className="bigcoin-button"
-                >
-                  {isGridMode ? 'HIDE GRID' : 'SHOW GRID'}
-                </button>
-              </div>
-              
-              <div className="flex">
-                {!hasClaimedStarterMiner && (
-                  <button
-                    onClick={() => setIsStarterMinerModalOpen(true)}
-                    className="bigcoin-button mx-1"
-                    disabled={isGettingStarterMiner}
-                  >
-                    {isGettingStarterMiner ? 'CLAIMING...' : 'CLAIM FREE MINER'}
-                  </button>
-                )}
-                <button
-                  onClick={onUpgradeFacility}
-                  className="bigcoin-button"
-                  disabled={isUpgradingFacility}
-                >
-                  {isUpgradingFacility ? 'UPGRADING...' : 'UPGRADE FACILITY'}
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : (
+      
+      <div className="relative w-full h-full">
+        {/* Room Background */}
+        <Image 
+          src="/bedroom.png" 
+          alt="Mining Room" 
+          fill
+          priority
+          className="object-contain"
+        />
+        
+        {/* Grid Mode Toggle Button (Top Left Corner) */}
+        {hasFacility && toggleGridMode && (
+          <button
+            onClick={toggleGridMode}
+            className={`absolute top-2 left-2 z-30 px-2 py-1 font-press-start text-xs transition-all ${
+              isGridMode ? 'bg-banana text-royal' : 'bg-transparent text-banana border border-banana'
+            }`}
+          >
+            {isGridMode ? 'HIDE GRID' : 'SHOW GRID'}
+          </button>
+        )}
+        
+        {/* Upgrade Button (Top Right Corner) */}
+        {hasFacility && (
+          <button
+            onClick={onUpgradeFacility}
+            disabled={isUpgradingFacility}
+            className="absolute top-2 right-2 z-30 px-2 py-1 font-press-start text-xs bg-transparent text-banana border border-banana hover:bg-banana hover:text-royal transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isUpgradingFacility ? 'UPGRADING...' : 'UPGRADE FACILITY'}
+          </button>
+        )}
+        
+        {/* Get Starter Miner Button (Bottom Center) - Only if has facility but no starter miner */}
+        {hasFacility && !hasClaimedStarterMiner && (
+          <button
+            onClick={() => setIsStarterMinerModalOpen(true)}
+            disabled={isGettingStarterMiner}
+            className="absolute bottom-2 left-1/2 transform -translate-x-1/2 z-30 px-4 py-2 font-press-start text-xs bg-banana text-royal hover:bg-opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isGettingStarterMiner ? 'CLAIMING...' : 'CLAIM STARTER MINER'}
+          </button>
+        )}
+        
+        {/* Mining Spaces Overlay - always render this to show miners */}
+        {hasFacility && renderMiningSpaces()}
+        
+        {/* Initial purchase UI if no facility exists */}
+        {!hasFacility && (
           <div className="flex flex-col items-center justify-center h-full text-center p-4">
             <p className="font-press-start text-xs text-[#FFD700] mb-6">You don't have any mining space yet.</p>
             <button

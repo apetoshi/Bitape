@@ -67,6 +67,7 @@ export default function RoomPage() {
   const [showMinerModal, setShowMinerModal] = useState(false);
   const [isGridModeActive, setIsGridModeActive] = useState(false);
   const isMounted = useIsMounted();
+  const [statsView, setStatsView] = useState<'simple' | 'pro'>('simple');
 
   // Get player facility data directly from contract
   const { data: facilityData } = useContractRead({
@@ -187,7 +188,8 @@ export default function RoomPage() {
             <div className="flex justify-between items-center mb-2">
               <span className="bigcoin-text">SPACES LEFT</span>
               <span className="bigcoin-value font-press-start">
-                {facility && !isNaN(Number(facility.capacity)) ? Number(facility.capacity) : 4} SPACES
+                {facility ? 
+                  (Number(facility.spaces) - (gameState.miners?.length || 0)) : 4} SPACES
               </span>
             </div>
             <div className="flex justify-between items-center">
@@ -210,7 +212,14 @@ export default function RoomPage() {
             <div className="flex justify-between items-center border-b border-white/20 pb-2">
               <span className="bigcoin-text">TOTAL SPACES</span>
               <span className="bigcoin-value font-press-start">
-                {facility && !isNaN(Number(facility.capacity)) ? Number(facility.capacity) : 4} SPACES
+                {facility && !isNaN(Number(facility.spaces)) ? Number(facility.spaces) : 4} SPACES
+              </span>
+            </div>
+            
+            <div className="flex justify-between items-center border-b border-white/20 pb-2">
+              <span className="bigcoin-text">USED SPACES</span>
+              <span className="bigcoin-value font-press-start">
+                {gameState.miners?.length || 0} SPACES
               </span>
             </div>
             
@@ -234,42 +243,53 @@ export default function RoomPage() {
         
       case 'selectedTile':
         return (
-          <div className="p-3">
+          <div className="p-3 space-y-2">
             {selectedTile ? (
-              <div className="space-y-2">
-                <div className="text-center pb-2 border-b border-white/20">
-                  <h3 className="bigcoin-text mb-1">GRID SPACE X:{selectedTile.x} Y:{selectedTile.y}</h3>
+              <div>
+                <div className="border-b border-white/20 pb-2 mb-3">
+                  <span className="bigcoin-text">LOCATION:</span>
+                  <span className="bigcoin-value block mt-1">{getLocationDescription(selectedTile)}</span>
                 </div>
                 
                 {selectedTileHasMiner(selectedTile.x, selectedTile.y) ? (
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center border-b border-white/20 pb-2">
-                      <span className="bigcoin-text">MINER TYPE</span>
-                      <span className="bigcoin-value font-press-start">BASIC MINER</span>
+                  <div className="space-y-3">
+                    <p className="bigcoin-text">ACTIVE MINER:</p>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-16 h-16 relative">
+                        <Image
+                          src="/banana-miner.gif"
+                          alt="Banana Miner"
+                          fill
+                          className="object-contain"
+                        />
+                      </div>
+                      <div>
+                        <p className="bigcoin-value">BANANA MINER</p>
+                        <p className="bigcoin-text text-xs opacity-80">100 GH/s · 1 WATT</p>
+                      </div>
                     </div>
-                    <div className="flex justify-between items-center border-b border-white/20 pb-2">
-                      <span className="bigcoin-text">HASHRATE</span>
-                      <span className="bigcoin-value font-press-start">100 H/s</span>
+                    <div className="mt-4">
+                      <button
+                        onClick={() => setShowMinerModal(true)}
+                        className="w-full bigcoin-button"
+                      >
+                        UPGRADE MINER
+                      </button>
                     </div>
-                    <div className="flex justify-between items-center pb-2">
-                      <span className="bigcoin-text">POWER USAGE</span>
-                      <span className="bigcoin-value font-press-start">1 GW</span>
-                    </div>
-                    <button
-                      className="w-full mt-2 bigcoin-button"
-                    >
-                      UPGRADE MINER
-                    </button>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    <p className="text-center bigcoin-text opacity-70">This space is empty. Add a miner to start mining BIT.</p>
-                    <button
-                      onClick={() => setShowMinerModal(true)}
-                      className="w-full mt-3 bigcoin-button"
-                    >
-                      BUY MINER
-                    </button>
+                  <div>
+                    <p className="bigcoin-text mb-3">NO MINER INSTALLED</p>
+                    {hasFacility && (
+                      <div className="mt-4">
+                        <button
+                          onClick={() => setShowMinerModal(true)}
+                          className="w-full bigcoin-button"
+                        >
+                          BUY MINER
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -321,16 +341,35 @@ export default function RoomPage() {
         return (
           <div className="bigcoin-panel mb-5" id="stats-tab-content">
             <div className="flex border-b-2 border-[#FFD700] p-2">
-              <button className="bigcoin-text mr-4 bigcoin-value">SIMPLE</button>
+              <button 
+                onClick={() => setStatsView("simple")}
+                className={`bigcoin-text mr-4 ${statsView === "simple" ? "bigcoin-value" : "opacity-50"}`}
+              >
+                SIMPLE
+              </button>
               <button className="bigcoin-text opacity-50">/</button>
-              <button className="bigcoin-text ml-4 opacity-50">PRO</button>
+              <button 
+                onClick={() => setStatsView("pro")}
+                className={`bigcoin-text ml-4 ${statsView === "pro" ? "bigcoin-value" : "opacity-50"}`}
+              >
+                PRO
+              </button>
             </div>
-            <div className="p-3 space-y-2 font-press-start">
-              <p className="bigcoin-text">- YOU ARE MINING <span className="bigcoin-value">{gameState.miningRate || 0} BIT</span> A DAY</p>
-              <p className="bigcoin-text">- YOUR HASH RATE IS <span className="bigcoin-value">{gameState.hashRate || 0} GH/S</span></p>
-              <p className="bigcoin-text">- <span className="bigcoin-value">{gameState.blocksUntilHalving || 0} BLOCKS</span> UNTIL NEXT HALVENING</p>
-              <p className="bigcoin-text">- YOU HAVE <span className="bigcoin-value">{gameState.networkHashRatePercentage || 0}%</span> OF THE TOTAL NETWORK HASH RATE (<span className="bigcoin-value">{gameState.totalNetworkHashRate || 0} GH/S</span>)</p>
-            </div>
+            
+            {statsView === "simple" ? (
+              <div className="p-3 space-y-2 font-press-start">
+                <p className="bigcoin-text">- YOU ARE MINING <span className="bigcoin-value">{gameState.miningRate || '0'} BIT</span> A DAY</p>
+                <p className="bigcoin-text">- YOUR HASH RATE IS <span className="bigcoin-value">{gameState.hashRate || '0'} GH/S</span></p>
+                <p className="bigcoin-text">- <span className="bigcoin-value">{gameState.blocksUntilHalving || '0'} BLOCKS</span> UNTIL NEXT HALVENING</p>
+                <p className="bigcoin-text">- YOU HAVE <span className="bigcoin-value">{gameState.networkHashRatePercentage || '0'}%</span> OF THE TOTAL NETWORK HASH RATE (<span className="bigcoin-value">{gameState.totalNetworkHashRate || '0'} GH/S</span>)</p>
+              </div>
+            ) : (
+              <div className="p-3 space-y-2 font-press-start">
+                <p className="bigcoin-text">- <span className="bigcoin-value">{gameState.rewardPerBlock || '0'}</span> TOTAL BIT MINED PER BLOCK</p>
+                <p className="bigcoin-text">- <span className="bigcoin-value">{gameState.totalMinedBit || '0'}</span> $BIT HAS EVER BEEN MINED</p>
+                <p className="bigcoin-text">- <span className="bigcoin-value">{gameState.burnedBit || '0'}</span> $BIT HAS BEEN BURNED</p>
+              </div>
+            )}
           </div>
         );
         
