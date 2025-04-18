@@ -8,28 +8,41 @@ import ConnectWalletButton from './ConnectWalletButton';
 import { useAccount } from 'wagmi';
 import { useContractRead } from 'wagmi';
 import { CONTRACT_ADDRESSES, MAIN_CONTRACT_ABI } from '../config/contracts';
+import { formatUnits } from 'viem';
 
 const LandingPage = () => {
   const router = useRouter();
   const { isConnected, address } = useAccount();
   const [minedBit, setMinedBit] = useState("0");
 
-  // Check mining status from contract
-  const { data: miningStarted } = useContractRead({
-    address: CONTRACT_ADDRESSES.MAIN,
-    abi: MAIN_CONTRACT_ABI,
-    functionName: 'miningHasStarted' as any,
+  // Read total BIT supply from the token contract
+  const { data: totalSupplyData } = useContractRead({
+    address: CONTRACT_ADDRESSES.BIT_TOKEN,
+    abi: [
+      {
+        inputs: [],
+        name: 'totalSupply',
+        outputs: [{ name: '', type: 'uint256' }],
+        stateMutability: 'view',
+        type: 'function'
+      }
+    ],
+    functionName: 'totalSupply',
   });
 
-  // Format mining data display - since mining hasn't started, we'll show 0
+  // Format total supply when data is available
   useEffect(() => {
-    if (miningStarted === true) {
-      // For future: When mining starts, fetch actual mined BIT
-      setMinedBit("0"); // For now still 0 since mining hasn't started
-    } else {
-      setMinedBit("0");
+    if (totalSupplyData) {
+      try {
+        // Format the bigint value to a human-readable string with 2 decimal places
+        const formattedSupply = Number(formatUnits(totalSupplyData as bigint, 18)).toFixed(2);
+        setMinedBit(formattedSupply);
+      } catch (error) {
+        console.error("Error formatting total supply:", error);
+        setMinedBit("0.00");
+      }
     }
-  }, [miningStarted]);
+  }, [totalSupplyData]);
 
   useEffect(() => {
     if (isConnected && address) {
