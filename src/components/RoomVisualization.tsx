@@ -83,24 +83,40 @@ export function RoomVisualization({
   const [isStarterMinerModalOpen, setIsStarterMinerModalOpen] = useState(false);
   const [previewMinerType, setPreviewMinerType] = useState<MinerType>(MinerType.BANANA_MINER);
 
-  // Check if user has claimed their free miner
-  const { data: minerData } = useContractRead({
+  // Check if user has claimed their free miner directly from the contract
+  const { data: acquiredStarterMinerData } = useContractRead({
     address: CONTRACT_ADDRESSES.MAIN,
     abi: MAIN_CONTRACT_ABI,
-    functionName: 'getPlayerFacility',
+    functionName: 'acquiredStarterMiner',
     args: [address || zeroAddress],
     query: {
       enabled: Boolean(address)
     }
   });
 
+  // Convert data to boolean
+  const hasActuallyClaimedStarterMiner = Boolean(acquiredStarterMinerData);
+
+  // Use a combined value - either from props or directly from contract
+  const effectivelyClaimedStarterMiner = hasClaimedStarterMiner || hasActuallyClaimedStarterMiner;
+
   // Show starter miner modal if facility exists but no miner has been claimed
   useEffect(() => {
-    if (hasFacility && !hasClaimedStarterMiner && !isGridMode) {
-      // Only show the prompt if they haven't toggled grid mode yet
+    // Only show the modal if:
+    // 1. User has a facility
+    // 2. User has NOT claimed starter miner (according to contract)
+    // 3. Not in grid mode
+    if (hasFacility && !effectivelyClaimedStarterMiner && !isGridMode) {
+      console.log('Opening starter miner modal. Contract says claimed:', hasActuallyClaimedStarterMiner);
       setIsStarterMinerModalOpen(true);
+    } else {
+      // Close the modal if user has already claimed (in case it was open)
+      if (effectivelyClaimedStarterMiner && isStarterMinerModalOpen) {
+        console.log('Closing starter miner modal because miner already claimed');
+        setIsStarterMinerModalOpen(false);
+      }
     }
-  }, [hasFacility, hasClaimedStarterMiner, isGridMode]);
+  }, [hasFacility, effectivelyClaimedStarterMiner, isGridMode, hasActuallyClaimedStarterMiner, isStarterMinerModalOpen]);
 
   const handleTileClick = (x: number, y: number) => {
     if (!isGridMode) return;
@@ -162,7 +178,7 @@ export function RoomVisualization({
     console.log('Processed contract miners:', contractMiners);
     
     // If no contract miners but user has claimed starter miner, try getting from localStorage
-    if (contractMiners.length === 0 && hasClaimedStarterMiner && typeof window !== 'undefined') {
+    if (contractMiners.length === 0 && effectivelyClaimedStarterMiner && typeof window !== 'undefined') {
       console.log('No contract miners, checking localStorage');
       const savedPositionStr = localStorage.getItem('claimedMinerPosition');
       console.log('Saved position from localStorage:', savedPositionStr);
@@ -341,19 +357,31 @@ export function RoomVisualization({
       <style jsx global>{pulseStyle}</style>
       
       <div className="relative w-full h-full">
-        {/* Room Background */}
-        <Image 
-          src="/bedroom.png" 
-          alt="Mining Room" 
-          fill
-          priority
-          className={`object-contain ${isMobile ? 'mobile-room-bg' : ''}`}
-          style={{
-            objectFit: 'contain',
-            maxWidth: '100%',
-            maxHeight: '100%'
-          }}
-        />
+        {/* Room Background - Only show if hasFacility is true */}
+        {hasFacility ? (
+          <Image 
+            src="/bedroom.png" 
+            alt="Mining Room" 
+            fill
+            priority
+            className={`object-contain ${isMobile ? 'mobile-room-bg' : ''}`}
+            style={{
+              objectFit: 'contain',
+              maxWidth: '100%',
+              maxHeight: '100%'
+            }}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-dark-blue">
+            <Image 
+              src="/empty-space.png" 
+              alt="Empty Space" 
+              width={300}
+              height={300}
+              className="opacity-30"
+            />
+          </div>
+        )}
         
         {/* Grid Mode Toggle Button (Top Left Corner) */}
         {hasFacility && toggleGridMode && (
@@ -379,7 +407,7 @@ export function RoomVisualization({
         )}
         
         {/* Get Starter Miner Button (Bottom Center) - Only if has facility but no starter miner */}
-        {hasFacility && !hasClaimedStarterMiner && (
+        {hasFacility && !effectivelyClaimedStarterMiner && (
           <button
             onClick={() => setIsStarterMinerModalOpen(true)}
             disabled={isGettingStarterMiner}
@@ -407,14 +435,16 @@ export function RoomVisualization({
         )}
       </div>
 
-      {/* Starter Miner Modal */}
-      <StarterMinerModal
-        isOpen={isStarterMinerModalOpen}
-        onClose={() => setIsStarterMinerModalOpen(false)}
-        onClaim={handleClaimStarterMiner}
-        selectedTile={selectedTile}
-        isProcessing={isGettingStarterMiner}
-      />
+      {/* Starter Miner Modal - Only show if user hasn't claimed starter miner according to contract */}
+      {!hasActuallyClaimedStarterMiner && (
+        <StarterMinerModal
+          isOpen={isStarterMinerModalOpen}
+          onClose={() => setIsStarterMinerModalOpen(false)}
+          onClaim={handleClaimStarterMiner}
+          selectedTile={selectedTile}
+          isProcessing={isGettingStarterMiner}
+        />
+      )}
     </>
   );
 }
