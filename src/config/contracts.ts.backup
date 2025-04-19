@@ -1,0 +1,197 @@
+// ApeChain Network Configuration
+export const APECHAIN_ID = 33139;
+
+// Contract Addresses on ApeChain
+export const CONTRACT_ADDRESSES = {
+  BIT_TOKEN: '0xb9BE704a40b1500D39FE4264a1C46E43a5C614bD', // BIT token address
+  MINING_CONTROLLER: '0x409Ec46CdA55E8C7A2Ec971745985bf7Dd58f533', // Mining controller address
+  MAIN: '0x409Ec46CdA55E8C7A2Ec971745985bf7Dd58f533' // Main contract address
+} as const;
+
+// Minimal ABIs for token interactions
+export const ERC20_ABI = [
+  {
+    constant: true,
+    inputs: [{ name: '_owner', type: 'address' }],
+    name: 'balanceOf',
+    outputs: [{ name: 'balance', type: 'uint256' }],
+    type: 'function',
+  },
+  {
+    constant: true,
+    inputs: [],
+    name: 'decimals',
+    outputs: [{ name: '', type: 'uint8' }],
+    type: 'function',
+  },
+  {
+    constant: false,
+    inputs: [
+      { name: 'spender', type: 'address' },
+      { name: 'amount', type: 'uint256' }
+    ],
+    name: 'approve',
+    outputs: [{ name: '', type: 'bool' }],
+    type: 'function',
+  },
+  {
+    constant: true,
+    inputs: [
+      { name: 'owner', type: 'address' },
+      { name: 'spender', type: 'address' }
+    ],
+    name: 'allowance',
+    outputs: [{ name: '', type: 'uint256' }],
+    type: 'function',
+  },
+] as const;
+
+// Main Contract ABI - Updated from Main_ABI.json
+export const MAIN_CONTRACT_ABI = [
+  // Key functions for frontend interaction
+  {
+    inputs: [{ name: 'referrer', type: 'address' }],
+    name: 'purchaseInitialFacility',
+    outputs: [],
+    stateMutability: 'payable',
+    type: 'function',
+  },
+  {
+    inputs: [{ name: 'user', type: 'address' }],
+    name: 'initializedStarterFacility',
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [{ name: 'user', type: 'address' }],
+    name: 'acquiredStarterMiner',
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { name: 'x', type: 'uint256' },
+      { name: 'y', type: 'uint256' }
+    ],
+    name: 'getFreeStarterMiner',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  // Fixed miner index issue - these functions are key for correct miner handling
+  {
+    inputs: [
+      { name: 'minerIndex', type: 'uint256' },
+      { name: 'x', type: 'uint256' },
+      { name: 'y', type: 'uint256' }
+    ],
+    name: 'buyMiner',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [{ name: 'minerIndex', type: 'uint256' }],
+    name: 'miners',
+    outputs: [
+      { name: 'minerIndex', type: 'uint256' },
+      { name: 'id', type: 'uint256' },
+      { name: 'x', type: 'uint256' },
+      { name: 'y', type: 'uint256' },
+      { name: 'hashrate', type: 'uint256' },
+      { name: 'powerConsumption', type: 'uint256' },
+      { name: 'cost', type: 'uint256' },
+      { name: 'inProduction', type: 'bool' }
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { name: 'player', type: 'address' },
+      { name: 'startIndex', type: 'uint256' },
+      { name: 'size', type: 'uint256' }
+    ],
+    name: 'getPlayerMinersPaginated',
+    outputs: [
+      {
+        components: [
+          { name: 'minerIndex', type: 'uint256' },
+          { name: 'id', type: 'uint256' },
+          { name: 'x', type: 'uint256' },
+          { name: 'y', type: 'uint256' },
+          { name: 'hashrate', type: 'uint256' },
+          { name: 'powerConsumption', type: 'uint256' },
+          { name: 'cost', type: 'uint256' },
+          { name: 'inProduction', type: 'bool' }
+        ],
+        internalType: 'struct Miner[]',
+        name: '',
+        type: 'tuple[]'
+      }
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'claimRewards',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [{ name: 'player', type: 'address' }],
+    name: 'pendingRewards',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [{ name: 'player', type: 'address' }],
+    name: 'playerHashrate',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'totalHashrate',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [{ name: 'player', type: 'address' }],
+    name: 'playerBitapePerBlock',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  }
+] as const;
+
+// Mining Controller ABI
+export const MINING_CONTROLLER_ABI = [
+  // Read functions
+  'function facilities(address user) view returns (uint256 power, uint256 level, uint256 lastClaimBlock)',
+  'function totalPower() view returns (uint256)',
+  'function rewardPerBlock() view returns (uint256)',
+  'function getUnclaimedRewards(address user) view returns (uint256)',
+  'function getUserMiningRate(address user) view returns (uint256)',
+  'function getNetworkHashRate() view returns (uint256)',
+  'function getUserHashRate(address user) view returns (uint256)',
+  'function getBlocksUntilHalving() view returns (uint256)',
+  'function getTotalMinedBit() view returns (uint256)',
+  'function getBurnedBit() view returns (uint256)',
+  
+  // Write functions
+  'function purchaseInitialFacility(address referrer) payable returns (bool)',
+  'function getStarterMiner() returns (bool)',
+  'function claimReward() returns (bool)',
+  'function upgradeFacility() returns (bool)',
+] as const;
+
+// Use the same address as in CONTRACT_ADDRESSES for consistency
+export const BIT_TOKEN_ADDRESS = '0xb9BE704a40b1500D39FE4264a1C46E43a5C614bD' as const; 

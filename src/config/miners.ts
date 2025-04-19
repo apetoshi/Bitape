@@ -1,9 +1,9 @@
 // Miner Types
 export enum MinerType {
-  BANANA_MINER = 0,
-  MONKEY_TOASTER = 1,
+  BANANA_MINER = 1,
+  MONKEY_TOASTER = 3,
   GORILLA_GADGET = 2,
-  APEPAD_MINI = 3,
+  APEPAD_MINI = 4,
 }
 
 // Miner Data Structure
@@ -34,20 +34,20 @@ export const MINERS: Record<number, MinerData> = {
     id: MinerType.MONKEY_TOASTER,
     name: "MONKEY TOASTER",
     image: "/monkey-toaster.gif",
-    hashrate: 250,
-    energyConsumption: 2.5,
-    price: 250, // 250 BIT
-    description: "2.5X HASHRATE OF BANANA MINER",
+    hashrate: 1000,
+    energyConsumption: 10,
+    price: 20, // 20 BIT
+    description: "10X HASHRATE OF BANANA MINER",
     isActive: true, // Now active
   },
   [MinerType.GORILLA_GADGET]: {
     id: MinerType.GORILLA_GADGET,
     name: "GORILLA GADGET",
     image: "/gorilla-gadget.gif",
-    hashrate: 750,
+    hashrate: 50000,
     energyConsumption: 5,
-    price: 1000, // 1000 BIT
-    description: "7.5X HASHRATE OF BANANA MINER",
+    price: 60, // 60 BIT
+    description: "50X HASHRATE OF BANANA MINER",
     isActive: true, // Now active
   },
   [MinerType.APEPAD_MINI]: {

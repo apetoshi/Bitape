@@ -1,25 +1,32 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useAccount, useContractRead } from 'wagmi';
+import { useAccount, useContractRead, useWriteContract, usePublicClient } from 'wagmi';
 import { zeroAddress } from 'viem';
-import { useGameState } from '@/hooks/useGameState';
+import type { Address } from 'viem';
+import { useGameState, type GameState } from '@/hooks/useGameState';
 import { useTokenBalance } from '@/hooks/useTokenBalance';
 import { CONTRACT_ADDRESSES, MAIN_CONTRACT_ABI } from '@/config/contracts';
-import { MinerType } from '@/config/miners';
+import { MinerType, MINERS } from '@/config/miners';
+import { MinerData as MinerDataConfig } from '@/config/miners';
 import BuyFacilityModal from '@/components/BuyFacilityModal';
 import AccountModal from '@/components/AccountModal';
 import ReferralModal from '@/components/ReferralModal';
 import { RoomVisualization } from '@/components/RoomVisualization';
 import { ResourcesPanel } from '@/components/ResourcesPanel';
 import { MiningClaimSection } from '@/components/MiningClaimSection';
+import { EnhancedMiningClaimSection } from '@/components/EnhancedMiningClaimSection';
 import { useIsMounted } from '@/hooks/useIsMounted';
 import FacilityPurchaseModal from '@/components/FacilityPurchaseModal';
 import MinerPurchaseModal from '@/components/MinerPurchaseModal';
-import { Address } from 'viem';
+import StatsDisplay from '@/components/StatsDisplay';
+import { getMinerMap, addMinerToMap, getMinerAtPosition } from './fixedMinerMap';
+
+// Import the PlayerMiner interface from the GameState type
+import type { PlayerMiner } from '@/hooks/useGameState';
 
 // Mobile tabs for bottom navigation
 type MobileTab = 'actions' | 'stats' | 'mining';
@@ -70,7 +77,9 @@ export default function RoomPage() {
   const [isGridModeActive, setIsGridModeActive] = useState(false);
   const isMounted = useIsMounted();
   const [statsView, setStatsView] = useState<'simple' | 'pro'>('simple');
-
+  const { writeContract } = useWriteContract();
+  const publicClient = usePublicClient();
+  
   // Get player facility data directly from contract
   const { data: facilityData } = useContractRead({
     address: CONTRACT_ADDRESSES.MAIN,
@@ -81,9 +90,297 @@ export default function RoomPage() {
       enabled: Boolean(address)
     }
   });
+  
+  const { data: acquiredStarterMinerData } = useContractRead({
+    address: CONTRACT_ADDRESSES.MAIN,
+    abi: MAIN_CONTRACT_ABI,
+    functionName: 'acquiredStarterMiner',
+    args: [address || zeroAddress],
+    query: {
+      enabled: Boolean(address)
+    }
+  });
 
   // Get player miners - currently mocked since not in ABI
   const playerMiners: bigint[] = [];
+
+  // Store miner data in state
+  const [minerFullData, setMinerFullData] = useState<Record<string, any>>({});
+  const [minerIds, setMinerIds] = useState<string[]>([]);
+
+  // Effect to log miner IDs that need to be fetched and update minerIds state
+  useEffect(() => {
+    if (!address || !gameState.miners || gameState.miners.length === 0) return;
+    
+    console.log('Miners found in gameState:');
+    const ids: string[] = [];
+    
+    gameState.miners.forEach(miner => {
+      if (miner.id) {
+        console.log(`Miner ID: ${miner.id}, Current data:`, miner);
+        ids.push(String(miner.id));
+      }
+    });
+    
+    // Update the minerIds state for dynamic fetching
+    setMinerIds(ids);
+  }, [address, gameState.miners]);
+
+  // Create a custom function to fetch miner data properly
+  const fetchMinerData = async (minerId: string | number) => {
+    if (!publicClient) return null;
+    
+    console.log(`Calling getPlayerMiner(${minerId}) to get full on-chain tuple data`);
+    
+    try {
+      // Call the contract function with ONLY the minerId parameter
+      const data = await publicClient.readContract({
+        address: CONTRACT_ADDRESSES.MAIN as Address,
+        abi: [
+          {
+            inputs: [
+              { name: 'minerId', type: 'uint256' }
+            ],
+            name: 'getPlayerMiner',
+            outputs: [
+              { name: 'minerIndex', type: 'uint256' },
+              { name: 'x', type: 'uint256' },
+              { name: 'y', type: 'uint256' },
+              { name: 'id', type: 'uint256' },
+              { name: 'hashrate', type: 'uint256' },
+              { name: 'powerConsumption', type: 'uint256' },
+              { name: 'cost', type: 'uint256' },
+              { name: 'inProduction', type: 'bool' }
+            ],
+            stateMutability: 'view',
+            type: 'function'
+          }
+        ] as const, // Add 'as const' to fix type issues
+        functionName: 'getPlayerMiner',
+        args: [BigInt(minerId)]
+      });
+      
+      console.log(`Full on-chain data tuple for miner ID ${minerId}:`, data);
+      return data;
+    } catch (error) {
+      console.error(`Error fetching miner data for ID ${minerId}:`, error);
+      return null;
+    }
+  };
+  
+  // Function to fetch data for specific miner IDs
+  const fetchSpecificMiners = useCallback(async () => {
+    if (!address) return;
+    
+    // Fetch data for miner ID 1 explicitly
+    try {
+      console.log("Attempting to fetch on-chain data for miner ID 1");
+      await fetchMinerData(1);
+    } catch (e) {
+      console.error("Error fetching miner 1:", e);
+    }
+    
+    // Fetch data for miner ID 11 explicitly (the one with invalid coordinates)
+    try {
+      console.log("Attempting to fetch on-chain data for miner ID 11");
+      await fetchMinerData(11);
+    } catch (e) {
+      console.error("Error fetching miner 11:", e);
+    }
+  }, [address]);
+  
+  // Effect to trigger the explicit fetches when miner IDs change
+  useEffect(() => {
+    if (minerIds.length > 0) {
+      fetchSpecificMiners();
+    }
+  }, [minerIds, fetchSpecificMiners]);
+
+  // Add special handling for miner with ID 11 that has invalid coordinates
+  useEffect(() => {
+    if (!gameState.miners || gameState.miners.length === 0) return;
+    
+    // Find miner with ID 11 
+    const miner11 = gameState.miners.find(m => m.id === '11' || m.id === 11);
+    
+    if (miner11) {
+      console.log(`Found miner with ID 11:`, miner11);
+      
+      // Check if it has invalid coordinates
+      if (Number(miner11.y) > 1) { 
+        console.warn(`Miner ID 11 has invalid y-coordinate of ${miner11.y}, should be 0 or 1`);
+        
+        // Get on-chain data to compare
+        fetchMinerData(11).then(data => {
+          if (data) {
+            const correctX = Number(data[1]); // x is at index 1 in the tuple
+            const correctY = Number(data[2]); // y is at index 2 in the tuple
+            
+            console.log(`On-chain coordinates for miner ID 11: (${correctX}, ${correctY})`);
+            
+            // If coordinates from contract are different from what we have locally
+            if (correctX !== Number(miner11.x) || correctY !== Number(miner11.y)) {
+              console.warn(`Coordinate mismatch! Local: (${miner11.x}, ${miner11.y}), On-chain: (${correctX}, ${correctY})`);
+              
+              // Create a corrected version of the miner data - in a production app we'd update state here
+              const correctedMiner = {
+                ...miner11,
+                x: correctX,
+                y: correctY
+              };
+              
+              console.log(`Corrected miner ID 11 data:`, correctedMiner);
+            }
+          }
+        });
+      }
+    }
+  }, [gameState.miners, fetchMinerData]);
+
+  // Apply coordinate validation to miners - filter out invalid coordinates
+  useEffect(() => {
+    if (!gameState.miners || gameState.miners.length === 0) return;
+    
+    // Check for miners with invalid coordinates
+    const invalidMiners = gameState.miners.filter(m => 
+      Number(m.x) > 1 || Number(m.y) > 1
+    );
+    
+    if (invalidMiners.length > 0) {
+      console.error(`Found ${invalidMiners.length} miners with invalid coordinates:`, invalidMiners);
+      
+      // Log each invalid miner
+      invalidMiners.forEach(m => {
+        console.error(`Miner ID=${m.id} has invalid position (${m.x}, ${m.y})`);
+      });
+    }
+  }, [gameState.miners]);
+
+  // Create a modified miners array that uses on-chain data when available
+  const getValidatedMiners = useCallback(() => {
+    if (!gameState.miners) return [];
+    
+    return gameState.miners.map(miner => {
+      const id = String(miner.id);
+      // Check if we have on-chain data for this miner
+      if (minerFullData[id]) {
+        // Extract values from tuple - index 0 is minerIndex from contract
+        const [minerType, x, y, minerId, hashrate, powerConsumption, cost, inProduction] = minerFullData[id];
+        
+        // IMPORTANT: On-chain minerIndex starts at 1, but MINERS config might be 0-indexed
+        // Convert contract minerIndex to frontend MinerType enum
+        // MinerType.BANANA_MINER = 1 in contract but might be 0 in frontend
+        const mappedMinerType = Number(minerType);
+        
+        // Log the mapping for debugging
+        console.log(`Mapping contract minerIndex ${minerType} to frontend type ${mappedMinerType} for miner ID ${id}`);
+        console.log(`Full on-chain data: [${minerType}, ${x}, ${y}, ${minerId}, ${hashrate}, ${powerConsumption}, ${cost}, ${inProduction}]`);
+        
+        // Use corrected on-chain coordinates
+        const correctedMiner = {
+          ...miner,
+          minerType: mappedMinerType,
+          x: Number(x),
+          y: Number(y),
+          hashrate: Number(hashrate),
+          powerConsumption: Number(powerConsumption),
+          cost: Number(cost),
+          inProduction: Boolean(inProduction)
+        };
+        
+        console.log(`Corrected miner ID ${id} data:`, correctedMiner);
+        return correctedMiner;
+      }
+      
+      // Otherwise use the existing data
+      return miner;
+    })
+    // Filter out miners with invalid coordinates
+    .filter(m => {
+      const x = Number(m.x);
+      const y = Number(m.y);
+      const valid = x <= 1 && y <= 1;
+      if (!valid) {
+        console.warn(`Filtering out miner ID ${m.id} with invalid coordinates (${x}, ${y})`);
+      }
+      return valid;
+    });
+  }, [gameState.miners, minerFullData]);
+
+  /**
+   * Function to get a miner at a specific tile position
+   */
+  const getMinerAtTile = (tileX: number | undefined, tileY: number | undefined): PlayerMiner | null => {
+    if (tileX === undefined || tileY === undefined) return null;
+    
+    // Add additional logging for debugging
+    console.log(`Searching for miner at position (${tileX}, ${tileY})`);
+    
+    // Use validated miners that have correct on-chain coordinates
+    const validatedMiners = getValidatedMiners();
+    console.log(`Current miners array:`, validatedMiners);
+
+    // Find the miner at this position - ensure we're comparing numbers strictly
+    const miner = validatedMiners.find(m => 
+      Number(m.x) === Number(tileX) && Number(m.y) === Number(tileY)
+    );
+    
+    console.log(`Miner found at (${tileX}, ${tileY}):`, miner);
+    return miner || null;
+  };
+
+  // Create a generic hook creator for any miner ID
+  const createMinerDataHook = (minerId: string) => {
+    return useContractRead({
+      address: CONTRACT_ADDRESSES.MAIN,
+      abi: [
+        ...MAIN_CONTRACT_ABI,
+        {
+          inputs: [
+            { name: 'player', type: 'address' },
+            { name: 'minerId', type: 'uint256' }
+          ],
+          name: 'getPlayerMiner',
+          outputs: [
+            { name: 'minerIndex', type: 'uint256' },
+            { name: 'x', type: 'uint256' },
+            { name: 'y', type: 'uint256' },
+            { name: 'id', type: 'uint256' },
+            { name: 'hashrate', type: 'uint256' },
+            { name: 'powerConsumption', type: 'uint256' },
+            { name: 'cost', type: 'uint256' },
+            { name: 'inProduction', type: 'bool' }
+          ],
+          stateMutability: 'view',
+          type: 'function'
+        }
+      ] as const,
+      functionName: 'getPlayerMiner',
+      args: [address || zeroAddress, BigInt(minerId)],
+      query: {
+        enabled: Boolean(address) && Boolean(minerId)
+      }
+    });
+  };
+
+  // Need to pre-define hooks for specific IDs we've seen in logs
+  const { data: miner1Data } = createMinerDataHook('1');
+  const { data: miner11Data } = createMinerDataHook('11');
+
+  // Log miner data when it changes and store in state
+  useEffect(() => {
+    if (miner1Data) {
+      console.log("Complete on-chain data for miner ID 1:", miner1Data);
+      setMinerFullData(prev => ({...prev, 1: miner1Data}));
+    }
+  }, [miner1Data]);
+
+  useEffect(() => {
+    if (miner11Data) {
+      console.log("Complete on-chain data for miner ID 11:", miner11Data);
+      setMinerFullData(prev => ({...prev, 11: miner11Data}));
+    }
+  }, [miner11Data]);
 
   // Get free miner data (index 1) - currently mocked since not in ABI
   const freeMinerData: MinerData = {
@@ -95,6 +392,14 @@ export default function RoomPage() {
     powerConsumption: BigInt(1),
     cost: BigInt(0)
   };
+
+  // Save the user's address to localStorage for use with fixedMinerMap
+  useEffect(() => {
+    if (address && typeof window !== 'undefined') {
+      localStorage.setItem('lastConnectedAddress', address);
+      console.log('Saved user address to localStorage:', address);
+    }
+  }, [address]);
 
   // Process facility data
   const facility = facilityData as bigint[] | undefined;
@@ -111,15 +416,15 @@ export default function RoomPage() {
   } : null;
 
   // Create a compatible version for RoomVisualization component
-  const compatibleFacilityData = parsedFacility ? {
-    level: parsedFacility.level,
-    capacity: parsedFacility.capacity,
-    miners: parsedFacility.miners,
-    power: parsedFacility.power,
-    used: parsedFacility.used,
-    resources: 0,                       // Not used but required by the component
-    spaces: parsedFacility.capacity     // For backward compatibility
-  } : undefined;
+  const visualizationFacilityData = {
+    level: parsedFacility?.level || 0,
+    miners: parsedFacility?.miners || 0,
+    power: typeof parsedFacility?.power !== 'undefined' ? Number(parsedFacility.power) : 0,
+    capacity: typeof parsedFacility?.capacity !== 'undefined' ? Number(parsedFacility.capacity) : 0,
+    used: typeof parsedFacility?.used !== 'undefined' ? Number(parsedFacility.used) : 0,
+    resources: 0,
+    spaces: typeof parsedFacility?.capacity !== 'undefined' ? Number(parsedFacility.capacity) : 0
+  };
 
   // Calculate derived values for displaying in UI
   const spacesLeft = parsedFacility ? 
@@ -142,131 +447,73 @@ export default function RoomPage() {
   // Explicitly convert to boolean
   const hasFacility = Boolean(initializedFacility);
 
-  // Check if selected tile has a miner
-  const selectedTileHasMiner = useCallback((x: number, y: number): boolean => {
-    // Add debugging to understand the state of miners
-    console.log('Checking for miner at position:', { x, y });
-    console.log('Available miners:', gameState.miners);
-    
-    // Convert coordinates to numbers early to ensure consistent comparison throughout
-    const targetX = Number(x);
-    const targetY = Number(y);
-    
-    // First, check the miners array from the contract
-    if (gameState.miners && gameState.miners.length > 0) {
-      // Check if any miner in the array has the given coordinates
-      const hasMiner = gameState.miners.some(miner => {
-        const minerX = Number(miner.x);
-        const minerY = Number(miner.y);
-        const matches = minerX === targetX && minerY === targetY;
-        console.log(`Miner at (${minerX}, ${minerY}) matches selected (${targetX}, ${targetY}): ${matches}`);
-        return matches;
-      });
-      
-      if (hasMiner) {
-        console.log(`Found miner in gameState.miners at (${targetX}, ${targetY})`);
-        return true;
+  // Add a specific hook to check the problematic coordinate (1,0)
+  const { data: tileOneZeroOccupied } = useContractRead({
+    address: CONTRACT_ADDRESSES.MAIN,
+    abi: [
+      ...MAIN_CONTRACT_ABI,
+      {
+        inputs: [
+          { name: 'player', type: 'address' },
+          { name: 'x', type: 'uint256' },
+          { name: 'y', type: 'uint256' }
+        ],
+        name: 'playerOccupiedCoords',
+        outputs: [{ name: '', type: 'bool' }],
+        stateMutability: 'view',
+        type: 'function'
       }
-    } else {
-      console.log('No miners available in gameState');
+    ] as const,
+    functionName: 'playerOccupiedCoords',
+    args: [address || zeroAddress, BigInt(1), BigInt(0)],
+    query: {
+      enabled: Boolean(address)
     }
-    
-    // Second, check localStorage as a fallback - especially for position (0,0) which is common for starter miners
-    if (gameState.hasClaimedStarterMiner && typeof window !== 'undefined') {
-      try {
-        const savedPositionStr = localStorage.getItem('claimedMinerPosition');
-        if (savedPositionStr) {
-          const position = JSON.parse(savedPositionStr);
-          const posX = Number(position.x);
-          const posY = Number(position.y);
-          const matches = posX === targetX && posY === targetY;
-          console.log(`Fallback check using localStorage. Position: (${posX}, ${posY}) matches (${targetX}, ${targetY}): ${matches}`);
-          
-          if (matches) {
-            console.log(`Found miner in localStorage at (${targetX}, ${targetY})`);
-            return true;
-          }
-        } else {
-          console.log('No saved position found in localStorage');
-          
-          // Special case for starter miner at (0,0) when claimed but position not saved
-          if (targetX === 0 && targetY === 0 && gameState.hasClaimedStarterMiner) {
-            console.log('Special case: Position is (0,0) and user has claimed starter miner. Assuming miner exists.');
-            return true;
-          }
-        }
-      } catch (e) {
-        console.error("Error parsing miner position from localStorage:", e);
-      }
-    }
-    
-    console.log(`No miner found at (${targetX}, ${targetY}) in any source`);
-    return false;
-  }, [gameState.miners, gameState.hasClaimedStarterMiner]);
+  });
 
-  // Get miner at selected tile
-  const getMinerAtTile = useCallback((x: number, y: number) => {
-    console.log('Getting miner at position:', { x, y });
-    
-    // Convert coordinates to numbers early for consistent comparison
-    const targetX = Number(x);
-    const targetY = Number(y);
-    
-    // First, check the miners array from the contract
-    if (gameState.miners && gameState.miners.length > 0) {
-      // Find the miner at the specified coordinates
-      const miner = gameState.miners.find(miner => 
-        Number(miner.x) === targetX && Number(miner.y) === targetY
-      );
+  // Create a state to track occupied coordinates
+  const [occupiedTiles, setOccupiedTiles] = useState<{x: number, y: number}[]>([]);
+  
+  // Update occupiedTiles when tileOneZeroOccupied changes
+  useEffect(() => {
+    if (tileOneZeroOccupied) {
+      console.log('Confirmed tile (1,0) is occupied');
+      setOccupiedTiles([{x: 1, y: 0}]);
       
-      if (miner) {
-        console.log('Found miner at selected position in gameState:', miner);
-        return miner;
+      // Update localStorage to match the blockchain data
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('claimedMinerPosition', JSON.stringify({x: 1, y: 0}));
+        console.log('Updated localStorage with correct miner position (1,0)');
       }
-    } else {
-      console.log('No miners available in gameState, checking localStorage fallback');
+    }
+  }, [tileOneZeroOccupied]);
+
+  /**
+   * Function to check if a tile has a miner
+   */
+  const selectedTileHasMiner = (tileX: number | undefined, tileY: number | undefined): boolean => {
+    // Special check for known miner positions - mainly for debugging
+    if (tileX === 0 && tileY === 0) {
+      console.log("Special check for starter miner at position (0,0)");
     }
     
-    // Fallback for starter miner using localStorage
-    if (gameState.hasClaimedStarterMiner && typeof window !== 'undefined') {
-      try {
-        const savedPositionStr = localStorage.getItem('claimedMinerPosition');
-        if (savedPositionStr) {
-          const position = JSON.parse(savedPositionStr);
-          const posX = Number(position.x);
-          const posY = Number(position.y);
-          
-          if (posX === targetX && posY === targetY) {
-            console.log('Found miner in localStorage at', {x: posX, y: posY});
-            return {
-              id: 0,
-              minerType: MinerType.BANANA_MINER,
-              x: posX,
-              y: posY
-            };
-          }
-        } else {
-          console.log('No saved position found in localStorage');
-          
-          // Special case for starter miner at (0,0) when claimed but position not saved
-          if (targetX === 0 && targetY === 0 && gameState.hasClaimedStarterMiner) {
-            console.log('Special case: Position is (0,0) and user has claimed starter miner. Creating default miner.');
-            return {
-              id: 0,
-              minerType: MinerType.BANANA_MINER,
-              x: 0,
-              y: 0
-            };
-          }
-        }
-      } catch (e) {
-        console.error("Error parsing miner position from localStorage:", e);
+    // First check localStorage
+    if (typeof window !== 'undefined' && tileX !== undefined && tileY !== undefined) {
+      const minerData = getMinerAtPosition(address as string, tileX, tileY);
+      if (minerData) {
+        console.log(`Found ${minerData.type === MinerType.MONKEY_TOASTER ? 'Monkey Toaster' : 'Banana Miner'} at position (${tileX},${tileY}) from localStorage!`);
       }
     }
     
-    console.log(`No miner found at (${targetX}, ${targetY}) in any source`);
-    return null;
-  }, [gameState.miners, gameState.hasClaimedStarterMiner]);
+    // Check using validated miners that have correct on-chain coordinates
+    const validatedMiners = getValidatedMiners();
+    const hasMiner = validatedMiners.some(m => 
+      Number(m.x) === Number(tileX) && Number(m.y) === Number(tileY)
+    );
+    
+    console.log(`Has miner at (${tileX},${tileY}): ${hasMiner}`);
+    return hasMiner;
+  };
 
   // Add global debugging object to persist across renders
   useEffect(() => {
@@ -337,10 +584,12 @@ export default function RoomPage() {
       }
       
       // If there's no selected tile but we know there's a miner at 0,0, select it
+      // but don't automatically change the tab
       if (!selectedTile && hasMinerAt00) {
-        console.log('🔍 Auto-selecting tile (0,0) where miner exists');
+        console.log('🔍 Auto-selecting tile (0,0) where miner exists, but keeping current tab');
         setSelectedTile({x: 0, y: 0});
-        setActiveTab('selectedTile');
+        // Remove automatic tab switching
+        // setActiveTab('selectedTile');
       }
     }
   }, [gameState.hasClaimedStarterMiner, selectedTileHasMiner, selectedTile]);
@@ -364,6 +613,372 @@ export default function RoomPage() {
       router.push(`/room/${address}`);
     }
   }, [isConnected, address, params?.address, router]);
+
+  // Add live contract reads for stats display
+  const { data: miningRateData, isLoading: isMiningRateLoading } = useContractRead({
+    address: CONTRACT_ADDRESSES.MAIN,
+    abi: [
+      ...MAIN_CONTRACT_ABI,
+      {
+        inputs: [{ name: 'player', type: 'address' }],
+        name: 'getPlayerBitPerDay',
+        outputs: [{ name: '', type: 'uint256' }],
+        stateMutability: 'view',
+        type: 'function'
+      }
+    ] as const,
+    functionName: 'getPlayerBitPerDay',
+    args: [address || zeroAddress],
+    query: {
+      enabled: Boolean(address),
+      refetchInterval: 30000 // Refresh every 30 seconds
+    }
+  });
+  
+  // Log the mining rate data when it changes
+  useEffect(() => {
+    if (miningRateData) {
+      console.log("Player mining rate (BIT per day):", miningRateData);
+      // Convert from wei (10^18) to a human-readable format
+      const bitPerDay = Number(miningRateData) / 10**18;
+      console.log("Player mining rate in BIT:", bitPerDay.toFixed(4));
+    }
+  }, [miningRateData]);
+
+  const { data: hashRateData, isLoading: isHashRateLoading } = useContractRead({
+    address: CONTRACT_ADDRESSES.MAIN,
+    abi: [
+      ...MAIN_CONTRACT_ABI,
+      {
+        inputs: [{ name: 'player', type: 'address' }],
+        name: 'playerHashrate',
+        outputs: [{ name: '', type: 'uint256' }],
+        stateMutability: 'view',
+        type: 'function'
+      }
+    ] as const,
+    functionName: 'playerHashrate',
+    args: [address || zeroAddress],
+    query: {
+      enabled: Boolean(address),
+      refetchInterval: 30000 // Refresh every 30 seconds
+    }
+  });
+
+  // Log the hash rate data when it changes
+  useEffect(() => {
+    if (hashRateData) {
+      console.log("Player hashrate:", hashRateData);
+    }
+  }, [hashRateData]);
+
+  const { data: blocksUntilHalvingData } = useContractRead({
+    address: CONTRACT_ADDRESSES.MAIN,
+    abi: [
+      ...MAIN_CONTRACT_ABI,
+      {
+        inputs: [],
+        name: 'getBlocksUntilNextHalving',
+        outputs: [{ name: '', type: 'uint256' }],
+        stateMutability: 'view',
+        type: 'function'
+      }
+    ] as const,
+    functionName: 'getBlocksUntilNextHalving',
+    args: [],
+    query: {
+      enabled: Boolean(address)
+    }
+  });
+
+  const { data: networkShareData, isLoading: isNetworkShareLoading } = useContractRead({
+    address: CONTRACT_ADDRESSES.MAIN,
+    abi: [
+      ...MAIN_CONTRACT_ABI,
+      {
+        inputs: [{ name: 'player', type: 'address' }],
+        name: 'getPlayerShareOfNetwork',
+        outputs: [{ name: '', type: 'uint256' }],
+        stateMutability: 'view',
+        type: 'function'
+      }
+    ] as const,
+    functionName: 'getPlayerShareOfNetwork',
+    args: [address || zeroAddress],
+    query: {
+      enabled: Boolean(address)
+    }
+  });
+
+  const { data: totalNetworkHashrateData, isLoading: isTotalNetworkHashrateLoading } = useContractRead({
+    address: CONTRACT_ADDRESSES.MAIN,
+    abi: [
+      ...MAIN_CONTRACT_ABI,
+      {
+        inputs: [],
+        name: 'getCurrentHashrate',
+        outputs: [{ name: '', type: 'uint256' }],
+        stateMutability: 'view',
+        type: 'function'
+      }
+    ] as const,
+    functionName: 'getCurrentHashrate',
+    args: [],
+    query: {
+      enabled: Boolean(address)
+    }
+  });
+
+  // Additional data for PRO mode
+  const { data: currentBitApePerBlockData } = useContractRead({
+    address: CONTRACT_ADDRESSES.MAIN,
+    abi: [
+      ...MAIN_CONTRACT_ABI,
+      {
+        inputs: [],
+        name: 'getCurrentBitApePerBlock',
+        outputs: [{ name: '', type: 'uint256' }],
+        stateMutability: 'view',
+        type: 'function'
+      }
+    ] as const,
+    functionName: 'getCurrentBitApePerBlock',
+    args: [],
+    query: {
+      enabled: Boolean(address)
+    }
+  });
+
+  const { data: totalSupplyData } = useContractRead({
+    address: CONTRACT_ADDRESSES.BIT_TOKEN,
+    abi: [
+      {
+        inputs: [],
+        name: 'totalSupply',
+        outputs: [{ name: '', type: 'uint256' }],
+        stateMutability: 'view',
+        type: 'function'
+      }
+    ] as const,
+    functionName: 'totalSupply',
+    args: [],
+    query: {
+      enabled: Boolean(address)
+    }
+  });
+
+  const { data: burnedBitData } = useContractRead({
+    address: CONTRACT_ADDRESSES.BIT_TOKEN,
+    abi: [
+      {
+        inputs: [],
+        name: 'amtBurned',
+        outputs: [{ name: '', type: 'uint256' }],
+        stateMutability: 'view',
+        type: 'function'
+      }
+    ] as const,
+    functionName: 'amtBurned',
+    args: [],
+    query: {
+      enabled: Boolean(address)
+    }
+  });
+
+  // Add unclaimed rewards read
+  const { data: unclaimedRewardsData, isLoading: isUnclaimedRewardsLoading, refetch: refetchRewards } = useContractRead({
+    address: CONTRACT_ADDRESSES.MAIN,
+    abi: [
+      ...MAIN_CONTRACT_ABI,
+      {
+        inputs: [{ name: 'player', type: 'address' }],
+        name: 'getCurrentRewards',
+        outputs: [{ name: '', type: 'uint256' }],
+        stateMutability: 'view',
+        type: 'function'
+      }
+    ] as const,
+    functionName: 'getCurrentRewards',
+    args: [address || zeroAddress],
+    query: {
+      enabled: Boolean(address),
+      refetchInterval: 30000, // Automatically refresh every 30 seconds
+    }
+  });
+
+  // These formatting functions will be moved to StatsDisplay.tsx
+  // Keep them here for now for mobile view formatting
+  const formatNumber = (value: bigint | undefined, decimals = 2, suffix = '', scaleDecimals = 0) => {
+    if (value === undefined) return 'Loading...';
+    
+    // Scale down the value if needed (for values in wei)
+    const scaleFactor = scaleDecimals > 0 ? 10 ** scaleDecimals : 1;
+    const num = Number(value) / scaleFactor;
+    
+    if (num >= 1_000_000_000) {
+      return `${(num / 1_000_000_000).toFixed(decimals)}B${suffix}`;
+    } else if (num >= 1_000_000) {
+      return `${(num / 1_000_000).toFixed(decimals)}M${suffix}`;
+    } else if (num >= 1_000) {
+      return `${(num / 1_000).toFixed(decimals)}K${suffix}`;
+    } else {
+      return `${num.toFixed(decimals)}${suffix}`;
+    }
+  };
+
+  // Format a percentage value with optional scaling
+  const formatPercentage = (value: bigint | undefined, scaleDecimals = 0) => {
+    if (value === undefined) return 'Loading...';
+    
+    // Scale down the value if needed (for values in wei)
+    const scaleFactor = scaleDecimals > 0 ? 10 ** scaleDecimals : 1;
+    const percentage = Number(value) / scaleFactor;
+    
+    return percentage.toFixed(2);
+  };
+
+  // Format values for claim section with better handling
+  const unclaimedRewards = isUnclaimedRewardsLoading 
+    ? 'Loading...'
+    : formatNumber(unclaimedRewardsData as bigint, 4, '', 18);
+    
+  // Calculate a mining rate based on hash rate if the contract doesn't provide one
+  const calculateMiningRate = () => {
+    // Only calculate if we have the hash rate but mining rate isn't available
+    if (
+      hashRateData && 
+      totalNetworkHashrateData && 
+      totalNetworkHashrateData > BigInt(0) &&
+      (!miningRateData || miningRateData === BigInt(0))
+    ) {
+      // Simplified estimate: ~ 2.5 BIT per block * 6000 blocks per day * user's share of network
+      const userShare = Number(hashRateData) / Number(totalNetworkHashrateData);
+      const bitPerBlock = 2.5; // Approximate
+      const blocksPerDay = 6000; // Approximate
+      const estimatedRate = userShare * bitPerBlock * blocksPerDay;
+      
+      console.log(`Estimated mining rate: ${estimatedRate.toFixed(2)} BIT/day (based on ${userShare.toFixed(4)} network share)`);
+      return estimatedRate.toFixed(2);
+    }
+    return null;
+  };
+  
+  // Get our calculated or contract-provided mining rate
+  const calculatedMiningRate = calculateMiningRate();
+  const displayMiningRate = calculatedMiningRate || formatNumber(miningRateData as bigint, 2, '', 18);
+
+  // Refresh rewards data periodically
+  useEffect(() => {
+    if (!address) return;
+    
+    // Initial fetch
+    refetchRewards();
+    
+    // Setup interval to refresh rewards data
+    const intervalId = setInterval(() => {
+      refetchRewards();
+    }, 60000); // Refresh every minute
+    
+    return () => clearInterval(intervalId);
+  }, [address, refetchRewards]);
+
+  // Handle claim rewards using the existing gameState method for simplicity
+  const handleClaimRewards = async () => {
+    try {
+      console.log("Claiming rewards...");
+      // Use the gameState's claimRewardsmethod which is already set up correctly
+      await gameState.claimReward();
+      
+      // After claiming, refetch the rewards to update the UI
+      setTimeout(() => {
+        console.log("Refetching rewards after claim");
+        refetchRewards();
+      }, 5000); // Allow time for transaction to process
+    } catch (error) {
+      console.error('Error claiming rewards:', error);
+    }
+  };
+
+  // Add useEffects for miner post-purchase storing
+  useEffect(() => {
+    if (typeof window === 'undefined' || !address || !gameState.miners) return;
+    
+    // Whenever the miners array changes, update our fixed miner map to ensure persistence
+    gameState.miners.forEach((miner: any) => {
+      console.log('Updating miner map:', miner);
+      // Store each miner in our persisted map
+      addMinerToMap(
+        address,
+        { x: Number(miner.x), y: Number(miner.y) },
+        Number(miner.type)
+      );
+    });
+  }, [gameState.miners, address]);
+
+  // Utility functions for working with miners
+  const getMinerTypeName = (minerType: number) => {
+    const minerNames = {
+      [MinerType.BANANA_MINER]: "BANANA MINER",
+      [MinerType.MONKEY_TOASTER]: "MONKEY TOASTER",
+      [MinerType.GORILLA_GADGET]: "GORILLA GADGET",
+      [MinerType.APEPAD_MINI]: "APEPAD MINI"
+    };
+    return minerNames[minerType as keyof typeof minerNames] || "UNKNOWN";
+  };
+  
+  const getMinerMiningRate = (minerType: number) => {
+    const miningRates = {
+      [MinerType.BANANA_MINER]: "100",
+      [MinerType.MONKEY_TOASTER]: "1000",
+      [MinerType.GORILLA_GADGET]: "750",
+      [MinerType.APEPAD_MINI]: "2000"
+    };
+    return miningRates[minerType as keyof typeof miningRates] || "0";
+  };
+  
+  const getMinerHashRate = (minerType: number) => {
+    const hashRates = {
+      [MinerType.BANANA_MINER]: "100",
+      [MinerType.MONKEY_TOASTER]: "1000",
+      [MinerType.GORILLA_GADGET]: "750",
+      [MinerType.APEPAD_MINI]: "2000"
+    };
+    return hashRates[minerType as keyof typeof hashRates] || "0";
+  };
+  
+  const getMinerPowerConsumption = (minerType: number) => {
+    const powerConsumptions = {
+      [MinerType.BANANA_MINER]: "1",
+      [MinerType.GORILLA_GADGET]: "5",
+      [MinerType.MONKEY_TOASTER]: "10",
+      [MinerType.APEPAD_MINI]: "100"
+    };
+    return powerConsumptions[minerType as keyof typeof powerConsumptions] || "0";
+  };
+
+  // Force refresh miners data when the component mounts
+  useEffect(() => {
+    if (hasFacility && gameState.refetch && address) {
+      console.log('Refreshing game state to update miners list');
+      // Make sure to call refetch to get the latest miner data
+      gameState.refetch();
+    }
+  }, [hasFacility, gameState, address]);
+
+  // Add a new hook to explicitly log miner data from gameState
+  useEffect(() => {
+    if (gameState.miners && gameState.miners.length > 0) {
+      console.log('Current miners from gameState:', gameState.miners);
+      
+      // Check specifically for miners at certain positions
+      const position1_0 = gameState.miners.find(m => Number(m.x) === 1 && Number(m.y) === 0);
+      if (position1_0) {
+        console.log(`Found miner at position (1,0) with type ${position1_0.minerType}`);
+      } else {
+        console.log('No miner found at position (1,0)');
+      }
+    }
+  }, [gameState.miners]);
 
   if (!isConnected || !address) {
     return null;
@@ -454,18 +1069,6 @@ export default function RoomPage() {
         );
         
       case 'selectedTile':
-        // Additional debugging to understand what's happening during render
-        console.log('Rendering selectedTile tab. Selected tile:', selectedTile);
-        if (selectedTile) {
-          console.log('Checking for miner at selected tile during render');
-          const hasMiner = selectedTileHasMiner(selectedTile.x, selectedTile.y);
-          console.log('Has miner during render:', hasMiner);
-          if (hasMiner) {
-            const miner = getMinerAtTile(selectedTile.x, selectedTile.y);
-            console.log('Miner details during render:', miner);
-          }
-        }
-
         return (
           <div className="p-3 space-y-2">
             {selectedTile ? (
@@ -477,97 +1080,36 @@ export default function RoomPage() {
                 </div>
                 
                 {(() => {
-                  // DIRECT LOCALSTORAGE CHECK (highest priority)
-                  let minerFromLocalStorage = null;
-                  
-                  console.log('DEBUG: Checking for miner at', selectedTile);
-                  
-                  // Only do this if the user has claimed a starter miner but we don't have it in gameState
-                  if (gameState.hasClaimedStarterMiner && 
-                     (!gameState.miners || gameState.miners.length === 0) && 
-                     typeof window !== 'undefined') {
-                    try {
-                      const savedPositionStr = localStorage.getItem('claimedMinerPosition');
-                      console.log('Direct localStorage check, saved position:', savedPositionStr);
-                      
-                      if (savedPositionStr) {
-                        const position = JSON.parse(savedPositionStr);
-                        console.log('Comparing localStorage position with selected tile:', {
-                          positionX: Number(position.x),
-                          positionY: Number(position.y),
-                          selectedX: Number(selectedTile.x),
-                          selectedY: Number(selectedTile.y)
-                        });
-                        
-                        if (Number(position.x) === Number(selectedTile.x) && 
-                            Number(position.y) === Number(selectedTile.y)) {
-                          console.log('MATCH FOUND in localStorage!');
-                          minerFromLocalStorage = {
-                            id: 0,
-                            minerType: MinerType.BANANA_MINER,
-                            x: Number(position.x),
-                            y: Number(position.y)
-                          };
-                        }
-                      }
-                    } catch (e) {
-                      console.error("Error accessing localStorage:", e);
-                    }
-                  } else {
-                    console.log('DEBUG: Skipping localStorage check because:', {
-                      hasClaimedStarterMiner: gameState.hasClaimedStarterMiner,
-                      hasMinersArray: !!(gameState.miners && gameState.miners.length > 0),
-                      browserEnvironment: typeof window !== 'undefined'
-                    });
-                  }
-                  
-                  // Get miner using our helper method
+                  // ALWAYS prioritize contract miners first
                   const miner = getMinerAtTile(selectedTile.x, selectedTile.y);
                   console.log('Miner found by getMinerAtTile:', miner);
                   
-                  // Always check localStorage as a fallback regardless of gameState.miners
-                  if (!miner && typeof window !== 'undefined' && gameState.hasClaimedStarterMiner) {
-                    try {
-                      const savedPositionStr = localStorage.getItem('claimedMinerPosition');
-                      if (savedPositionStr) {
-                        const position = JSON.parse(savedPositionStr);
-                        if (Number(position.x) === Number(selectedTile.x) && Number(position.y) === Number(selectedTile.y)) {
-                          console.log('FALLBACK: Found miner in localStorage after getMinerAtTile returned null');
-                          minerFromLocalStorage = {
-                            id: 0,
-                            minerType: MinerType.BANANA_MINER,
-                            x: Number(position.x),
-                            y: Number(position.y)
-                          };
-                        }
-                      }
-                    } catch (e) {
-                      console.error("Error in fallback localStorage check:", e);
-                    }
-                  }
-                  
-                  // Use either the contract miner or localStorage miner
-                  const finalMiner = miner || minerFromLocalStorage;
-                  console.log('Final miner to display:', finalMiner);
-                  
-                  if (finalMiner) {
+                  if (miner) {
+                    // Get the correct miner type for image and stats
+                    const minerType = miner.minerType !== undefined ? 
+                      Number(miner.minerType) : 
+                      (miner.type !== undefined ? Number(miner.type) : 0);
+                    
+                    const minerConfig = MINERS[minerType as keyof typeof MINERS];
+                    const minerImage = minerConfig?.image || '/banana-miner.gif';
+                    const minerName = minerConfig?.name || getMinerTypeName(minerType);
+                    
                     return (
                       <div className="space-y-3">
                         <p className="bigcoin-text">MINER DETAILS:</p>
-                        <p className="bigcoin-text text-xs">Source: {miner ? 'Contract Data' : 'LocalStorage'}</p>
                         <div className="flex items-center space-x-2">
                           <div className="w-16 h-16 relative">
                             <Image
-                              src="/banana-miner.gif"
-                              alt="Banana Miner"
+                              src={minerImage}
+                              alt={minerName}
                               fill
                               className="object-contain"
                             />
                           </div>
                           <div>
-                            <p className="bigcoin-value">{getMinerTypeName(finalMiner.minerType)}</p>
-                            <p className="bigcoin-text text-xs opacity-80">HASH RATE: {getMinerHashRate(finalMiner.minerType)} GH/s</p>
-                            <p className="bigcoin-text text-xs opacity-80">ENERGY: {getMinerPowerConsumption(finalMiner.minerType)} WATTS</p>
+                            <p className="bigcoin-value">{minerName}</p>
+                            <p className="bigcoin-text text-xs opacity-80">HASH RATE: {getMinerHashRate(minerType)} GH/s</p>
+                            <p className="bigcoin-text text-xs opacity-80">ENERGY: {getMinerPowerConsumption(minerType)} WATTS</p>
                           </div>
                         </div>
                         <div className="mt-4">
@@ -581,19 +1123,16 @@ export default function RoomPage() {
                       </div>
                     );
                   } else {
-                    // No miner found at this location
                     return (
-                      <div>
-                        <p className="bigcoin-text mb-3">NO MINER INSTALLED</p>
-                        {hasFacility && (
-                          <div className="mt-4">
-                            <button
-                              onClick={() => setShowMinerModal(true)}
-                              className="w-full bigcoin-button"
-                            >
-                              BUY MINER
-                            </button>
-                          </div>
+                      <div className="space-y-3">
+                        <p className="text-center text-sm py-4">No miner at this location.</p>
+                        {hasFacility && parsedFacility && Number(parsedFacility.miners) < Number(parsedFacility.capacity) && (
+                          <button
+                            onClick={() => setShowMinerModal(true)}
+                            className="w-full bigcoin-button"
+                          >
+                            PLACE MINER HERE
+                          </button>
                         )}
                       </div>
                     );
@@ -601,9 +1140,8 @@ export default function RoomPage() {
                 })()}
               </div>
             ) : (
-              <div className="text-center p-2">
-                <p className="bigcoin-text opacity-80">Select a tile to view or add miners</p>
-                <p className="bigcoin-text opacity-50 mt-2">Click GRID button then select a space</p>
+              <div className="text-center py-4">
+                <p className="text-sm">Click a tile to select it</p>
               </div>
             )}
           </div>
@@ -627,7 +1165,7 @@ export default function RoomPage() {
               >
                 UPGRADE FACILITY
               </button>
-              {!gameState.hasClaimedStarterMiner && (
+              {!acquiredStarterMinerData && (
                 <button
                   className="bigcoin-button"
                   onClick={() => setIsStarterMinerModalOpen(true)}
@@ -668,6 +1206,55 @@ export default function RoomPage() {
                 {parsedFacility ? `${parsedFacility.power - parsedFacility.used} GW` : '0 GW'}
               </span>
             </div>
+            
+            {/* Also display mining stats in mobile view */}
+            <div className="border-t border-white/20 pt-4 mt-4">
+              <h3 className="bigcoin-text mb-2">MINING STATS</h3>
+              <p className="font-press-start text-white text-xs mb-1">- MINING <span className="text-banana">
+                {miningRateData !== undefined 
+                  ? formatNumber(miningRateData, 2, '', 18) 
+                  : 'Loading...'}
+              </span> BIT/DAY</p>
+              <p className="font-press-start text-white text-xs mb-1">- HASH RATE: <span className="text-banana">
+                {hashRateData !== undefined 
+                  ? formatNumber(hashRateData, 0, '') 
+                  : 'Loading...'}
+              </span> GH/S</p>
+              <p className="font-press-start text-white text-xs mb-1">- <span className="text-banana">
+                {blocksUntilHalvingData !== undefined 
+                  ? String(blocksUntilHalvingData) 
+                  : 'Loading...'}
+              </span> BLOCKS UNTIL HALVENING</p>
+              <p className="font-press-start text-white text-xs">- <span className="text-banana">
+                {networkShareData !== undefined 
+                  ? (Number(networkShareData) / 100).toFixed(2) 
+                  : 'Loading...'}%
+              </span> OF NETWORK (<span className="text-banana">
+                {totalNetworkHashrateData !== undefined 
+                  ? formatNumber(totalNetworkHashrateData, 0, '') 
+                  : 'Loading...'}
+              </span> GH/S)</p>
+            </div>
+            
+            {/* Add PRO stats in mobile view as well */}
+            <div className="border-t border-white/20 pt-4 mt-4">
+              <h3 className="bigcoin-text mb-2">NETWORK STATS</h3>
+              <p className="font-press-start text-white text-xs mb-1">- <span className="text-banana">
+                {currentBitApePerBlockData !== undefined 
+                  ? formatNumber(currentBitApePerBlockData, 2, '', 18) 
+                  : 'Loading...'}
+              </span> BIT PER BLOCK</p>
+              <p className="font-press-start text-white text-xs mb-1">- <span className="text-banana">
+                {totalSupplyData !== undefined 
+                  ? formatNumber(totalSupplyData, 2, '', 18) 
+                  : 'Loading...'}
+              </span> TOTAL BIT MINED</p>
+              <p className="font-press-start text-white text-xs">- <span className="text-banana">
+                {burnedBitData !== undefined 
+                  ? formatNumber(burnedBitData, 2, '', 18) 
+                  : 'Loading...'}
+              </span> BIT BURNED</p>
+            </div>
           </div>
         );
       case 'mining':
@@ -677,32 +1264,41 @@ export default function RoomPage() {
         // If no miners in gameState but user has claimed starter miner, check localStorage
         if (displayedMiners.length === 0 && gameState.hasClaimedStarterMiner && typeof window !== 'undefined') {
           try {
-            const savedPositionStr = localStorage.getItem('claimedMinerPosition');
-            if (savedPositionStr) {
-              const position = JSON.parse(savedPositionStr);
-              // Add the starter miner from localStorage
+            // Check localStorage for any saved miners
+            const minerData = getMinerAtPosition(address as string, 0, 0);
+            if (minerData) {
+              console.log('Found Banana Miner at position (0,0) from localStorage!');
               displayedMiners.push({
-                id: 0,
+                id: '0',
                 minerType: MinerType.BANANA_MINER,
-                x: Number(position.x),
-                y: Number(position.y)
+                x: 0,
+                y: 0,
+                image: MINERS[MinerType.BANANA_MINER].image,
+                hashrate: 1,
+                powerConsumption: 1,
+                cost: 0,
+                inProduction: true
               });
-              console.log('Added miner from localStorage for mobile mining tab:', position);
             }
           } catch (e) {
-            console.error("Error parsing miner position for mobile tab:", e);
+            console.error('Error retrieving miner from localStorage:', e);
           }
         }
         
         // If still no miners but we know starter miner is claimed, add default at 0,0
         if (displayedMiners.length === 0 && gameState.hasClaimedStarterMiner) {
+          console.log('No miners found, but starter miner claimed. Adding default at (0,0)');
           displayedMiners.push({
-            id: 0,
+            id: '0',
             minerType: MinerType.BANANA_MINER,
             x: 0,
-            y: 0
+            y: 0,
+            image: MINERS[MinerType.BANANA_MINER].image,
+            hashrate: 1,
+            powerConsumption: 1,
+            cost: 0,
+            inProduction: true
           });
-          console.log('Added default starter miner at (0,0) for mobile mining tab');
         }
 
         return (
@@ -728,8 +1324,16 @@ export default function RoomPage() {
             
             {/* Mining stats with improved mobile styling */}
             <div className="border-t border-white/20 pt-3 mb-3">
-              <p className="font-press-start text-white text-xs mb-1">- MINING {gameState.miningRate || 0} BIT/DAY</p>
-              <p className="font-press-start text-white text-xs mb-1">- HASH RATE: {gameState.hashRate || 0} GH/S</p>
+              <p className="font-press-start text-white text-xs mb-1">- MINING <span className="text-banana">
+                {miningRateData !== undefined 
+                  ? formatNumber(miningRateData, 2, '', 18) 
+                  : 'Loading...'}
+              </span> BIT/DAY</p>
+              <p className="font-press-start text-white text-xs mb-1">- HASH RATE: <span className="text-banana">
+                {hashRateData !== undefined 
+                  ? formatNumber(hashRateData, 0, '') 
+                  : 'Loading...'}
+              </span> GH/S</p>
             </div>
             
             <div className="mt-4">
@@ -762,24 +1366,6 @@ export default function RoomPage() {
     }
   };
 
-  const getMinerTypeName = (minerType: number) => {
-    const minerTypes = {
-      0: "BANANA MINER",
-      1: "APE MINER",
-      2: "ROYAL APE MINER"
-    };
-    return minerTypes[minerType as keyof typeof minerTypes] || "UNKNOWN";
-  };
-
-  const getMinerMiningRate = (minerType: number) => {
-    const miningRates = {
-      0: "1",
-      1: "10",
-      2: "100"
-    };
-    return miningRates[minerType as keyof typeof miningRates] || "0";
-  };
-
   const getLocationDescription = (tile: SelectedTile) => {
     if (tile.x === 0 && tile.y === 0) return "NEAR BED";
     if (tile.x === 1 && tile.y === 0) return "NEAR BANANA BOXES";
@@ -790,12 +1376,30 @@ export default function RoomPage() {
 
   const handleTileSelect = (x: number, y: number) => {
     console.log(`Tile selected at (${x}, ${y})`);
+    
+    // Check if we're selecting the same tile again
+    const isSameTile = selectedTile && selectedTile.x === x && selectedTile.y === y;
+    
+    // Force re-render by creating a new object, even if coordinates are the same
     setSelectedTile({ x, y });
-    setActiveTab('selectedTile');
+    
+    // Switch to the selected tile tab when a new tile is selected
+    if (!isSameTile || activeTab !== 'selectedTile') {
+      setActiveTab('selectedTile');
+    }
     
     // Check if there's a miner at this position immediately after selection
     const hasMiner = selectedTileHasMiner(x, y);
     console.log(`Tile has miner: ${hasMiner}`);
+    
+    // Force the component to update since tile selection is critical for UI
+    // This helps address the double-click issue
+    setTimeout(() => {
+      if (selectedTile?.x !== x || selectedTile?.y !== y) {
+        console.log('Forcing tile selection update');
+        setSelectedTile({ x, y });
+      }
+    }, 100);
   };
 
   const handlePurchaseFacility = async () => {
@@ -887,24 +1491,6 @@ export default function RoomPage() {
     }
   };
 
-  const getMinerHashRate = (minerType: number) => {
-    const hashRates = {
-      0: "100",
-      1: "1000",
-      2: "10000"
-    };
-    return hashRates[minerType as keyof typeof hashRates] || "0";
-  };
-
-  const getMinerPowerConsumption = (minerType: number) => {
-    const powerConsumptions = {
-      0: "1",
-      1: "10",
-      2: "100"
-    };
-    return powerConsumptions[minerType as keyof typeof powerConsumptions] || "0";
-  };
-
   // Render statistics panel function
   const renderStatistics = (minerType: number) => {
     if (minerType === undefined) return null;
@@ -928,6 +1514,38 @@ export default function RoomPage() {
         </div>
       </div>
     );
+  };
+
+  // Update localStorage to use the correct coordinates for starter miner
+  useEffect(() => {
+    if (gameState.hasClaimedStarterMiner && typeof window !== 'undefined') {
+      // Check if the localStorage has the wrong position
+      const savedPositionStr = localStorage.getItem('claimedMinerPosition');
+      if (savedPositionStr) {
+        const position = JSON.parse(savedPositionStr);
+        // If the position is 0,0 but should be 1,0 according to chain data
+        if (position.x === 0 && position.y === 0 && tileOneZeroOccupied) {
+          console.log('Correcting miner position in localStorage from (0,0) to (1,0)');
+          localStorage.setItem('claimedMinerPosition', JSON.stringify({x: 1, y: 0}));
+        }
+      }
+    }
+  }, [gameState.hasClaimedStarterMiner, tileOneZeroOccupied]);
+
+  // Update the handleBuyMinerSuccess function to also add the miner to our fixed map
+  const handleBuyMinerSuccess = (
+    minerType: number,
+    position: { x: number; y: number }
+  ) => {
+    console.log(`Miner purchase successful! Type: ${minerType}, Position: (${position.x}, ${position.y})`);
+    
+    // Add to our fixed miner map for persistence
+    if (address) {
+      addMinerToMap(address, position, minerType);
+    }
+    
+    // Force a refresh of the miners data
+    refetchRewards();
   };
 
   if (!isMounted) {
@@ -967,7 +1585,7 @@ export default function RoomPage() {
           <div className="bigcoin-panel">
             <RoomVisualization 
               hasFacility={hasFacility}
-              facilityData={compatibleFacilityData}
+              facilityData={visualizationFacilityData}
               onPurchaseFacility={handlePurchaseFacility}
               onGetStarterMiner={handleGetStarterMiner}
               onUpgradeFacility={handleUpgradeFacility}
@@ -980,7 +1598,73 @@ export default function RoomPage() {
               isGridMode={isGridModeActive}
               toggleGridMode={toggleGridMode}
               hasClaimedStarterMiner={gameState.hasClaimedStarterMiner}
-              miners={gameState.miners}
+              miners={getValidatedMiners()
+                .map(m => {
+                  // Get the correct miner type from the contract's minerIndex
+                  const contractMinerType = m.minerType;
+                  
+                  // Map contract minerType to our frontend MinerType enum
+                  let frontendMinerType;
+                  
+                  // Check which mapping system is in use
+                  if (MinerType.BANANA_MINER === 1) {
+                    // If enum matches contract exactly (1-indexed)
+                    frontendMinerType = contractMinerType;
+                  } else {
+                    // If enum is 0-indexed (common in JS/TS), adjust by -1
+                    frontendMinerType = contractMinerType;
+                  }
+                  
+                  // Use the correct type to get image
+                  const minerImage = MINERS[frontendMinerType]?.image || '/banana-miner.gif';
+                  
+                  console.log(`Miner ID ${m.id}: Contract type ${contractMinerType}, Frontend type ${frontendMinerType}, Image ${minerImage}`);
+                  
+                  return {
+                    id: m.id,
+                    minerType: frontendMinerType,
+                    x: Number(m.x),
+                    y: Number(m.y),
+                    image: minerImage,
+                    hashrate: m.hashrate,
+                    powerConsumption: m.powerConsumption,
+                    inProduction: m.inProduction
+                  };
+                })}
+              selectedTileHasMiner={(x, y) => selectedTileHasMiner(x, y)}
+              getMinerAtTile={(x, y) => {
+                const miner = getMinerAtTile(x, y);
+                if (!miner) return null;
+                
+                // Get the correct miner type from the contract's minerIndex
+                const contractMinerType = miner.minerType;
+                
+                // Map contract minerType to our frontend MinerType enum
+                let frontendMinerType;
+                
+                // Check which mapping system is in use
+                if (MinerType.BANANA_MINER === 1) {
+                  // If enum matches contract exactly (1-indexed)
+                  frontendMinerType = contractMinerType;
+                } else {
+                  // If enum is 0-indexed (common in JS/TS), adjust by -1
+                  frontendMinerType = contractMinerType;
+                }
+                
+                // Use the correct type to get image
+                const minerImage = MINERS[frontendMinerType]?.image || '/banana-miner.gif';
+                
+                return {
+                  id: miner.id,
+                  minerType: frontendMinerType,
+                  x: Number(miner.x),
+                  y: Number(miner.y),
+                  image: minerImage,
+                  hashrate: miner.hashrate,
+                  powerConsumption: miner.powerConsumption,
+                  inProduction: miner.inProduction
+                };
+              }}
             />
           </div>
         </div>
@@ -1083,30 +1767,30 @@ export default function RoomPage() {
 
             {/* Stats Panel */}
             <div className="bg-royal border-2 border-banana rounded-lg overflow-hidden">
-              <div className="flex border-b-2 border-banana px-3 py-1">
-                <button className="font-press-start text-xs text-banana mr-4">SIMPLE</button>
-                <button className="font-press-start text-xs text-[#4A5568]">PRO</button>
-              </div>
-              <div className="p-3 space-y-1 font-press-start text-white text-xs">
-                <p>- YOU ARE MINING {gameState.miningRate || 0} BIT A DAY</p>
-                <p>- YOUR HASH RATE IS {gameState.hashRate || 0} GH/S</p>
-                <p>- {gameState.blocksUntilHalving || 0} BLOCKS UNTIL NEXT HALVENING</p>
-                <p>- YOU HAVE {gameState.networkHashRatePercentage || 0}% OF THE TOTAL NETWORK HASH RATE ({gameState.totalNetworkHashRate || 0} GH/S)</p>
-              </div>
+              <StatsDisplay
+                miningRateData={miningRateData as bigint}
+                hashRateData={hashRateData as bigint}
+                blocksUntilHalvingData={blocksUntilHalvingData as bigint}
+                networkShareData={networkShareData as bigint}
+                totalNetworkHashrateData={totalNetworkHashrateData as bigint}
+                totalSupplyData={totalSupplyData as bigint}
+                burnedBitData={burnedBitData as bigint}
+                currentBitApePerBlockData={currentBitApePerBlockData as bigint}
+                isMiningRateLoading={isMiningRateLoading}
+                isHashRateLoading={isHashRateLoading}
+                isNetworkShareLoading={isNetworkShareLoading}
+                isTotalNetworkHashrateLoading={isTotalNetworkHashrateLoading}
+              />
             </div>
 
             {/* Mining Panel */}
             <div className="bg-royal border-2 border-banana rounded-lg overflow-hidden">
-              <div className="p-3 text-center font-press-start">
-                <p className="text-white mb-2 text-sm">YOU HAVE MINED {gameState.minedBit || 0} BIT</p>
-                <button 
-                  onClick={() => gameState.claimReward()}
-                  disabled={gameState.isClaimingReward || !gameState.hasFacility}
-                  className="w-full bg-dark-blue text-banana py-1 px-3 text-sm hover:bg-opacity-80 disabled:opacity-50 border-2 border-banana"
-                >
-                  CLAIM MINED BIT
-                </button>
-              </div>
+              <EnhancedMiningClaimSection
+                minedBit={unclaimedRewards}
+                onClaimRewards={handleClaimRewards}
+                isClaimingReward={gameState.isClaimingReward}
+                miningRate={displayMiningRate}
+              />
             </div>
           </div>
 
@@ -1115,7 +1799,7 @@ export default function RoomPage() {
             <div className="relative w-[700px] h-[700px] border border-banana overflow-hidden p-1.5">
               <RoomVisualization 
                 hasFacility={hasFacility}
-                facilityData={compatibleFacilityData}
+                facilityData={visualizationFacilityData}
                 onPurchaseFacility={handlePurchaseFacility}
                 onGetStarterMiner={handleGetStarterMiner}
                 onUpgradeFacility={handleUpgradeFacility}
@@ -1128,13 +1812,79 @@ export default function RoomPage() {
                 isGridMode={isGridModeActive}
                 toggleGridMode={toggleGridMode}
                 hasClaimedStarterMiner={gameState.hasClaimedStarterMiner}
-                miners={gameState.miners}
+                miners={getValidatedMiners()
+                  .map(m => {
+                    // Get the correct miner type from the contract's minerIndex
+                    const contractMinerType = m.minerType;
+                    
+                    // Map contract minerType to our frontend MinerType enum
+                    let frontendMinerType;
+                    
+                    // Check which mapping system is in use
+                    if (MinerType.BANANA_MINER === 1) {
+                      // If enum matches contract exactly (1-indexed)
+                      frontendMinerType = contractMinerType;
+                    } else {
+                      // If enum is 0-indexed (common in JS/TS), adjust by -1
+                      frontendMinerType = contractMinerType;
+                    }
+                    
+                    // Use the correct type to get image
+                    const minerImage = MINERS[frontendMinerType]?.image || '/banana-miner.gif';
+                    
+                    console.log(`Miner ID ${m.id}: Contract type ${contractMinerType}, Frontend type ${frontendMinerType}, Image ${minerImage}`);
+                    
+                    return {
+                      id: m.id,
+                      minerType: frontendMinerType,
+                      x: Number(m.x),
+                      y: Number(m.y),
+                      image: minerImage,
+                      hashrate: m.hashrate,
+                      powerConsumption: m.powerConsumption,
+                      inProduction: m.inProduction
+                    };
+                  })}
+                selectedTileHasMiner={(x, y) => selectedTileHasMiner(x, y)}
+                getMinerAtTile={(x, y) => {
+                  const miner = getMinerAtTile(x, y);
+                  if (!miner) return null;
+                  
+                  // Get the correct miner type from the contract's minerIndex
+                  const contractMinerType = miner.minerType;
+                  
+                  // Map contract minerType to our frontend MinerType enum
+                  let frontendMinerType;
+                  
+                  // Check which mapping system is in use
+                  if (MinerType.BANANA_MINER === 1) {
+                    // If enum matches contract exactly (1-indexed)
+                    frontendMinerType = contractMinerType;
+                  } else {
+                    // If enum is 0-indexed (common in JS/TS), adjust by -1
+                    frontendMinerType = contractMinerType;
+                  }
+                  
+                  // Use the correct type to get image
+                  const minerImage = MINERS[frontendMinerType]?.image || '/banana-miner.gif';
+                  
+                  return {
+                    id: miner.id,
+                    minerType: frontendMinerType,
+                    x: Number(miner.x),
+                    y: Number(miner.y),
+                    image: minerImage,
+                    hashrate: miner.hashrate,
+                    powerConsumption: miner.powerConsumption,
+                    inProduction: miner.inProduction
+                  };
+                }}
               />
             </div>
           </div>
         </div>
       </div>
-
+      
       {/* Modals */}
       <BuyFacilityModal 
         isOpen={isBuyModalOpen}

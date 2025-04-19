@@ -1,0 +1,91 @@
+/* Animations for BitApe Mining UI */
+
+/* Fade Out Animation */
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+        
+.animate-fade-out {
+  animation: fadeOut 3s forwards;
+}
+
+/* Shine Effect Animation */
+@keyframes shine {
+  from { transform: translateX(-100%) rotate(35deg); }
+  to { transform: translateX(150%) rotate(35deg); }
+}
+        
+.shine-effect {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0) 0%,
+    rgba(255,255,255,0.2) 50%,
+    rgba(255,255,255,0) 100%
+  );
+  animation: shine 2s infinite;
+  transform: translateX(-100%) rotate(35deg);
+}
+
+/* Pulse Animation */
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+.animate-pulse-custom {
+  animation: pulse 2s infinite ease-in-out;
+}
+
+/* Mining Animation */
+@keyframes mining {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-3px); }
+  100% { transform: translateY(0px); }
+}
+
+.mining-icon {
+  display: inline-block;
+  animation: mining 1s infinite ease-in-out;
+}
+
+/* Success Animation */
+@keyframes success {
+  0% { transform: scale(0.8); opacity: 0; }
+  25% { transform: scale(1.1); opacity: 1; }
+  50% { transform: scale(0.95); opacity: 1; }
+  75% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.success-animation {
+  animation: success 0.5s forwards;
+}
+
+/* Float Animation */
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
+}
+
+.float-animation {
+  animation: float 3s infinite ease-in-out;
+}
+
+/* Number Ticking Animation */
+@keyframes numberTick {
+  0% { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.number-tick {
+  display: inline-block;
+  animation: numberTick 0.3s forwards;
+} 

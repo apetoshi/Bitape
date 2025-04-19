@@ -1,10 +1,19 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import '@/styles/globals.css';
 import Providers from '@/components/Providers';
 import DockMenuWrapper from '@/components/DockMenuWrapper';
 
 const inter = Inter({ subsets: ['latin'] });
+
+// Move viewport configuration to a separate export
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  minimumScale: 1,
+  userScalable: true
+};
 
 export const metadata: Metadata = {
   title: 'BitApe - A Peer-to-Peer Electronic Ape Cash System',
@@ -15,13 +24,6 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: 'black-translucent',
     title: 'BitApe'
-  },
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 5,
-    minimumScale: 1,
-    userScalable: true
   },
   icons: {
     icon: '/bitape.png',

@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { Dialog } from '@headlessui/react';
 import { MINERS, MinerType, MinerData, getActiveMiners } from '@/config/miners';
+import { addMinerToMap } from '@/app/room/[address]/fixedMinerMap';
 
 interface MinerPurchaseModalProps {
   isOpen: boolean;
@@ -31,7 +32,11 @@ const MinerPurchaseModal: React.FC<MinerPurchaseModalProps> = ({
   bitBalance,
   hasClaimedStarterMiner
 }) => {
-  const [selectedMiner, setSelectedMiner] = useState<MinerType>(MinerType.BANANA_MINER);
+  // Set default selected miner: if starter miner is claimed, default to MONKEY_TOASTER
+  const defaultMiner = hasClaimedStarterMiner ? MinerType.MONKEY_TOASTER : MinerType.BANANA_MINER;
+  const [selectedMiner, setSelectedMiner] = useState<MinerType>(defaultMiner);
+  const [purchaseStage, setPurchaseStage] = useState<'initial' | 'approving' | 'purchasing' | 'success'>('initial');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const activeMiners = getActiveMiners();
   
   // Convert bitBalance to a number
@@ -50,20 +55,185 @@ const MinerPurchaseModal: React.FC<MinerPurchaseModalProps> = ({
   // Determine if user can purchase this miner
   const canPurchase = selectedTile && (canAfford || canGetFreeMiner);
   
+  // Create a mapping of miner types to their names and indices for clarity
+  const minerMapping = {
+    [MinerType.BANANA_MINER]: { name: "BANANA MINER", index: MinerType.BANANA_MINER },
+    [MinerType.MONKEY_TOASTER]: { name: "MONKEY TOASTER", index: MinerType.MONKEY_TOASTER },
+    [MinerType.GORILLA_GADGET]: { name: "GORILLA GADGET", index: MinerType.GORILLA_GADGET },
+    [MinerType.APEPAD_MINI]: { name: "APEPAD MINI", index: MinerType.APEPAD_MINI },
+  };
+  
+  // Define a specific display order for miners regardless of their index values
+  const minerDisplayOrder = [
+    MinerType.BANANA_MINER,
+    MinerType.MONKEY_TOASTER,
+    MinerType.GORILLA_GADGET,
+    MinerType.APEPAD_MINI
+  ];
+  
+  // Get active miners in our preferred display order
+  const orderedActiveMiners = minerDisplayOrder
+    .map(minerType => MINERS[minerType])
+    .filter(miner => miner.isActive);
+  
   // Handle the purchase
   const handlePurchase = async () => {
-    if (!selectedTile || isPurchasing || !canPurchase) return;
+    // Reset any previous error message
+    setErrorMessage(null);
     
-    await onPurchase(selectedMiner, selectedTile.x, selectedTile.y);
-    onClose();
+    // Add detailed debugging to understand what's happening
+    console.log("handlePurchase called with: ", {
+      selectedTile,
+      isPurchasing,
+      canPurchase,
+      selectedMiner,
+      minerIndex: selectedMiner,  // Important: Use consistent naming with contract
+      minerIndexValue: Number(selectedMiner),
+      minerName: MINERS[selectedMiner].name
+    });
+    
+    // Add explicit mapping information for clarity
+    console.log("Miner index mapping information:", {
+      BANANA_MINER: MinerType.BANANA_MINER,
+      MONKEY_TOASTER: MinerType.MONKEY_TOASTER,
+      GORILLA_GADGET: MinerType.GORILLA_GADGET,
+      APEPAD_MINI: MinerType.APEPAD_MINI
+    });
+    
+    if (!selectedTile || isPurchasing || !canPurchase) {
+      console.log("Purchase aborted because:", {
+        noSelectedTile: !selectedTile,
+        isPurchasing,
+        cannotPurchase: !canPurchase
+      });
+      return;
+    }
+    
+    try {
+      // Always start with approving state first
+      setPurchaseStage('approving');
+      
+      // Ensure coordinates are numbers
+      const x = Number(selectedTile.x);
+      const y = Number(selectedTile.y);
+      
+      console.log(`Initiating purchase of miner index ${selectedMiner} (${MINERS[selectedMiner].name}) at position (${x}, ${y})`);
+      console.log(`Expected contract calldata will contain: minerIndex=${selectedMiner}, x=${x}, y=${y}`);
+      
+      // Now call the purchase function
+      try {
+        await onPurchase(selectedMiner, x, y);
+        
+        // If we get here without errors, set to success state
+        setPurchaseStage('success');
+        console.log("Purchase transaction submitted successfully");
+        
+        // For any miner purchased, save to localStorage for UI persistence
+        if (typeof window !== 'undefined') {
+          // Create a standard key for Monkey Toaster position
+          if (selectedMiner === MinerType.MONKEY_TOASTER) {
+            console.log(`Saving ${MINERS[selectedMiner].name} purchase to localStorage`);
+            localStorage.setItem('monkey_toaster_purchased', 'true');
+            localStorage.setItem('monkey_toaster_position', JSON.stringify({x, y}));
+          }
+          
+          // Also save to fixedMinerMap for all miner types for consistent storage
+          try {
+            // We need a user address to save to the miner map
+            const userAddress = localStorage.getItem('lastConnectedAddress');
+            if (userAddress) {
+              console.log(`Saving miner to fixedMinerMap for address ${userAddress}`);
+              addMinerToMap(userAddress, {x, y}, selectedMiner);
+            } else {
+              console.warn('Could not save to fixedMinerMap: No user address found');
+            }
+          } catch (err) {
+            console.error('Error saving to fixedMinerMap:', err);
+          }
+        }
+        
+        // Don't automatically close modal, let user see success message and refresh option
+      } catch (error) {
+        // Set error message for display
+        const message = error instanceof Error ? error.message : 'Unknown error occurred';
+        setErrorMessage(message);
+        console.error('Purchase transaction failed:', message);
+        setPurchaseStage('initial');
+      }
+    } catch (error) {
+      // Handle any other errors
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      setErrorMessage(message);
+      console.error('Error during miner purchase:', message);
+      setPurchaseStage('initial');
+    }
+  };
+
+  // Reset purchase stage when modal is closed
+  useEffect(() => {
+    if (!isOpen) {
+      setPurchaseStage('initial');
+    }
+  }, [isOpen]);
+
+  // When the modal opens and hasClaimedStarterMiner changes, update the selected miner
+  useEffect(() => {
+    if (hasClaimedStarterMiner && selectedMiner === MinerType.BANANA_MINER) {
+      setSelectedMiner(MinerType.MONKEY_TOASTER);
+    }
+  }, [isOpen, hasClaimedStarterMiner, selectedMiner]);
+
+  // Add useEffect to log state changes for debugging
+  useEffect(() => {
+    if (isOpen) {
+      console.log("MinerPurchaseModal state:", {
+        selectedMiner,
+        purchaseStage,
+        isPurchasing,
+        bitBalance,
+        canAfford,
+        isFreeMiner,
+        canGetFreeMiner,
+        canPurchase,
+        selectedTile
+      });
+    }
+  }, [isOpen, selectedMiner, purchaseStage, isPurchasing, bitBalance, canAfford, isFreeMiner, canGetFreeMiner, canPurchase, selectedTile]);
+
+  // Function to refresh the page
+  const refreshPage = () => {
+    if (typeof window !== 'undefined') {
+      window.location.reload();
+    }
   };
 
   if (!isOpen) return null;
 
+  // Get button text based on current state
+  const getButtonText = () => {
+    if (isPurchasing || purchaseStage !== 'initial') {
+      if (purchaseStage === 'approving') return 'APPROVING TOKENS...';
+      if (purchaseStage === 'purchasing') return 'PURCHASING...';
+      if (purchaseStage === 'success') return 'PURCHASED!';
+      return 'PROCESSING...';
+    }
+    
+    if (isFreeMiner) return 'CLAIM FREE MINER';
+    return `BUY FOR ${minerDetails.price} BIT`;
+  };
+
+  // Get button tooltip based on conditions
+  const getButtonTooltip = () => {
+    if (!selectedTile) return "Select a tile first";
+    if (!canAfford && !canGetFreeMiner) return "Insufficient BIT balance";
+    if (isPurchasing) return "Transaction in progress";
+    return isFreeMiner ? "Claim your free starter miner" : "Purchase this miner";
+  };
+
   return (
     <Dialog
       open={isOpen}
-      onClose={onClose}
+      onClose={purchaseStage === 'success' ? refreshPage : onClose}
       className="relative z-50"
     >
       <style jsx global>{modalScrollStyle}</style>
@@ -86,7 +256,7 @@ const MinerPurchaseModal: React.FC<MinerPurchaseModalProps> = ({
           <div className="grid grid-cols-2 gap-4">
             {/* Left Side - Miner List */}
             <div className="space-y-2 border-r border-banana pr-3">
-              {activeMiners.map((miner) => {
+              {orderedActiveMiners.map((miner) => {
                 const isSelected = selectedMiner === miner.id;
                 const isFreeMiner = miner.id === MinerType.BANANA_MINER && miner.price === 0;
                 const isUnavailable = isFreeMiner && hasClaimedStarterMiner;
@@ -94,10 +264,11 @@ const MinerPurchaseModal: React.FC<MinerPurchaseModalProps> = ({
                 return (
                   <div 
                     key={miner.id}
-                    onClick={() => !isUnavailable && setSelectedMiner(miner.id as MinerType)}
-                    className={`bg-dark-blue p-2 flex items-center rounded cursor-pointer
+                    onClick={() => !isUnavailable && purchaseStage === 'initial' && setSelectedMiner(miner.id as MinerType)}
+                    className={`bg-dark-blue p-2 flex items-center rounded 
+                      ${purchaseStage === 'initial' && !isUnavailable ? 'cursor-pointer' : 'cursor-not-allowed'}
                       ${isSelected ? 'border-l-4 border-banana' : ''}
-                      ${isUnavailable ? 'opacity-50 cursor-not-allowed' : 'hover:bg-dark-blue/80'}`}
+                      ${isUnavailable || purchaseStage !== 'initial' ? 'opacity-50' : 'hover:bg-dark-blue/80'}`}
                   >
                     <div className="w-10 h-10 mr-3 relative">
                       <Image 
@@ -137,6 +308,7 @@ const MinerPurchaseModal: React.FC<MinerPurchaseModalProps> = ({
                 <p className="text-white mb-1">- HASH RATE: {minerDetails.hashrate} GH/S</p>
                 <p className="text-white mb-1">- PRICE: {minerDetails.price} BIT</p>
                 <p className="text-white mb-1">- ENERGY: {minerDetails.energyConsumption} WATT</p>
+                <p className="text-white mb-1">- MINER INDEX: {selectedMiner} ({minerMapping[selectedMiner].name})</p>
                 {minerDetails.description && (
                   <p className={`mt-3 text-center ${isFreeMiner ? 'text-green-400' : 'text-yellow-300'}`}>
                     {minerDetails.description}
@@ -148,33 +320,94 @@ const MinerPurchaseModal: React.FC<MinerPurchaseModalProps> = ({
                     INSUFFICIENT BIT BALANCE
                   </p>
                 )}
+                
+                {purchaseStage === 'approving' && (
+                  <p className="text-green-400 mt-3 text-center animate-pulse">
+                    APPROVING TOKEN SPEND...
+                  </p>
+                )}
+                
+                {purchaseStage === 'purchasing' && (
+                  <p className="text-green-400 mt-3 text-center animate-pulse">
+                    PURCHASING MINER...
+                  </p>
+                )}
+                
+                {purchaseStage === 'success' && (
+                  <div className="mt-3 text-center">
+                    <p className="text-green-400 font-press-start text-sm mb-2">
+                      MINER PURCHASED SUCCESSFULLY!
+                    </p>
+                    <p className="text-xs text-gray-300">
+                      Your new miner should appear on the grid shortly. If you don't see it, please refresh the page.
+                    </p>
+                    <button
+                      onClick={refreshPage}
+                      className="mt-2 font-press-start text-xs px-4 py-1 bg-banana text-royal hover:bg-opacity-90"
+                    >
+                      REFRESH PAGE
+                    </button>
+                  </div>
+                )}
+                
+                {errorMessage && (
+                  <p className="text-red-500 mt-3 text-center break-words">
+                    ERROR: {errorMessage}
+                  </p>
+                )}
+                
+                {/* Add more detailed explanation of the purchase process */}
+                {canPurchase && purchaseStage === 'initial' && !isFreeMiner && (
+                  <p className="text-xs text-gray-300 mt-3 text-center">
+                    When you click BUY, you'll need to approve the transaction. 
+                    If it's your first time, two wallet prompts may appear: 
+                    one for token approval and one for the purchase.
+                  </p>
+                )}
               </div>
             </div>
           </div>
           
           <div className="flex justify-between mt-8">
             <button
-              onClick={onClose}
-              className="font-press-start px-6 py-2 border-2 border-banana text-banana hover:bg-banana hover:text-royal transition-colors"
+              onClick={purchaseStage === 'success' ? refreshPage : onClose}
+              disabled={purchaseStage !== 'initial' && purchaseStage !== 'success'}
+              className={`font-press-start px-6 py-2 border-2 border-banana text-banana 
+                ${(purchaseStage === 'initial' || purchaseStage === 'success')
+                  ? 'hover:bg-banana hover:text-royal' 
+                  : 'opacity-50 cursor-not-allowed'} 
+                transition-colors`}
             >
-              CANCEL
+              {purchaseStage === 'success' ? 'REFRESH' : 'CANCEL'}
             </button>
-            <button
-              onClick={handlePurchase}
-              disabled={!canPurchase || isPurchasing}
-              className={`font-press-start px-6 py-2 ${
-                canPurchase
-                  ? 'bg-banana text-royal hover:bg-opacity-90'
-                  : 'bg-gray-700 text-gray-400 cursor-not-allowed'
-              } transition-colors`}
-            >
-              {isPurchasing 
-                ? 'PROCESSING...' 
-                : isFreeMiner 
-                  ? 'CLAIM FREE MINER' 
-                  : `BUY FOR ${minerDetails.price} BIT`}
-            </button>
+            {purchaseStage !== 'success' ? (
+              <button
+                onClick={handlePurchase}
+                disabled={!canPurchase || isPurchasing || purchaseStage !== 'initial'}
+                title={getButtonTooltip()}
+                className={`font-press-start px-6 py-2 ${
+                  canPurchase && purchaseStage === 'initial'
+                    ? 'bg-banana text-royal hover:bg-opacity-90'
+                    : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                } transition-colors`}
+              >
+                {getButtonText()}
+              </button>
+            ) : (
+              <button
+                onClick={refreshPage}
+                className="font-press-start px-6 py-2 bg-banana text-royal hover:bg-opacity-90 transition-colors"
+              >
+                REFRESH PAGE
+              </button>
+            )}
           </div>
+          
+          {selectedTile && (
+            <div className="mt-6 text-center text-xs text-white">
+              MINER WILL BE PLACED AT POSITION: X={selectedTile.x}, Y={selectedTile.y}
+            </div>
+          )}
         </Dialog.Panel>
       </div>
     </Dialog>

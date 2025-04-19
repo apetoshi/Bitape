@@ -7,6 +7,7 @@ import Header from '../components/Header';
 import { ResourcesPanel } from './ResourcesPanel';
 import StatsDisplay from '../components/StatsDisplay';
 import { MiningClaimSection } from './MiningClaimSection';
+import { EnhancedMiningClaimSection } from './EnhancedMiningClaimSection';
 import { RoomVisualization } from './RoomVisualization';
 import FacilityPurchaseModal from './FacilityPurchaseModal';
 import PWAInstallButton from './PWAInstallButton';
@@ -28,7 +29,7 @@ const GameLayout: React.FC = () => {
     setIsModalOpen(false);
   };
 
-  const handleClaimReward = async () => {
+  const handleClaimRewards= async () => {
     if (!gameState.claimReward) return;
     await gameState.claimReward();
   };
@@ -134,22 +135,23 @@ const GameLayout: React.FC = () => {
           {renderTabContent()}
           
           {/* Mining claim section */}
-          <MiningClaimSection 
+          <EnhancedMiningClaimSection 
             minedBit={gameState.minedBit}
-            onClaimReward={handleClaimReward}
+            onClaimRewards={handleClaimReward}
             isClaimingReward={gameState.isClaimingReward}
+            miningRate={gameState.miningRate}
           />
           
           {/* Stats */}
           <StatsDisplay 
-            miningRate={gameState.miningRate}
-            hashRate={gameState.hashRate}
-            blocksUntilHalving={gameState.blocksUntilHalving}
-            networkHashRatePercentage={gameState.networkHashRatePercentage}
-            totalNetworkHashRate={gameState.totalNetworkHashRate}
-            totalMinedBit={gameState.totalMinedBit || '2,211,552.572'}
-            burnedBit={gameState.burnedBit || '1,238,626.5'}
-            rewardPerBlock={gameState.rewardPerBlock || '2.5'}
+            miningRateData={gameState.miningRate ? BigInt(parseFloat(gameState.miningRate) * 1e18) : undefined}
+            hashRateData={gameState.hashRate ? BigInt(parseFloat(gameState.hashRate)) : undefined}
+            blocksUntilHalvingData={gameState.blocksUntilHalving ? BigInt(gameState.blocksUntilHalving) : undefined}
+            networkShareData={gameState.networkHashRatePercentage ? BigInt(parseFloat(gameState.networkHashRatePercentage) * 100) : undefined}
+            totalNetworkHashrateData={gameState.totalNetworkHashRate ? BigInt(parseFloat(gameState.totalNetworkHashRate)) : undefined}
+            totalSupplyData={gameState.totalMinedBit ? BigInt(parseFloat(gameState.totalMinedBit.replace(/,/g, '')) * 1e18) : undefined}
+            burnedBitData={gameState.burnedBit ? BigInt(parseFloat(gameState.burnedBit.replace(/,/g, '')) * 1e18) : undefined}
+            currentBitApePerBlockData={gameState.rewardPerBlock ? BigInt(parseFloat(gameState.rewardPerBlock) * 1e18) : undefined}
           />
         </div>
         
@@ -175,21 +177,22 @@ const GameLayout: React.FC = () => {
             
             {renderTabContent()}
             
-            <StatsDisplay 
+            <EnhancedMiningClaimSection 
+              minedBit={gameState.minedBit}
+              onClaimRewards={handleClaimReward}
+              isClaimingReward={gameState.isClaimingReward}
               miningRate={gameState.miningRate}
-              hashRate={gameState.hashRate}
-              blocksUntilHalving={gameState.blocksUntilHalving}
-              networkHashRatePercentage={gameState.networkHashRatePercentage}
-              totalNetworkHashRate={gameState.totalNetworkHashRate}
-              totalMinedBit={gameState.totalMinedBit || '2,211,552.572'}
-              burnedBit={gameState.burnedBit || '1,238,626.5'}
-              rewardPerBlock={gameState.rewardPerBlock || '2.5'}
             />
             
-            <MiningClaimSection 
-              minedBit={gameState.minedBit}
-              onClaimReward={handleClaimReward}
-              isClaimingReward={gameState.isClaimingReward}
+            <StatsDisplay 
+              miningRateData={gameState.miningRate ? BigInt(parseFloat(gameState.miningRate) * 1e18) : undefined}
+              hashRateData={gameState.hashRate ? BigInt(parseFloat(gameState.hashRate)) : undefined}
+              blocksUntilHalvingData={gameState.blocksUntilHalving ? BigInt(gameState.blocksUntilHalving) : undefined}
+              networkShareData={gameState.networkHashRatePercentage ? BigInt(parseFloat(gameState.networkHashRatePercentage) * 100) : undefined}
+              totalNetworkHashrateData={gameState.totalNetworkHashRate ? BigInt(parseFloat(gameState.totalNetworkHashRate)) : undefined}
+              totalSupplyData={gameState.totalMinedBit ? BigInt(parseFloat(gameState.totalMinedBit.replace(/,/g, '')) * 1e18) : undefined}
+              burnedBitData={gameState.burnedBit ? BigInt(parseFloat(gameState.burnedBit.replace(/,/g, '')) * 1e18) : undefined}
+              currentBitApePerBlockData={gameState.rewardPerBlock ? BigInt(parseFloat(gameState.rewardPerBlock) * 1e18) : undefined}
             />
           </div>
           

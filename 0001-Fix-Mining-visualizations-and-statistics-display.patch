@@ -1,0 +1,427 @@
+From 92042cbfcb0b6fc9d4b395e10ca08c7b52bfd0d2 Mon Sep 17 00:00:00 2001
+From: apetoshi <apetoshi@github.com>
+Date: Thu, 17 Apr 2025 11:54:21 -0400
+Subject: [PATCH] Fix: Mining visualizations and statistics display
+
+---
+ src/app/room/[address]/page.tsx      | 115 +++++++++-----
+ src/components/RoomVisualization.tsx | 217 +++++++++++----------------
+ 2 files changed, 163 insertions(+), 169 deletions(-)
+
+diff --git a/src/app/room/[address]/page.tsx b/src/app/room/[address]/page.tsx
+index 4d19dad9..659449ec 100644
+--- a/src/app/room/[address]/page.tsx
++++ b/src/app/room/[address]/page.tsx
+@@ -67,6 +67,7 @@ export default function RoomPage() {
+   const [showMinerModal, setShowMinerModal] = useState(false);
+   const [isGridModeActive, setIsGridModeActive] = useState(false);
+   const isMounted = useIsMounted();
++  const [statsView, setStatsView] = useState<'simple' | 'pro'>('simple');
+ 
+   // Get player facility data directly from contract
+   const { data: facilityData } = useContractRead({
+@@ -187,7 +188,8 @@ export default function RoomPage() {
+             <div className="flex justify-between items-center mb-2">
+               <span className="bigcoin-text">SPACES LEFT</span>
+               <span className="bigcoin-value font-press-start">
+-                {facility && !isNaN(Number(facility.capacity)) ? Number(facility.capacity) : 4} SPACES
++                {facility ? 
++                  (Number(facility.spaces) - (gameState.miners?.length || 0)) : 4} SPACES
+               </span>
+             </div>
+             <div className="flex justify-between items-center">
+@@ -210,7 +212,14 @@ export default function RoomPage() {
+             <div className="flex justify-between items-center border-b border-white/20 pb-2">
+               <span className="bigcoin-text">TOTAL SPACES</span>
+               <span className="bigcoin-value font-press-start">
+-                {facility && !isNaN(Number(facility.capacity)) ? Number(facility.capacity) : 4} SPACES
++                {facility && !isNaN(Number(facility.spaces)) ? Number(facility.spaces) : 4} SPACES
++              </span>
++            </div>
++            
++            <div className="flex justify-between items-center border-b border-white/20 pb-2">
++              <span className="bigcoin-text">USED SPACES</span>
++              <span className="bigcoin-value font-press-start">
++                {gameState.miners?.length || 0} SPACES
+               </span>
+             </div>
+             
+@@ -234,42 +243,53 @@ export default function RoomPage() {
+         
+       case 'selectedTile':
+         return (
+-          <div className="p-3">
++          <div className="p-3 space-y-2">
+             {selectedTile ? (
+-              <div className="space-y-2">
+-                <div className="text-center pb-2 border-b border-white/20">
+-                  <h3 className="bigcoin-text mb-1">GRID SPACE X:{selectedTile.x} Y:{selectedTile.y}</h3>
++              <div>
++                <div className="border-b border-white/20 pb-2 mb-3">
++                  <span className="bigcoin-text">LOCATION:</span>
++                  <span className="bigcoin-value block mt-1">{getLocationDescription(selectedTile)}</span>
+                 </div>
+                 
+                 {selectedTileHasMiner(selectedTile.x, selectedTile.y) ? (
+-                  <div className="space-y-2">
+-                    <div className="flex justify-between items-center border-b border-white/20 pb-2">
+-                      <span className="bigcoin-text">MINER TYPE</span>
+-                      <span className="bigcoin-value font-press-start">BASIC MINER</span>
+-                    </div>
+-                    <div className="flex justify-between items-center border-b border-white/20 pb-2">
+-                      <span className="bigcoin-text">HASHRATE</span>
+-                      <span className="bigcoin-value font-press-start">100 H/s</span>
++                  <div className="space-y-3">
++                    <p className="bigcoin-text">ACTIVE MINER:</p>
++                    <div className="flex items-center space-x-2">
++                      <div className="w-16 h-16 relative">
++                        <Image
++                          src="/banana-miner.gif"
++                          alt="Banana Miner"
++                          fill
++                          className="object-contain"
++                        />
++                      </div>
++                      <div>
++                        <p className="bigcoin-value">BANANA MINER</p>
++                        <p className="bigcoin-text text-xs opacity-80">100 GH/s · 1 WATT</p>
++                      </div>
+                     </div>
+-                    <div className="flex justify-between items-center pb-2">
+-                      <span className="bigcoin-text">POWER USAGE</span>
+-                      <span className="bigcoin-value font-press-start">1 GW</span>
++                    <div className="mt-4">
++                      <button
++                        onClick={() => setShowMinerModal(true)}
++                        className="w-full bigcoin-button"
++                      >
++                        UPGRADE MINER
++                      </button>
+                     </div>
+-                    <button
+-                      className="w-full mt-2 bigcoin-button"
+-                    >
+-                      UPGRADE MINER
+-                    </button>
+                   </div>
+                 ) : (
+-                  <div className="space-y-2">
+-                    <p className="text-center bigcoin-text opacity-70">This space is empty. Add a miner to start mining BIT.</p>
+-                    <button
+-                      onClick={() => setShowMinerModal(true)}
+-                      className="w-full mt-3 bigcoin-button"
+-                    >
+-                      BUY MINER
+-                    </button>
++                  <div>
++                    <p className="bigcoin-text mb-3">NO MINER INSTALLED</p>
++                    {hasFacility && (
++                      <div className="mt-4">
++                        <button
++                          onClick={() => setShowMinerModal(true)}
++                          className="w-full bigcoin-button"
++                        >
++                          BUY MINER
++                        </button>
++                      </div>
++                    )}
+                   </div>
+                 )}
+               </div>
+@@ -321,16 +341,35 @@ export default function RoomPage() {
+         return (
+           <div className="bigcoin-panel mb-5" id="stats-tab-content">
+             <div className="flex border-b-2 border-[#FFD700] p-2">
+-              <button className="bigcoin-text mr-4 bigcoin-value">SIMPLE</button>
++              <button 
++                onClick={() => setStatsView("simple")}
++                className={`bigcoin-text mr-4 ${statsView === "simple" ? "bigcoin-value" : "opacity-50"}`}
++              >
++                SIMPLE
++              </button>
+               <button className="bigcoin-text opacity-50">/</button>
+-              <button className="bigcoin-text ml-4 opacity-50">PRO</button>
+-            </div>
+-            <div className="p-3 space-y-2 font-press-start">
+-              <p className="bigcoin-text">- YOU ARE MINING <span className="bigcoin-value">{gameState.miningRate || 0} BIT</span> A DAY</p>
+-              <p className="bigcoin-text">- YOUR HASH RATE IS <span className="bigcoin-value">{gameState.hashRate || 0} GH/S</span></p>
+-              <p className="bigcoin-text">- <span className="bigcoin-value">{gameState.blocksUntilHalving || 0} BLOCKS</span> UNTIL NEXT HALVENING</p>
+-              <p className="bigcoin-text">- YOU HAVE <span className="bigcoin-value">{gameState.networkHashRatePercentage || 0}%</span> OF THE TOTAL NETWORK HASH RATE (<span className="bigcoin-value">{gameState.totalNetworkHashRate || 0} GH/S</span>)</p>
++              <button 
++                onClick={() => setStatsView("pro")}
++                className={`bigcoin-text ml-4 ${statsView === "pro" ? "bigcoin-value" : "opacity-50"}`}
++              >
++                PRO
++              </button>
+             </div>
++            
++            {statsView === "simple" ? (
++              <div className="p-3 space-y-2 font-press-start">
++                <p className="bigcoin-text">- YOU ARE MINING <span className="bigcoin-value">{gameState.miningRate || '0'} BIT</span> A DAY</p>
++                <p className="bigcoin-text">- YOUR HASH RATE IS <span className="bigcoin-value">{gameState.hashRate || '0'} GH/S</span></p>
++                <p className="bigcoin-text">- <span className="bigcoin-value">{gameState.blocksUntilHalving || '0'} BLOCKS</span> UNTIL NEXT HALVENING</p>
++                <p className="bigcoin-text">- YOU HAVE <span className="bigcoin-value">{gameState.networkHashRatePercentage || '0'}%</span> OF THE TOTAL NETWORK HASH RATE (<span className="bigcoin-value">{gameState.totalNetworkHashRate || '0'} GH/S</span>)</p>
++              </div>
++            ) : (
++              <div className="p-3 space-y-2 font-press-start">
++                <p className="bigcoin-text">- <span className="bigcoin-value">{gameState.rewardPerBlock || '0'}</span> TOTAL BIT MINED PER BLOCK</p>
++                <p className="bigcoin-text">- <span className="bigcoin-value">{gameState.totalMinedBit || '0'}</span> $BIT HAS EVER BEEN MINED</p>
++                <p className="bigcoin-text">- <span className="bigcoin-value">{gameState.burnedBit || '0'}</span> $BIT HAS BEEN BURNED</p>
++              </div>
++            )}
+           </div>
+         );
+         
+diff --git a/src/components/RoomVisualization.tsx b/src/components/RoomVisualization.tsx
+index 60b66664..3c8868d5 100644
+--- a/src/components/RoomVisualization.tsx
++++ b/src/components/RoomVisualization.tsx
+@@ -168,19 +168,17 @@ export function RoomVisualization({
+     return contractMiners;
+   };
+ 
+-  // Function to render the mining spaces overlay
+-  const renderMiningSpaces = () => {
+-    if (!isGridMode) return null;
+-
+-    // Grid coordinates for the four mining spaces
+-    // Adjusted grid positions for better mobile compatibility
+-    const gridPositions = [
+-      { x: 0, y: 0, top: '42%', left: '40%', width: '15%', height: '15%' }, // top right
+-      { x: 1, y: 0, top: '50%', left: '30%', width: '15%', height: '15%' }, // top left
+-      { x: 0, y: 1, top: '50%', left: '55%', width: '15%', height: '15%' }, // bottom right
+-      { x: 1, y: 1, top: '62%', left: '35%', width: '15%', height: '15%' }  // bottom left
+-    ];
++  // Grid coordinates for the four mining spaces
++  // Adjusted grid positions for better mobile compatibility
++  const gridPositions = [
++    { x: 0, y: 0, top: '42%', left: '40%', width: '15%', height: '15%' }, // top right
++    { x: 1, y: 0, top: '50%', left: '30%', width: '15%', height: '15%' }, // top left
++    { x: 0, y: 1, top: '50%', left: '55%', width: '15%', height: '15%' }, // bottom right
++    { x: 1, y: 1, top: '62%', left: '35%', width: '15%', height: '15%' }  // bottom left
++  ];
+ 
++  // Function to render the mining spaces overlay and miners
++  const renderMiningSpaces = () => {
+     // Get all claimed miner positions 
+     const allMiners = getAllMinerPositions();
+     
+@@ -196,32 +194,7 @@ export function RoomVisualization({
+ 
+     return (
+       <div className="absolute inset-0 pointer-events-none">
+-        {/* Grid tiles */}
+-        {gridPositions.map((pos) => {
+-          const isSelected = selectedTile?.x === pos.x && selectedTile?.y === pos.y;
+-          const isOccupied = isTileOccupied(pos.x, pos.y);
+-          
+-          return (
+-            <div
+-              key={`${pos.x}-${pos.y}`}
+-              onClick={() => handleTileClick(pos.x, pos.y)}
+-              className={`absolute pointer-events-auto transition-all duration-200 cursor-pointer z-10 ${
+-                isSelected ? 'ring-2 ring-[#FFD700]' : 'hover:ring-2 hover:ring-[#FFD70066]'
+-              } ${isOccupied ? 'opacity-70' : ''}`}
+-              style={{
+-                top: pos.top,
+-                left: pos.left,
+-                width: pos.width,
+-                height: pos.height,
+-                background: isSelected ? 'rgba(255, 215, 0, 0.3)' : 'rgba(255, 215, 0, 0.1)',
+-                transform: 'skew(-24deg, 14deg)',
+-                borderRadius: '2px'
+-              }}
+-            />
+-          );
+-        })}
+-        
+-        {/* Show existing miners on the grid */}
++        {/* Always show miners, regardless of grid mode */}
+         {allMiners.map((miner, index) => {
+           // Find the grid position data for this miner
+           const pos = gridPositions.find(p => p.x === miner.x && p.y === miner.y);
+@@ -254,49 +227,31 @@ export function RoomVisualization({
+             </div>
+           );
+         })}
+-        
+-        {/* Show preview of miner on selection (only when not already claimed) */}
+-        {selectedTile && !isTileOccupied(selectedTile.x, selectedTile.y) && (
+-          <>
+-            {/* Find the selected grid position */}
+-            {(() => {
+-              const pos = gridPositions.find(p => p.x === selectedTile.x && p.y === selectedTile.y);
+-              if (!pos) return null;
+-              
+-              return (
+-                <div 
+-                  className="absolute pointer-events-none z-20"
+-                  style={{
+-                    top: pos.top,
+-                    left: pos.left,
+-                    width: pos.width,
+-                    height: pos.height,
+-                    transform: 'skew(-24deg, 14deg)',
+-                  }}
+-                >
+-                  <div className="relative w-full h-full">
+-                    <Image
+-                      src={MINERS[previewMinerType].image}
+-                      alt="Miner Preview"
+-                      fill
+-                      className="object-contain miner-preview"
+-                      style={{ 
+-                        transform: 'skew(24deg, -14deg) scale(2.5) translate(-10%, -15%)',
+-                        imageRendering: 'pixelated',
+-                        opacity: 0.7, // Make it slightly transparent to indicate it's a preview
+-                      }}
+-                    />
+-                    <div className="absolute inset-0 flex items-center justify-center">
+-                      <div className="bg-[#FFD700]/60 text-[#0c1c31] px-2 py-1 text-xs font-press-start rounded transform -rotate-12">
+-                        Preview
+-                      </div>
+-                    </div>
+-                  </div>
+-                </div>
+-              );
+-            })()}
+-          </>
+-        )}
++
++        {/* Only show grid tiles when grid mode is active */}
++        {isGridMode && gridPositions.map((pos) => {
++          const isSelected = selectedTile?.x === pos.x && selectedTile?.y === pos.y;
++          const isOccupied = isTileOccupied(pos.x, pos.y);
++          
++          return (
++            <div
++              key={`${pos.x}-${pos.y}`}
++              onClick={() => handleTileClick(pos.x, pos.y)}
++              className={`absolute pointer-events-auto transition-all duration-200 cursor-pointer z-10 ${
++                isSelected ? 'ring-2 ring-[#FFD700]' : 'hover:ring-2 hover:ring-[#FFD70066]'
++              } ${isOccupied ? 'opacity-70' : ''}`}
++              style={{
++                top: pos.top,
++                left: pos.left,
++                width: pos.width,
++                height: pos.height,
++                background: isSelected ? 'rgba(255, 215, 0, 0.3)' : 'rgba(255, 215, 0, 0.1)',
++                transform: 'skew(-24deg, 14deg)',
++                borderRadius: '2px'
++              }}
++            />
++          );
++        })}
+       </div>
+     );
+   };
+@@ -304,56 +259,56 @@ export function RoomVisualization({
+   return (
+     <>
+       <style jsx global>{pulseStyle}</style>
+-      <div className="relative w-full aspect-square overflow-hidden bg-[#0c1c31] pb-12">
+-        {hasFacility ? (
+-          <div className="relative w-full h-full flex flex-col">
+-            <div className="relative flex-grow">
+-              <Image
+-                src="/bedroom.png"
+-                alt="Mining Facility"
+-                fill
+-                style={{ 
+-                  objectFit: 'cover',
+-                  objectPosition: 'center',
+-                  imageRendering: 'pixelated'
+-                }}
+-                priority
+-              />
+-              {renderMiningSpaces()}
+-            </div>
+-            
+-            {/* Bottom control panel */}
+-            <div className="absolute left-0 right-0 bottom-0 flex justify-between">
+-              <div>
+-                <button
+-                  onClick={toggleGridMode}
+-                  className="bigcoin-button"
+-                >
+-                  {isGridMode ? 'HIDE GRID' : 'SHOW GRID'}
+-                </button>
+-              </div>
+-              
+-              <div className="flex">
+-                {!hasClaimedStarterMiner && (
+-                  <button
+-                    onClick={() => setIsStarterMinerModalOpen(true)}
+-                    className="bigcoin-button mx-1"
+-                    disabled={isGettingStarterMiner}
+-                  >
+-                    {isGettingStarterMiner ? 'CLAIMING...' : 'CLAIM FREE MINER'}
+-                  </button>
+-                )}
+-                <button
+-                  onClick={onUpgradeFacility}
+-                  className="bigcoin-button"
+-                  disabled={isUpgradingFacility}
+-                >
+-                  {isUpgradingFacility ? 'UPGRADING...' : 'UPGRADE FACILITY'}
+-                </button>
+-              </div>
+-            </div>
+-          </div>
+-        ) : (
++      
++      <div className="relative w-full h-full">
++        {/* Room Background */}
++        <Image 
++          src="/bedroom.png" 
++          alt="Mining Room" 
++          fill
++          priority
++          className="object-contain"
++        />
++        
++        {/* Grid Mode Toggle Button (Top Left Corner) */}
++        {hasFacility && toggleGridMode && (
++          <button
++            onClick={toggleGridMode}
++            className={`absolute top-2 left-2 z-30 px-2 py-1 font-press-start text-xs transition-all ${
++              isGridMode ? 'bg-banana text-royal' : 'bg-transparent text-banana border border-banana'
++            }`}
++          >
++            {isGridMode ? 'HIDE GRID' : 'SHOW GRID'}
++          </button>
++        )}
++        
++        {/* Upgrade Button (Top Right Corner) */}
++        {hasFacility && (
++          <button
++            onClick={onUpgradeFacility}
++            disabled={isUpgradingFacility}
++            className="absolute top-2 right-2 z-30 px-2 py-1 font-press-start text-xs bg-transparent text-banana border border-banana hover:bg-banana hover:text-royal transition-all disabled:opacity-50 disabled:cursor-not-allowed"
++          >
++            {isUpgradingFacility ? 'UPGRADING...' : 'UPGRADE FACILITY'}
++          </button>
++        )}
++        
++        {/* Get Starter Miner Button (Bottom Center) - Only if has facility but no starter miner */}
++        {hasFacility && !hasClaimedStarterMiner && (
++          <button
++            onClick={() => setIsStarterMinerModalOpen(true)}
++            disabled={isGettingStarterMiner}
++            className="absolute bottom-2 left-1/2 transform -translate-x-1/2 z-30 px-4 py-2 font-press-start text-xs bg-banana text-royal hover:bg-opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
++          >
++            {isGettingStarterMiner ? 'CLAIMING...' : 'CLAIM STARTER MINER'}
++          </button>
++        )}
++        
++        {/* Mining Spaces Overlay - always render this to show miners */}
++        {hasFacility && renderMiningSpaces()}
++        
++        {/* Initial purchase UI if no facility exists */}
++        {!hasFacility && (
+           <div className="flex flex-col items-center justify-center h-full text-center p-4">
+             <p className="font-press-start text-xs text-[#FFD700] mb-6">You don't have any mining space yet.</p>
+             <button
+-- 
+2.45.1
+

@@ -1,0 +1,61 @@
+Contract Update Guide - COMPLETED
+
+We've successfully updated the frontend to use the new contract addresses:
+
+Main.sol: 0x409Ec46CdA55E8C7A2Ec971745985bf7Dd58f533
+Bitape.sol: 0xb9BE704a40b1500D39FE4264a1C46E43a5C614bD
+
+Key changes made:
+
+1. Updated contract addresses in src/config/contracts.ts
+2. Added BIT_TOKEN_ABI based on the new Bitape.sol contract ABI 
+3. Updated MAIN_CONTRACT_ABI with the new function signatures from Main_ABI.json
+4. Fixed the miner indexing issue by ensuring the correct functions are used throughout the application
+5. Updated hooks to use the new contract functions:
+   - useMiningData.ts - Now uses playerHashrate and totalHashrate functions
+   - useResourcesData.ts - Now uses getPlayerMinersPaginated instead of getUserMiners
+   - useGameState.ts - Updated several functions to use the correct contract methods
+
+Testing Instructions:
+
+1. Start the development server:
+   ```
+   npm run dev
+   ```
+
+2. Connect your wallet and verify:
+   - Wallet connection works
+   - Balances are displayed correctly
+   - Facility initialization works
+   - Starter miner can be claimed
+   - Miner purchases work correctly
+   - Mining stats are displayed correctly
+
+3. Pay special attention to miner indexing:
+   - Verify that miner indices 1 and 2 are properly distinguished
+   - Check that miners appear in their correct positions on the grid
+   - Confirm that miner types (BANANA_MINER, MONKEY_TOASTER) are correctly identified
+
+4. If you encounter any issues:
+   - Check browser console for errors
+   - Verify contract addresses in the browser network tab
+   - Make sure your wallet is connected to ApeChain
+
+The updated ABIs and contracts now correctly handle the miner indices, fixing the issue where minerIndex 1 & 2 were both mapped to 1.
+
+For specific ABI changes, paste your new contract ABIs here:
+
+BIT_TOKEN_ABI:
+```
+[your new BIT_TOKEN_ABI here]
+```
+
+MAIN_CONTRACT_ABI:
+```
+[your new MAIN_CONTRACT_ABI here]
+```
+
+MINING_CONTROLLER_ABI:
+```
+[your new MINING_CONTROLLER_ABI here]
+```
