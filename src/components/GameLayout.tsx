@@ -29,7 +29,7 @@ const GameLayout: React.FC = () => {
     setIsModalOpen(false);
   };
 
-  const handleClaimRewards= async () => {
+  const handleClaimRewards = async () => {
     if (!gameState.claimReward) return;
     await gameState.claimReward();
   };
@@ -137,7 +137,7 @@ const GameLayout: React.FC = () => {
           {/* Mining claim section */}
           <EnhancedMiningClaimSection 
             minedBit={gameState.minedBit}
-            onClaimRewards={handleClaimReward}
+            onClaimRewards={handleClaimRewards}
             isClaimingReward={gameState.isClaimingReward}
             miningRate={gameState.miningRate}
           />
@@ -179,7 +179,7 @@ const GameLayout: React.FC = () => {
             
             <EnhancedMiningClaimSection 
               minedBit={gameState.minedBit}
-              onClaimRewards={handleClaimReward}
+              onClaimRewards={handleClaimRewards}
               isClaimingReward={gameState.isClaimingReward}
               miningRate={gameState.miningRate}
             />

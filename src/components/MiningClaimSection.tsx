@@ -44,16 +44,16 @@ export const MiningClaimSection: React.FC<MiningClaimSectionProps> = ({
     if (isLoading || !hasMinedBit) return;
     
     try {
-      console.log('Calling claimRewardscontract function directly from MiningClaimSection...');
+      console.log('Calling claimRewards contract function directly from MiningClaimSection...');
       setIsManualClaiming(true);
       
       writeContract({
         address: CONTRACT_ADDRESSES.MAIN,
         abi: MAIN_CONTRACT_ABI,
-        functionName: 'claimReward',
+        functionName: 'claimRewards',
       });
       
-      // Also call the original onClaimRewardssto maintain compatibility
+      // Also call the original onClaimRewards to maintain compatibility
       onClaimRewards().catch(err => {
         console.log('Secondary claim method failed (this is normal):', err);
       });

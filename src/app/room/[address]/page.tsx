@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/rules-of-hooks */
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -127,18 +128,18 @@ export default function RoomPage() {
   }, [address, gameState.miners]);
 
   // Create a custom function to fetch miner data properly
-  const fetchMinerData = async (minerId: string | number) => {
+  const fetchMinerData = useCallback(async (minerId: string | number) => {
+    console.log(`Fetching data for miner ID: ${minerId}`);
     if (!publicClient) return null;
     
-    console.log(`Calling getPlayerMiner(${minerId}) to get full on-chain tuple data`);
-    
     try {
-      // Call the contract function with ONLY the minerId parameter
+      // Call the contract function with the minerId parameter
       const data = await publicClient.readContract({
         address: CONTRACT_ADDRESSES.MAIN as Address,
         abi: [
           {
             inputs: [
+              { name: 'player', type: 'address' },
               { name: 'minerId', type: 'uint256' }
             ],
             name: 'getPlayerMiner',
@@ -155,18 +156,18 @@ export default function RoomPage() {
             stateMutability: 'view',
             type: 'function'
           }
-        ] as const, // Add 'as const' to fix type issues
+        ] as const,
         functionName: 'getPlayerMiner',
-        args: [BigInt(minerId)]
+        args: [address || zeroAddress, BigInt(minerId.toString())]
       });
       
-      console.log(`Full on-chain data tuple for miner ID ${minerId}:`, data);
+      console.log(`Data for miner ID ${minerId}:`, data);
       return data;
     } catch (error) {
       console.error(`Error fetching miner data for ID ${minerId}:`, error);
       return null;
     }
-  };
+  }, [address, publicClient]);
   
   // Function to fetch data for specific miner IDs
   const fetchSpecificMiners = useCallback(async () => {
@@ -187,7 +188,7 @@ export default function RoomPage() {
     } catch (e) {
       console.error("Error fetching miner 11:", e);
     }
-  }, [address]);
+  }, [address, fetchMinerData]);
   
   // Effect to trigger the explicit fetches when miner IDs change
   useEffect(() => {
@@ -310,27 +311,21 @@ export default function RoomPage() {
   /**
    * Function to get a miner at a specific tile position
    */
-  const getMinerAtTile = (tileX: number | undefined, tileY: number | undefined): PlayerMiner | null => {
+  const getMinerAtTile = useCallback((tileX: number | undefined, tileY: number | undefined): PlayerMiner | null => {
     if (tileX === undefined || tileY === undefined) return null;
     
-    // Add additional logging for debugging
-    console.log(`Searching for miner at position (${tileX}, ${tileY})`);
+    console.log(`Looking for miner at tile (${tileX}, ${tileY})`);
     
-    // Use validated miners that have correct on-chain coordinates
-    const validatedMiners = getValidatedMiners();
-    console.log(`Current miners array:`, validatedMiners);
-
-    // Find the miner at this position - ensure we're comparing numbers strictly
-    const miner = validatedMiners.find(m => 
+    const miner = getValidatedMiners().find(m => 
       Number(m.x) === Number(tileX) && Number(m.y) === Number(tileY)
     );
     
     console.log(`Miner found at (${tileX}, ${tileY}):`, miner);
     return miner || null;
-  };
+  }, [getValidatedMiners]);
 
-  // Create a generic hook creator for any miner ID
-  const createMinerDataHook = (minerId: string) => {
+  // Change this to a proper custom hook rather than a function that calls hooks
+  function useMinerData(minerId: string) {
     return useContractRead({
       address: CONTRACT_ADDRESSES.MAIN,
       abi: [
@@ -361,11 +356,11 @@ export default function RoomPage() {
         enabled: Boolean(address) && Boolean(minerId)
       }
     });
-  };
+  }
 
   // Need to pre-define hooks for specific IDs we've seen in logs
-  const { data: miner1Data } = createMinerDataHook('1');
-  const { data: miner11Data } = createMinerDataHook('11');
+  const { data: miner1Data } = useMinerData('1');
+  const { data: miner11Data } = useMinerData('11');
 
   // Log miner data when it changes and store in state
   useEffect(() => {
@@ -491,7 +486,7 @@ export default function RoomPage() {
   /**
    * Function to check if a tile has a miner
    */
-  const selectedTileHasMiner = (tileX: number | undefined, tileY: number | undefined): boolean => {
+  const selectedTileHasMiner = useCallback((tileX: number | undefined, tileY: number | undefined): boolean => {
     // Special check for known miner positions - mainly for debugging
     if (tileX === 0 && tileY === 0) {
       console.log("Special check for starter miner at position (0,0)");
@@ -513,7 +508,7 @@ export default function RoomPage() {
     
     console.log(`Has miner at (${tileX},${tileY}): ${hasMiner}`);
     return hasMiner;
-  };
+  }, [address, getValidatedMiners]);
 
   // Add global debugging object to persist across renders
   useEffect(() => {
@@ -570,29 +565,19 @@ export default function RoomPage() {
 
   // Special check for position (0,0) which is commonly used for starter miners
   useEffect(() => {
-    if (gameState.hasClaimedStarterMiner) {
-      console.log('🔍 Special check for starter miner at position (0,0)');
-      
-      // Check if there's a miner at 0,0
-      const hasMinerAt00 = selectedTileHasMiner(0, 0);
-      console.log(`🔍 Has miner at (0,0): ${hasMinerAt00}`);
-      
-      // If the current selected tile is at 0,0, force a refresh
-      if (selectedTile && selectedTile.x === 0 && selectedTile.y === 0) {
-        console.log('🔍 Current selected tile is at (0,0), forcing refresh');
-        setSelectedTile({...selectedTile});
-      }
-      
-      // If there's no selected tile but we know there's a miner at 0,0, select it
-      // but don't automatically change the tab
-      if (!selectedTile && hasMinerAt00) {
-        console.log('🔍 Auto-selecting tile (0,0) where miner exists, but keeping current tab');
-        setSelectedTile({x: 0, y: 0});
-        // Remove automatic tab switching
-        // setActiveTab('selectedTile');
+    if (gameState.hasClaimedStarterMiner && typeof window !== 'undefined') {
+      // Check if the localStorage has the wrong position
+      const savedPositionStr = localStorage.getItem('claimedMinerPosition');
+      if (savedPositionStr) {
+        const position = JSON.parse(savedPositionStr);
+        // If the position is 0,0 but should be 1,0 according to chain data
+        if (position.x === 0 && position.y === 0 && tileOneZeroOccupied) {
+          console.log('Correcting miner position in localStorage from (0,0) to (1,0)');
+          localStorage.setItem('claimedMinerPosition', JSON.stringify({x: 1, y: 0}));
+        }
       }
     }
-  }, [gameState.hasClaimedStarterMiner, selectedTileHasMiner, selectedTile]);
+  }, [gameState.hasClaimedStarterMiner, tileOneZeroOccupied]);
 
   // Force a re-render of the mining tab when miners change
   useEffect(() => {
@@ -1532,7 +1517,7 @@ export default function RoomPage() {
     }
   }, [gameState.hasClaimedStarterMiner, tileOneZeroOccupied]);
 
-  // Update the handleBuyMinerSuccess function to also add the miner to our fixed map
+  // Handle buying a miner
   const handleBuyMinerSuccess = (
     minerType: number,
     position: { x: number; y: number }

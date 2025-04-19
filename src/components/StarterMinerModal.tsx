@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback, useState } from 'react';
 import Image from 'next/image';
 import { Dialog } from '@headlessui/react';
 
@@ -49,32 +49,15 @@ const StarterMinerModal: React.FC<StarterMinerModalProps> = ({
   selectedTile,
   isProcessing
 }) => {
-  // Force close the modal after 500ms if user clicks the close button
-  // This is a workaround for the stuck modal issue
-  const handleForceClose = () => {
-    onClose();
-    
-    // Force close after a delay as backup
+  const [isShowing, setIsShowing] = useState(isOpen);
+  
+  // Use useCallback to prevent recreation on every render
+  const handleForceClose = useCallback(() => {
+    setIsShowing(false);
     setTimeout(() => {
-      // Try to force close by manipulating DOM if needed
-      const modalBackdrops = document.querySelectorAll('.fixed.inset-0.bg-black\\/70');
-      modalBackdrops.forEach(el => {
-        if (el.parentNode) {
-          el.parentNode.removeChild(el);
-        }
-      });
-      
-      // Also try to hide any modal panels
-      const modalPanels = document.querySelectorAll('.starter-miner-modal');
-      modalPanels.forEach(el => {
-        if (el instanceof HTMLElement) {
-          el.style.display = 'none';
-        }
-      });
-      
-      console.log('Forced modal close');
-    }, 500);
-  };
+      onClose();
+    }, 300);
+  }, [onClose]);
 
   // Add escape key handler as another way to close
   useEffect(() => {
@@ -86,13 +69,13 @@ const StarterMinerModal: React.FC<StarterMinerModalProps> = ({
     
     window.addEventListener('keydown', handleEscapeKey);
     return () => window.removeEventListener('keydown', handleEscapeKey);
-  }, []);
+  }, [handleForceClose]);
 
-  if (!isOpen) return null;
+  if (!isShowing) return null;
 
   return (
     <Dialog
-      open={isOpen}
+      open={isShowing}
       onClose={() => {}} // Prevent automatic closing on backdrop click 
       className="relative z-50"
     >
