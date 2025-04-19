@@ -12,6 +12,7 @@ interface MinerPurchaseModalProps {
   isPurchasing: boolean;
   bitBalance: string;
   hasClaimedStarterMiner: boolean;
+  minerTypeData?: Record<number, any>;
 }
 
 // Add styles for mobile scrolling
@@ -30,7 +31,8 @@ const MinerPurchaseModal: React.FC<MinerPurchaseModalProps> = ({
   selectedTile,
   isPurchasing,
   bitBalance,
-  hasClaimedStarterMiner
+  hasClaimedStarterMiner,
+  minerTypeData = {}
 }) => {
   // Set default selected miner: if starter miner is claimed, default to MONKEY_TOASTER
   const defaultMiner = hasClaimedStarterMiner ? MinerType.MONKEY_TOASTER : MinerType.BANANA_MINER;
@@ -45,11 +47,38 @@ const MinerPurchaseModal: React.FC<MinerPurchaseModalProps> = ({
   // Get the details of the selected miner
   const minerDetails = MINERS[selectedMiner];
   
-  // Check if user can afford the selected miner
-  const canAfford = minerDetails.price <= bitBalanceNumber;
+  // Update where the miner details are displayed to use contract data when available
+  const getMinerInfo = (minerType: MinerType, property: 'hashrate' | 'powerConsumption' | 'cost') => {
+    // Use contract data for Monkey Toaster if available
+    if (minerType === MinerType.MONKEY_TOASTER && minerTypeData[MinerType.MONKEY_TOASTER]) {
+      const data = minerTypeData[MinerType.MONKEY_TOASTER];
+      if (property === 'hashrate') {
+        return Number(data[4]).toString(); // hashrate is at index 4
+      } else if (property === 'powerConsumption') {
+        return Number(data[5]).toString(); // powerConsumption is at index 5
+      } else if (property === 'cost') {
+        return Number(data[6]).toString(); // cost is at index 6
+      }
+    }
+    
+    // Fallback to config data
+    const miner = MINERS[minerType];
+    if (property === 'hashrate') {
+      return miner.hashrate.toString();
+    } else if (property === 'powerConsumption') {
+      return miner.energyConsumption.toString();
+    } else if (property === 'cost') {
+      return miner.price.toString();
+    }
+    return '0';
+  };
+  
+  // Check if user can afford the selected miner using contract data when available
+  const minerCost = Number(getMinerInfo(selectedMiner, 'cost'));
+  const canAfford = minerCost <= bitBalanceNumber;
   
   // For the free starter miner, check if user has already claimed it
-  const isFreeMiner = selectedMiner === MinerType.BANANA_MINER && minerDetails.price === 0;
+  const isFreeMiner = selectedMiner === MinerType.BANANA_MINER && minerCost === 0;
   const canGetFreeMiner = isFreeMiner && !hasClaimedStarterMiner;
   
   // Determine if user can purchase this miner
@@ -305,9 +334,9 @@ const MinerPurchaseModal: React.FC<MinerPurchaseModalProps> = ({
                 />
               </div>
               <div className="space-y-2 font-press-start text-xs">
-                <p className="text-white mb-1">- HASH RATE: {minerDetails.hashrate} GH/S</p>
-                <p className="text-white mb-1">- PRICE: {minerDetails.price} BIT</p>
-                <p className="text-white mb-1">- ENERGY: {minerDetails.energyConsumption} WATT</p>
+                <p className="text-white mb-1">- HASH RATE: {getMinerInfo(selectedMiner, 'hashrate')} GH/S</p>
+                <p className="text-white mb-1">- PRICE: {getMinerInfo(selectedMiner, 'cost')} BIT</p>
+                <p className="text-white mb-1">- ENERGY: {getMinerInfo(selectedMiner, 'powerConsumption')} WATT</p>
                 <p className="text-white mb-1">- MINER INDEX: {selectedMiner} ({minerMapping[selectedMiner].name})</p>
                 {minerDetails.description && (
                   <p className={`mt-3 text-center ${isFreeMiner ? 'text-green-400' : 'text-yellow-300'}`}>

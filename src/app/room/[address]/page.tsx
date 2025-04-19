@@ -169,6 +169,84 @@ export default function RoomPage() {
     }
   }, [address, publicClient]);
   
+  // Function to fetch miner type data directly from the contract
+  const fetchMinerTypeData = useCallback(async (minerIndex: number) => {
+    console.log(`Fetching data for miner type: ${minerIndex}`);
+    if (!publicClient) return null;
+    
+    try {
+      // Call the miners function to get the miner type details
+      const data = await publicClient.readContract({
+        address: CONTRACT_ADDRESSES.MAIN as Address,
+        abi: [
+          {
+            inputs: [
+              { name: '', type: 'uint256' }
+            ],
+            name: 'miners',
+            outputs: [
+              { name: 'minerIndex', type: 'uint256' },
+              { name: 'id', type: 'uint256' },
+              { name: 'x', type: 'uint256' },
+              { name: 'y', type: 'uint256' },
+              { name: 'hashrate', type: 'uint256' },
+              { name: 'powerConsumption', type: 'uint256' },
+              { name: 'cost', type: 'uint256' },
+              { name: 'inProduction', type: 'bool' }
+            ],
+            stateMutability: 'view',
+            type: 'function'
+          }
+        ] as const,
+        functionName: 'miners',
+        args: [BigInt(minerIndex)]
+      });
+      
+      console.log(`Contract data for miner type ${minerIndex}:`, data);
+      return data;
+    } catch (error) {
+      console.error(`Error fetching miner type data for index ${minerIndex}:`, error);
+      return null;
+    }
+  }, [publicClient]);
+
+  // State to store miner type data from the contract
+  const [minerTypeData, setMinerTypeData] = useState<Record<number, any>>({});
+  
+  // Fetch miner type data for Monkey Toaster (index 3) on mount
+  useEffect(() => {
+    if (!publicClient || !address) return;
+    
+    const fetchMonkeyToasterData = async () => {
+      try {
+        const monkeyToasterData = await fetchMinerTypeData(MinerType.MONKEY_TOASTER);
+        if (monkeyToasterData) {
+          console.log('🐵 Monkey Toaster data from contract:', monkeyToasterData);
+          console.log('🐵 hashrate:', Number(monkeyToasterData[4]));
+          console.log('🐵 powerConsumption:', Number(monkeyToasterData[5]));
+          console.log('🐵 cost:', Number(monkeyToasterData[6]));
+          
+          setMinerTypeData(prev => ({
+            ...prev,
+            [MinerType.MONKEY_TOASTER]: monkeyToasterData
+          }));
+          
+          // Add monkey toaster data to window object for easy inspection in browser console
+          if (typeof window !== 'undefined') {
+            // @ts-ignore - Add debug object to window
+            window.__BITAPE_DEBUG = window.__BITAPE_DEBUG || {};
+            // @ts-ignore - Track miners data
+            window.__BITAPE_DEBUG.monkeyToasterData = monkeyToasterData;
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching Monkey Toaster data:', error);
+      }
+    };
+    
+    fetchMonkeyToasterData();
+  }, [publicClient, address, fetchMinerTypeData]);
+
   // Function to fetch data for specific miner IDs
   const fetchSpecificMiners = useCallback(async () => {
     if (!address) return;
@@ -912,9 +990,16 @@ export default function RoomPage() {
   };
   
   const getMinerMiningRate = (minerType: number) => {
+    // Use contract data for the Monkey Toaster if available
+    if (minerType === MinerType.MONKEY_TOASTER && minerTypeData[MinerType.MONKEY_TOASTER]) {
+      const hashrate = Number(minerTypeData[MinerType.MONKEY_TOASTER][4]); // hashrate is at index 4
+      console.log(`Using contract data for MONKEY_TOASTER mining rate: ${hashrate}`);
+      return hashrate.toString();
+    }
+    
     const miningRates = {
       [MinerType.BANANA_MINER]: "100",
-      [MinerType.MONKEY_TOASTER]: "1000",
+      [MinerType.MONKEY_TOASTER]: "1000", // Fallback if contract data not available
       [MinerType.GORILLA_GADGET]: "750",
       [MinerType.APEPAD_MINI]: "2000"
     };
@@ -922,9 +1007,16 @@ export default function RoomPage() {
   };
   
   const getMinerHashRate = (minerType: number) => {
+    // Use contract data for the Monkey Toaster if available
+    if (minerType === MinerType.MONKEY_TOASTER && minerTypeData[MinerType.MONKEY_TOASTER]) {
+      const hashrate = Number(minerTypeData[MinerType.MONKEY_TOASTER][4]); // hashrate is at index 4
+      console.log(`Using contract data for MONKEY_TOASTER hashrate: ${hashrate}`);
+      return hashrate.toString();
+    }
+    
     const hashRates = {
       [MinerType.BANANA_MINER]: "100",
-      [MinerType.MONKEY_TOASTER]: "1000",
+      [MinerType.MONKEY_TOASTER]: "1000", // Fallback if contract data not available
       [MinerType.GORILLA_GADGET]: "750",
       [MinerType.APEPAD_MINI]: "2000"
     };
@@ -932,13 +1024,38 @@ export default function RoomPage() {
   };
   
   const getMinerPowerConsumption = (minerType: number) => {
+    // Use contract data for the Monkey Toaster if available
+    if (minerType === MinerType.MONKEY_TOASTER && minerTypeData[MinerType.MONKEY_TOASTER]) {
+      const powerConsumption = Number(minerTypeData[MinerType.MONKEY_TOASTER][5]); // powerConsumption is at index 5
+      console.log(`Using contract data for MONKEY_TOASTER power consumption: ${powerConsumption}`);
+      return powerConsumption.toString();
+    }
+    
     const powerConsumptions = {
       [MinerType.BANANA_MINER]: "1",
       [MinerType.GORILLA_GADGET]: "5",
-      [MinerType.MONKEY_TOASTER]: "10",
+      [MinerType.MONKEY_TOASTER]: "10", // Fallback if contract data not available
       [MinerType.APEPAD_MINI]: "100"
     };
     return powerConsumptions[minerType as keyof typeof powerConsumptions] || "0";
+  };
+  
+  // Add a new function to get the miner cost from contract data
+  const getMinerCost = (minerType: number) => {
+    // Use contract data for the Monkey Toaster if available
+    if (minerType === MinerType.MONKEY_TOASTER && minerTypeData[MinerType.MONKEY_TOASTER]) {
+      const cost = Number(minerTypeData[MinerType.MONKEY_TOASTER][6]); // cost is at index 6
+      console.log(`Using contract data for MONKEY_TOASTER cost: ${cost}`);
+      return cost.toString();
+    }
+    
+    const costs = {
+      [MinerType.BANANA_MINER]: "0",
+      [MinerType.GORILLA_GADGET]: "60",
+      [MinerType.MONKEY_TOASTER]: "20", // Fallback if contract data not available
+      [MinerType.APEPAD_MINI]: "5000"
+    };
+    return costs[minerType as keyof typeof costs] || "0";
   };
 
   // Force refresh miners data when the component mounts
@@ -1095,6 +1212,10 @@ export default function RoomPage() {
                             <p className="bigcoin-value">{minerName}</p>
                             <p className="bigcoin-text text-xs opacity-80">HASH RATE: {getMinerHashRate(minerType)} GH/s</p>
                             <p className="bigcoin-text text-xs opacity-80">ENERGY: {getMinerPowerConsumption(minerType)} WATTS</p>
+                            {/* Add cost information for miners other than the free starter miner */}
+                            {minerType !== MinerType.BANANA_MINER && (
+                              <p className="bigcoin-text text-xs opacity-80">COST: {getMinerCost(minerType)} BIT</p>
+                            )}
                           </div>
                         </div>
                         <div className="mt-4">
@@ -1497,6 +1618,12 @@ export default function RoomPage() {
           <span className="text-xs opacity-80">Power Consumption:</span>
           <span className="text-xs font-bold">{getMinerPowerConsumption(minerType)} GW</span>
         </div>
+        {minerType !== MinerType.BANANA_MINER && (
+          <div className="flex justify-between">
+            <span className="text-xs opacity-80">Cost:</span>
+            <span className="text-xs font-bold">{getMinerCost(minerType)} BIT</span>
+          </div>
+        )}
       </div>
     );
   };
@@ -1906,8 +2033,9 @@ export default function RoomPage() {
         onPurchase={handleMinerPurchase}
         selectedTile={selectedTile || undefined}
         isPurchasing={gameState.isPurchasingMiner}
-        bitBalance={bitBalance}
+        bitBalance={bitBalance || '0'}
         hasClaimedStarterMiner={gameState.hasClaimedStarterMiner}
+        minerTypeData={minerTypeData}
       />
 
       {/* Upgrade Facility Modal */}
