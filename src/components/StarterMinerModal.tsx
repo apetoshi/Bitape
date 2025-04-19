@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import Image from 'next/image';
 import { Dialog } from '@headlessui/react';
 
@@ -39,12 +39,51 @@ const StarterMinerModal: React.FC<StarterMinerModalProps> = ({
   selectedTile,
   isProcessing
 }) => {
+  // Force close the modal after 500ms if user clicks the close button
+  // This is a workaround for the stuck modal issue
+  const handleForceClose = () => {
+    onClose();
+    
+    // Force close after a delay as backup
+    setTimeout(() => {
+      // Try to force close by manipulating DOM if needed
+      const modalBackdrops = document.querySelectorAll('.fixed.inset-0.bg-black\\/70');
+      modalBackdrops.forEach(el => {
+        if (el.parentNode) {
+          el.parentNode.removeChild(el);
+        }
+      });
+      
+      // Also try to hide any modal panels
+      const modalPanels = document.querySelectorAll('.starter-miner-modal');
+      modalPanels.forEach(el => {
+        if (el instanceof HTMLElement) {
+          el.style.display = 'none';
+        }
+      });
+      
+      console.log('Forced modal close');
+    }, 500);
+  };
+
+  // Add escape key handler as another way to close
+  useEffect(() => {
+    const handleEscapeKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleForceClose();
+      }
+    };
+    
+    window.addEventListener('keydown', handleEscapeKey);
+    return () => window.removeEventListener('keydown', handleEscapeKey);
+  }, []);
+
   if (!isOpen) return null;
 
   return (
     <Dialog
       open={isOpen}
-      onClose={onClose}
+      onClose={handleForceClose}
       className="relative z-50"
     >
       <style jsx global>{minerPreviewStyle}</style>
@@ -103,7 +142,7 @@ const StarterMinerModal: React.FC<StarterMinerModalProps> = ({
 
           <div className="flex justify-between space-x-4">
             <button
-              onClick={onClose}
+              onClick={handleForceClose}
               className="font-press-start px-6 py-2 border-2 border-banana text-banana hover:bg-banana hover:text-royal transition-colors"
             >
               CLOSE
@@ -118,7 +157,7 @@ const StarterMinerModal: React.FC<StarterMinerModalProps> = ({
               </button>
             ) : (
               <button
-                onClick={onClose}
+                onClick={handleForceClose}
                 className="font-press-start px-6 py-2 bg-banana text-royal hover:bg-opacity-90 transition-colors"
               >
                 CHOOSE LOCATION
