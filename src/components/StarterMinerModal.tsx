@@ -24,6 +24,16 @@ const minerPreviewStyle = `
     animation: float 3s ease-in-out infinite;
   }
   
+  @keyframes pulse {
+    0% { opacity: 0.7; }
+    50% { opacity: 1; }
+    100% { opacity: 0.7; }
+  }
+  
+  .instruction-pulse {
+    animation: pulse 2s infinite;
+  }
+  
   /* Ensure modal is scrollable on mobile */
   .starter-miner-modal {
     max-height: 90vh;
@@ -94,15 +104,34 @@ const StarterMinerModal: React.FC<StarterMinerModalProps> = ({
             CLAIM YOUR FREE BANANA MINER
           </Dialog.Title>
           
-          <div className="bg-opacity-10 bg-white p-6 mb-8">
+          <div className="bg-royal-dark p-6 mb-8 border border-banana/20">
             <div className="space-y-4 font-press-start">
+              {/* Step-by-step instructions to guide the user */}
+              <div className="mb-4 border border-banana/50 p-3 bg-black/50">
+                <p className="text-white text-center font-bold">FOLLOW THESE STEPS:</p>
+                <ol className="list-decimal pl-6 text-white mt-2 space-y-2">
+                  <li className={`${!selectedTile ? 'text-yellow-300 instruction-pulse font-bold' : 'line-through opacity-50'}`}>
+                    Click "CLOSE" to dismiss this popup
+                  </li>
+                  <li className={`${!selectedTile ? 'text-yellow-300 instruction-pulse font-bold' : 'line-through opacity-50'}`}>
+                    Click the "SHOW GRID" button in the top-left corner
+                  </li>
+                  <li className={`${!selectedTile ? 'text-yellow-300 instruction-pulse font-bold' : 'line-through opacity-50'}`}>
+                    Select a tile location for your miner
+                  </li>
+                  <li className={`${selectedTile ? 'text-yellow-300 instruction-pulse font-bold' : 'opacity-50'}`}>
+                    Return to this popup and click "CLAIM FREE MINER"
+                  </li>
+                </ol>
+              </div>
+
               {selectedTile ? (
-                <p className="text-white text-center">
-                  Selected Position: X:{selectedTile.x}, Y:{selectedTile.y}
+                <p className="text-green-400 text-center font-bold">
+                  ✓ Tile Selected: X:{selectedTile.x}, Y:{selectedTile.y}
                 </p>
               ) : (
-                <p className="text-yellow-300 text-center">
-                  Please click "SHOW GRID" and select a mining tile first!
+                <p className="text-yellow-300 text-center animate-pulse">
+                  Please select a mining tile first!
                 </p>
               )}
               
@@ -160,7 +189,7 @@ const StarterMinerModal: React.FC<StarterMinerModalProps> = ({
                 onClick={handleForceClose}
                 className="font-press-start px-6 py-2 bg-banana text-royal hover:bg-opacity-90 transition-colors"
               >
-                CHOOSE LOCATION
+                CLOSE & SELECT TILE
               </button>
             )}
           </div>
