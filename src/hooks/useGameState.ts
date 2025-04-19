@@ -274,7 +274,7 @@ export function useGameState(): GameState {
         abi: MAIN_CONTRACT_ABI,
         functionName: 'purchaseInitialFacility',
         args: [zeroAddress],
-        value: parseEther('0.1')
+        value: parseEther('0.005')
       });
       await refetchStats();
     } catch (error) {
@@ -636,7 +636,7 @@ export function useGameState(): GameState {
       totalReferrals: Number(totalReferrals),
       rewardsEarned: totalBitEarned,
     },
-    initialFacilityPrice: '10',
+    initialFacilityPrice: '0.005',
     hasClaimedStarterMiner: !!hasClaimedStarterMiner,
     purchaseMiner: handlePurchaseMiner,
     isPurchasingMiner,
