@@ -93,7 +93,7 @@ const StarterMinerModal: React.FC<StarterMinerModalProps> = ({
   return (
     <Dialog
       open={isOpen}
-      onClose={handleForceClose}
+      onClose={() => {}} // Prevent automatic closing on backdrop click 
       className="relative z-50"
     >
       <style jsx global>{minerPreviewStyle}</style>
@@ -106,21 +106,20 @@ const StarterMinerModal: React.FC<StarterMinerModalProps> = ({
           
           <div className="bg-royal-dark p-6 mb-8 border border-banana/20">
             <div className="space-y-4 font-press-start">
-              {/* Step-by-step instructions to guide the user */}
               <div className="mb-4 border border-banana/50 p-3 bg-black/50">
-                <p className="text-white text-center font-bold">FOLLOW THESE STEPS:</p>
+                <p className="text-white text-center font-bold">HOW TO CLAIM YOUR MINER:</p>
                 <ol className="list-decimal pl-6 text-white mt-2 space-y-2">
-                  <li className={`${!selectedTile ? 'text-yellow-300 instruction-pulse font-bold' : 'line-through opacity-50'}`}>
-                    Click "CLOSE" to dismiss this popup
+                  <li className="text-yellow-300 font-bold">
+                    Click "CLOSE" button below
                   </li>
-                  <li className={`${!selectedTile ? 'text-yellow-300 instruction-pulse font-bold' : 'line-through opacity-50'}`}>
-                    Click the "SHOW GRID" button in the top-left corner
+                  <li className="text-yellow-300 font-bold">
+                    Click "SHOW GRID" button in the top-left
                   </li>
-                  <li className={`${!selectedTile ? 'text-yellow-300 instruction-pulse font-bold' : 'line-through opacity-50'}`}>
-                    Select a tile location for your miner
+                  <li className="text-yellow-300 font-bold">
+                    Click one of the highlighted tiles
                   </li>
-                  <li className={`${selectedTile ? 'text-yellow-300 instruction-pulse font-bold' : 'opacity-50'}`}>
-                    Return to this popup and click "CLAIM FREE MINER"
+                  <li className="text-yellow-300 font-bold">
+                    Click "CLAIM STARTER MINER" button
                   </li>
                 </ol>
               </div>
@@ -131,7 +130,7 @@ const StarterMinerModal: React.FC<StarterMinerModalProps> = ({
                 </p>
               ) : (
                 <p className="text-yellow-300 text-center animate-pulse">
-                  Please select a mining tile first!
+                  No tile selected yet
                 </p>
               )}
               

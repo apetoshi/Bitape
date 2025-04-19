@@ -184,23 +184,6 @@ export function RoomVisualization({
     }
   }, [address, playerMinerIds, miners, effectivelyClaimedStarterMiner]);
 
-  // Show starter miner modal if facility exists but no miner has been claimed
-  useEffect(() => {
-    // Only show the modal initially if:
-    // 1. User has a facility
-    // 2. User has NOT claimed starter miner (according to contract)
-    if (hasFacility && !effectivelyClaimedStarterMiner) {
-      console.log('Opening starter miner modal. Contract says claimed:', hasActuallyClaimedStarterMiner);
-      setIsStarterMinerModalOpen(true);
-    } else {
-      // Close the modal if user has already claimed (in case it was open)
-      if (effectivelyClaimedStarterMiner && isStarterMinerModalOpen) {
-        console.log('Closing starter miner modal because miner already claimed');
-        setIsStarterMinerModalOpen(false);
-      }
-    }
-  }, [hasFacility, effectivelyClaimedStarterMiner, hasActuallyClaimedStarterMiner, isStarterMinerModalOpen]);
-
   const handleTileClick = (x: number, y: number) => {
     if (!isGridMode) return;
     setSelectedTile({ x, y });
@@ -546,7 +529,10 @@ export function RoomVisualization({
         {/* Get Starter Miner Button (Bottom Center) - Only if has facility but no starter miner */}
         {hasFacility && !effectivelyClaimedStarterMiner && (
           <button
-            onClick={() => setIsStarterMinerModalOpen(true)}
+            onClick={() => {
+              // Only show the modal, don't toggle grid mode
+              setIsStarterMinerModalOpen(true);
+            }}
             disabled={isGettingStarterMiner}
             className="absolute bottom-2 left-1/2 transform -translate-x-1/2 z-30 px-4 py-2 font-press-start text-xs bg-banana text-royal hover:bg-opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
