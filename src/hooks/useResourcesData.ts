@@ -1,8 +1,8 @@
 'use client';
 
 import { useAccount, useContractRead, useBalance } from 'wagmi';
-import { formatUnits } from 'viem';
-import { APECHAIN_ID, CONTRACT_ADDRESSES, ERC20_ABI, MAIN_CONTRACT_ABI } from '../config/contracts';
+import { formatUnits, zeroAddress } from 'viem';
+import { APECHAIN_ID, CONTRACT_ADDRESSES, ERC20_ABI, MAIN_CONTRACT_ABI, BIT_TOKEN_ABI } from '../config/contracts';
 import { useEffect, useState } from 'react';
 
 export interface ResourcesData {
@@ -33,9 +33,9 @@ export function useResourcesData(): ResourcesData {
   // Get BIT token balance
   const { data: bitBalanceData, isLoading: isBitLoading } = useContractRead({
     address: CONTRACT_ADDRESSES.BIT_TOKEN,
-    abi: ERC20_ABI,
+    abi: BIT_TOKEN_ABI,
     functionName: 'balanceOf',
-    args: [address as `0x${string}`],
+    args: [address || zeroAddress],
     query: {
       enabled: !!address,
     },
@@ -46,7 +46,7 @@ export function useResourcesData(): ResourcesData {
     address: CONTRACT_ADDRESSES.MAIN,
     abi: MAIN_CONTRACT_ABI,
     functionName: 'initializedStarterFacility',
-    args: [address as `0x${string}`],
+    args: [address || zeroAddress],
     query: {
       enabled: !!address,
     },
@@ -57,18 +57,18 @@ export function useResourcesData(): ResourcesData {
     address: CONTRACT_ADDRESSES.MAIN,
     abi: MAIN_CONTRACT_ABI,
     functionName: 'getPlayerFacility',
-    args: [address as `0x${string}`],
+    args: [address || zeroAddress],
     query: {
       enabled: !!address && !!hasInitializedFacility,
     },
   });
 
-  // Get user miners count
-  const { data: userMinersData, isLoading: isMinersLoading } = useContractRead({
+  // Get user miners using the paginated function
+  const { data: userMiners, isLoading: isMinersLoading } = useContractRead({
     address: CONTRACT_ADDRESSES.MAIN,
     abi: MAIN_CONTRACT_ABI,
-    functionName: 'getUserMiners',
-    args: [address as `0x${string}`],
+    functionName: 'getPlayerMinersPaginated',
+    args: [address || zeroAddress, BigInt(0), BigInt(100)], // Start at index 0, get up to 100 miners
     query: {
       enabled: !!address && !!hasInitializedFacility,
     },
@@ -90,15 +90,17 @@ export function useResourcesData(): ResourcesData {
     );
 
     // Process facility data
-    if (facilityData && userMinersData && hasFacility) {
+    if (facilityData && hasFacility) {
       try {
-        const [power, level, miners, capacity, used, resources, spaces] = facilityData as unknown as bigint[];
-        const [minerIds] = userMinersData as [bigint[], bigint[], bigint[]];
+        // facilityData is an array of values: [power, level, miners, capacity, used, resources, spaces]
+        const facilityValues = facilityData as unknown as bigint[];
+        const totalPower = Number(facilityValues[0] || BigInt(0));
+        const usedPower = Number(facilityValues[4] || BigInt(0));
+        const maxSpaces = Number(facilityValues[6] || BigInt(0));
         
-        const totalMiners = minerIds ? minerIds.length : 0;
-        const maxSpaces = Number(spaces);
-        const totalPower = Number(power);
-        const usedPower = Number(used);
+        // Count user miners
+        const minersList = userMiners as unknown as any[] || [];
+        const totalMiners = minersList.length;
         
         // Set spaces left
         setSpacesLeft(maxSpaces - totalMiners);
@@ -107,12 +109,14 @@ export function useResourcesData(): ResourcesData {
         setGigawattsAvailable(totalPower - usedPower);
       } catch (error) {
         console.error('Error processing facility data:', error);
+        setSpacesLeft(0);
+        setGigawattsAvailable(0);
       }
     } else if (!hasFacility) {
       setSpacesLeft(0);
       setGigawattsAvailable(0);
     }
-  }, [facilityData, userMinersData, hasFacility, isApeLoading, isBitLoading, isInitLoading, isFacilityLoading, isMinersLoading]);
+  }, [facilityData, userMiners, hasFacility, isApeLoading, isBitLoading, isInitLoading, isFacilityLoading, isMinersLoading]);
 
   return {
     apeBalance: apeBalanceData?.formatted ?? '0',
