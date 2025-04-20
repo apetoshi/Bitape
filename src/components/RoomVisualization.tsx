@@ -129,18 +129,20 @@ export function RoomVisualization({
 
   // Direct contract read for each miner using contract calls
   const { data: directMinerReads, isLoading: isDirectMinerLoading } = useContractReads({
-    contracts: playerMinerIds && Array.isArray(playerMinerIds) && playerMinerIds.length > 0
-      ? playerMinerIds.map(id => ({
-          address: CONTRACT_ADDRESSES.MAIN,
-          abi: MAIN_CONTRACT_ABI_EXTENDED as any, // Type assertion to resolve ABI type issues
-          functionName: 'getMiner',
-          args: [id]
+    contracts: (playerMinerIds && Array.isArray(playerMinerIds) && playerMinerIds.length > 0)
+      ? (Array.from(playerMinerIds).map(id => {
+          return {
+            address: CONTRACT_ADDRESSES.MAIN,
+            abi: MAIN_CONTRACT_ABI_EXTENDED as any, // Type assertion to resolve ABI type issues
+            functionName: 'getMiner',
+            args: [id as any]
+          } as const;
         }))
       : [],
     query: {
       enabled: Boolean(address) && Boolean(playerMinerIds) && Array.isArray(playerMinerIds) && playerMinerIds.length > 0
     }
-  });
+  } as any);
 
   // Convert data to boolean
   const hasActuallyClaimedStarterMiner = Boolean(acquiredStarterMinerData);
