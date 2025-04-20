@@ -751,7 +751,7 @@ export default function RoomPage() {
   }, [address]);
 
   // Process facility data
-  const facility = facilityData as bigint[] | undefined;
+  const facility = facilityData as unknown as bigint[] | undefined;
   
   // Create a parsed version of facility data with proper Number conversions
   const parsedFacility = facility ? {
