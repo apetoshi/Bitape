@@ -3,9 +3,9 @@ export const APECHAIN_ID = 33139;
 
 // Contract Addresses on ApeChain
 export const CONTRACT_ADDRESSES = {
-  BIT_TOKEN: '0xb9BE704a40b1500D39FE4264a1C46E43a5C614bD', // BIT token address
-  MINING_CONTROLLER: '0x409Ec46CdA55E8C7A2Ec971745985bf7Dd58f533', // Mining controller address
-  MAIN: '0x409Ec46CdA55E8C7A2Ec971745985bf7Dd58f533' // Main contract address
+  BIT_TOKEN: '0xb9be704a40b1500d39fe4264a1c46e43a5c614bd', // BIT token address
+  MINING_CONTROLLER: '0x409Ec46CdA55E8C7A2Ec971745985bf7Dd58f533', // Mining controller address (old)
+  MAIN: '0x409Ec46CdA55E8C7A2Ec971745985bf7Dd58f533' // Main contract address from user's task
 } as const;
 
 // Minimal ABIs for token interactions
@@ -186,7 +186,7 @@ export const MAIN_CONTRACT_ABI = [
   },
   // Facility-related functions
   {
-    inputs: [{ internalType: 'address', name: 'user', type: 'address' }],
+    inputs: [{ internalType: 'address', name: 'player', type: 'address' }],
     name: 'getPlayerFacility',
     outputs: [
       { internalType: 'uint256', name: 'power', type: 'uint256' },
@@ -195,7 +195,7 @@ export const MAIN_CONTRACT_ABI = [
       { internalType: 'uint256', name: 'capacity', type: 'uint256' },
       { internalType: 'uint256', name: 'used', type: 'uint256' },
       { internalType: 'uint256', name: 'resources', type: 'uint256' },
-      { internalType: 'uint256', name: 'spaces', type: 'uint256' },
+      { internalType: 'uint256', name: 'spaces', type: 'uint256' }
     ],
     stateMutability: 'view',
     type: 'function',
@@ -315,6 +315,34 @@ export const MAIN_CONTRACT_ABI = [
     stateMutability: 'view',
     type: 'function',
   },
+  // New facility data function
+  {
+    inputs: [{ internalType: 'address', name: 'owner', type: 'address' }],
+    name: 'ownerToFacility',
+    outputs: [
+      { internalType: 'uint256', name: 'facilityIndex', type: 'uint256' },
+      { internalType: 'uint256', name: 'maxMiners', type: 'uint256' },
+      { internalType: 'uint256', name: 'currMiners', type: 'uint256' },
+      { internalType: 'uint256', name: 'totalPowerOutput', type: 'uint256' },
+      { internalType: 'uint256', name: 'currPowerOutput', type: 'uint256' },
+      { internalType: 'uint256', name: 'x', type: 'uint256' },
+      { internalType: 'uint256', name: 'y', type: 'uint256' }
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  // Fallback function for facility data in case ownerToFacility doesn't work
+  {
+    inputs: [{ internalType: 'address', name: 'player', type: 'address' }],
+    name: 'facilities',
+    outputs: [
+      { internalType: 'uint256', name: 'power', type: 'uint256' },
+      { internalType: 'uint256', name: 'level', type: 'uint256' },
+      { internalType: 'uint256', name: 'lastClaimBlock', type: 'uint256' }
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
 ] as const;
 
 // Mining Controller ABI 
@@ -338,5 +366,54 @@ export const MINING_CONTROLLER_ABI = [
   'function upgradeFacility() returns (bool)',
 ] as const;
 
-// Use the same address as in CONTRACT_ADDRESSES for consistency
-export const BIT_TOKEN_ADDRESS = '0xb9BE704a40b1500D39FE4264a1C46E43a5C614bD' as const; 
+// Direct export of BIT_TOKEN_ADDRESS for consistency
+export const BIT_TOKEN_ADDRESS = '0xb9be704a40b1500d39fe4264a1c46e43a5c614bd';
+
+// Add the getMiner function to the ABI if it doesn't already exist
+export const MAIN_CONTRACT_ABI_EXTENDED = [
+  ...MAIN_CONTRACT_ABI,
+  // Add specific function for getting miner details - needed for API
+  {
+    inputs: [{ name: 'minerId', type: 'uint256' }],
+    name: 'getMiner',
+    outputs: [
+      { name: 'minerIndex', type: 'uint256' },
+      { name: 'x', type: 'uint256' },
+      { name: 'y', type: 'uint256' },
+      { name: 'hashrate', type: 'uint256' },
+      { name: 'powerConsumption', type: 'uint256' },
+      { name: 'cost', type: 'uint256' },
+      { name: 'owner', type: 'address' },
+      { name: 'inProduction', type: 'bool' }
+    ],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  // Add specific function for player miners
+  {
+    inputs: [
+      { name: 'player', type: 'address' },
+      { name: 'startIndex', type: 'uint256' },
+      { name: 'size', type: 'uint256' }
+    ],
+    name: 'getPlayerMinersPaginated',
+    outputs: [
+      {
+        components: [
+          { name: 'minerIndex', type: 'uint256' },
+          { name: 'id', type: 'uint256' },
+          { name: 'x', type: 'uint256' },
+          { name: 'y', type: 'uint256' },
+          { name: 'hashrate', type: 'uint256' },
+          { name: 'powerConsumption', type: 'uint256' },
+          { name: 'cost', type: 'uint256' },
+          { name: 'inProduction', type: 'bool' }
+        ],
+        name: '',
+        type: 'tuple[]'
+      }
+    ],
+    stateMutability: 'view',
+    type: 'function'
+  }
+]; 

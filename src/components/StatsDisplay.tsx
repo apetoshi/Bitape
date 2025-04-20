@@ -1,4 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import ViewModeToggle, { ViewMode } from './ViewModeToggle';
+import { formatUnits } from 'viem';
+import { useContractRead } from 'wagmi';
+import { CONTRACT_ADDRESSES, BIT_TOKEN_ABI } from '../config/contracts';
 
 interface StatsDisplayProps {
   miningRateData: bigint | undefined;
@@ -6,7 +10,7 @@ interface StatsDisplayProps {
   blocksUntilHalvingData: bigint | undefined;
   networkShareData: bigint | undefined;
   totalNetworkHashrateData: bigint | undefined;
-  totalSupplyData: bigint | undefined;
+  totalSupplyData?: bigint | undefined;
   burnedBitData: bigint | undefined;
   currentBitApePerBlockData: bigint | undefined;
   isMiningRateLoading?: boolean;
@@ -21,7 +25,7 @@ const StatsDisplay: React.FC<StatsDisplayProps> = ({
   blocksUntilHalvingData,
   networkShareData,
   totalNetworkHashrateData,
-  totalSupplyData,
+  totalSupplyData: propsTotalSupplyData,
   burnedBitData,
   currentBitApePerBlockData,
   isMiningRateLoading = false,
@@ -29,13 +33,57 @@ const StatsDisplay: React.FC<StatsDisplayProps> = ({
   isNetworkShareLoading = false,
   isTotalNetworkHashrateLoading = false
 }) => {
-  const [mode, setMode] = useState<'SIMPLE' | 'PRO'>('SIMPLE');
+  const [mode, setMode] = useState<ViewMode>('SIMPLE');
+  const [displayedTotalSupply, setDisplayedTotalSupply] = useState("0.00");
+  const [displayedBlocksUntilHalving, setDisplayedBlocksUntilHalving] = useState("0");
+
+  // Direct contract read to get total supply
+  const { data: contractTotalSupplyData, isLoading: isTotalSupplyLoading } = useContractRead({
+    address: CONTRACT_ADDRESSES.BIT_TOKEN,
+    abi: BIT_TOKEN_ABI,
+    functionName: 'totalSupply',
+    query: {
+      enabled: true,
+    },
+  });
+
+  // Use the directly fetched totalSupplyData or fall back to props
+  const totalSupplyData = contractTotalSupplyData || propsTotalSupplyData;
+
+  // Format total supply when data is available
+  useEffect(() => {
+    if (totalSupplyData) {
+      try {
+        console.log('Raw total supply data:', totalSupplyData.toString());
+        // Format the bigint value to a human-readable string with 2 decimal places
+        const formattedSupply = Number(formatUnits(totalSupplyData as bigint, 18)).toFixed(2);
+        console.log('Formatted total supply:', formattedSupply);
+        setDisplayedTotalSupply(formattedSupply);
+      } catch (error) {
+        console.error("Error formatting total supply:", error);
+        setDisplayedTotalSupply("0.00");
+      }
+    } else {
+      console.log('Total supply data is undefined or null');
+    }
+  }, [totalSupplyData]);
+
+  // Format blocks until halving when data is available
+  useEffect(() => {
+    if (blocksUntilHalvingData) {
+      setDisplayedBlocksUntilHalving(blocksUntilHalvingData.toString());
+    }
+  }, [blocksUntilHalvingData]);
 
   // Format values for display
   const formatNumber = (value: bigint | undefined, decimals = 2, suffix = '', scaleDecimals = 0, isLoading = false) => {
+    if (isLoading) {
+      return 'Loading...';
+    }
+    
     // Return 0 with proper formatting when loading has completed but value is undefined
     if (value === undefined) {
-      return isLoading ? 'Loading...' : '0';
+      return '0';
     }
     
     // Scale down the value if needed (for values in wei)
@@ -60,11 +108,15 @@ const StatsDisplay: React.FC<StatsDisplayProps> = ({
 
   // Format a percentage value with optional scaling
   const formatPercentage = (value: bigint | undefined, isLoading = false) => {
-    if (value === undefined) {
-      return isLoading ? 'Loading...' : '0.00';
+    if (isLoading) {
+      return 'Loading...';
     }
     
-    // Network share is already provided as percentage * 100
+    if (value === undefined) {
+      return '0.00';
+    }
+    
+    // Network share is already provided as percentage * 10000 (4 decimal places)
     const percentage = Number(value) / 100;
     
     return percentage.toFixed(2);
@@ -73,68 +125,73 @@ const StatsDisplay: React.FC<StatsDisplayProps> = ({
   // Process values for display with loading awareness
   const miningRate = formatNumber(miningRateData, 2, '', 18, isMiningRateLoading);
   const hashRate = formatNumber(hashRateData, 0, '', 0, isHashRateLoading);
-  const blocksUntilHalving = blocksUntilHalvingData !== undefined ? String(blocksUntilHalvingData) : 'Loading...';
-  
-  // Calculate mining rate estimate based on hash rate (if contract isn't providing it)
-  let calculatedMiningRate = miningRate;
-  if ((miningRate === '0' || miningRate === 'Loading...') && hashRateData) {
-    // Simplified estimate: ~ 2.5 BIT per block * 6000 blocks per day * user's share of network
-    if (totalNetworkHashrateData && totalNetworkHashrateData > BigInt(0)) {
-      const userShare = Number(hashRateData) / Number(totalNetworkHashrateData);
-      const bitPerBlock = currentBitApePerBlockData ? Number(currentBitApePerBlockData) / 10**18 : 2.5;
-      const blocksPerDay = 6000; // Approximate
-      const estimatedMiningRate = userShare * bitPerBlock * blocksPerDay;
-      
-      calculatedMiningRate = estimatedMiningRate.toFixed(2);
-      console.log(`Estimated mining rate: ${calculatedMiningRate} BIT/day (based on ${userShare.toFixed(4)} network share)`);
-    }
-  }
   
   // Calculate network share percentage directly from hash rate and total network hash rate
   let networkSharePercentage = '0.00';
-  if (hashRateData && totalNetworkHashrateData && totalNetworkHashrateData > BigInt(0)) {
+  if (isNetworkShareLoading) {
+    networkSharePercentage = 'Loading...';
+  } else if (networkShareData !== undefined) {
+    // Use the pre-calculated network share value passed in
+    networkSharePercentage = formatPercentage(networkShareData, isNetworkShareLoading);
+  } else if (hashRateData && totalNetworkHashrateData && totalNetworkHashrateData > BigInt(0)) {
+    // Or calculate it from hashrate data as a fallback
     const percentage = (Number(hashRateData) / Number(totalNetworkHashrateData)) * 100;
     networkSharePercentage = percentage.toFixed(2);
-    console.log(`Calculated network share: ${percentage.toFixed(2)}% (hashRate: ${hashRateData}, totalNetwork: ${totalNetworkHashrateData})`);
-  } else {
-    // Fallback to the contract-provided value if available
-    networkSharePercentage = formatPercentage(networkShareData, isNetworkShareLoading);
   }
   
   const totalNetworkHashrate = formatNumber(totalNetworkHashrateData, 0, '', 0, isTotalNetworkHashrateLoading);
   const currentBitApePerBlock = formatNumber(currentBitApePerBlockData, 2, '', 18);
-  const totalSupply = formatNumber(totalSupplyData, 2, '', 18);
   const burnedBit = formatNumber(burnedBitData, 2, '', 18);
 
   return (
-    <div>
-      <div className="flex border-b-2 border-banana px-3 py-1">
-        <button 
-          onClick={() => setMode('SIMPLE')}
-          className={`font-press-start text-xs ${mode === 'SIMPLE' ? 'text-banana' : 'text-[#4A5568]'} mr-4`}
-        >
-          SIMPLE
-        </button>
-        <button 
-          onClick={() => setMode('PRO')}
-          className={`font-press-start text-xs ${mode === 'PRO' ? 'text-banana' : 'text-[#4A5568]'}`}
-        >
-          PRO
-        </button>
+    <div className="bg-[#001420] p-3 rounded-md border-2 border-banana">
+      <div className="mb-3">
+        <ViewModeToggle 
+          viewMode={mode} 
+          onChange={setMode} 
+          compact={true} 
+          className="w-full"
+          buttonClassName="font-bold hover:text-banana transition-colors duration-200"
+        />
       </div>
-      <div className="p-3 space-y-1 font-press-start text-white text-xs">
+      <div className="p-3 space-y-2 font-press-start text-white text-xs">
         {mode === 'SIMPLE' ? (
           <>
-            <p>- YOU ARE MINING <span className="text-banana">{calculatedMiningRate}</span> BIT A DAY</p>
-            <p>- YOUR HASH RATE IS <span className="text-banana">{hashRate}</span> GH/S</p>
-            <p>- <span className="text-banana">{blocksUntilHalving}</span> BLOCKS UNTIL NEXT HALVENING</p>
-            <p>- YOU HAVE <span className="text-banana">{networkSharePercentage}%</span> OF THE TOTAL NETWORK HASH RATE (<span className="text-banana">{totalNetworkHashrate}</span> GH/S)</p>
+            <p className="flex justify-between items-center">
+              <span>- MINING RATE:</span> 
+              <span className="text-banana">{miningRate} BIT/DAY</span>
+            </p>
+            <p className="flex justify-between items-center">
+              <span>- HASH RATE:</span> 
+              <span className="text-banana">{hashRate} GH/S</span>
+            </p>
+            <p className="flex justify-between items-center">
+              <span>- NEXT HALVENING:</span> 
+              <span className="text-banana">{displayedBlocksUntilHalving} BLOCKS</span>
+            </p>
+            <p className="flex justify-between items-center">
+              <span>- NETWORK SHARE:</span> 
+              <span className="text-banana">{networkSharePercentage}%</span>
+            </p>
           </>
         ) : (
           <>
-            <p>- <span className="text-banana">{currentBitApePerBlock}</span> TOTAL BIT MINED PER BLOCK</p>
-            <p>- <span className="text-banana">{totalSupply}</span> BIT HAS EVER BEEN MINED</p>
-            <p>- <span className="text-banana">{burnedBit}</span> BIT HAS BEEN BURNED</p>
+            <p className="flex justify-between items-center">
+              <span>- BIT PER BLOCK:</span> 
+              <span className="text-banana">{currentBitApePerBlock}</span>
+            </p>
+            <p className="flex justify-between items-center">
+              <span>- TOTAL BIT MINED:</span> 
+              <span className="text-banana">{displayedTotalSupply}</span>
+            </p>
+            <p className="flex justify-between items-center">
+              <span>- BIT BURNED:</span> 
+              <span className="text-banana">{burnedBit}</span>
+            </p>
+            <p className="flex justify-between items-center">
+              <span>- HALVENING PERIOD:</span> 
+              <span className="text-banana">2,102,400 BLOCKS</span>
+            </p>
           </>
         )}
       </div>

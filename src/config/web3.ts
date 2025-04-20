@@ -1,9 +1,10 @@
 import { createConfig, http } from 'wagmi';
 import { QueryClient } from '@tanstack/react-query';
 import { coinbaseWallet, injected, walletConnect } from 'wagmi/connectors';
+import { mainnet } from 'wagmi/chains';
 
 // Define ApeChain as a custom chain
-const apechain = {
+export const apechain = {
   id: 33139,
   name: 'ApeChain',
   network: 'apechain',
@@ -24,7 +25,7 @@ const apechain = {
 
 // 1. Create wagmi config with enhanced mobile support
 export const config = createConfig({
-  chains: [apechain],
+  chains: [apechain, mainnet],
   connectors: [
     // Better MetaMask support with more detection options
     injected({
@@ -57,6 +58,7 @@ export const config = createConfig({
   ],
   transports: {
     [apechain.id]: http(),
+    [mainnet.id]: http(),
   },
 });
 

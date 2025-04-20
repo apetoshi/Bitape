@@ -1,9 +1,9 @@
 // Miner Types
 export enum MinerType {
-  BANANA_MINER = 1,
-  MONKEY_TOASTER = 3,
-  GORILLA_GADGET = 2,
-  APEPAD_MINI = 4,
+  BANANA_MINER = 1,  // Index 1: Starter miner
+  MONKEY_TOASTER = 2, // Index 2: Monkey Toaster (updated)
+  GORILLA_GADGET = 3, // Index 3: Gorilla Gadget (updated)
+  APEPAD_MINI = 4,    // Index 4: ApepadMini
 }
 
 // Miner Data Structure

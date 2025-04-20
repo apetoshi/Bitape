@@ -547,11 +547,11 @@ export function useGameState(): GameState {
       // Execute the transaction using wagmi's writeContract
       writeContract({
         address: CONTRACT_ADDRESSES.MAIN,
-        abi: MAIN_CONTRACT_ABI,
+        abi: MAIN_CONTRACT_ABI as any,
         functionName: 'purchaseInitialFacility',
         args: [zeroAddress],
         value: requiredBalance
-      }, {
+      } as any, {
         onSuccess: async (txHash) => {
           console.log('Facility purchase transaction submitted:', txHash);
           
