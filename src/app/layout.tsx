@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import '@/styles/globals.css';
 import Script from 'next/script';
+import Providers from '@/components/Providers';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -141,7 +142,9 @@ export default function RootLayout({
         </Script>
       </head>
       <body className={`${inter.className} bg-royal text-white overflow-x-hidden`}>
-        {children}
+        <Providers>
+          {children}
+        </Providers>
       </body>
     </html>
   );
