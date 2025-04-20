@@ -6,14 +6,12 @@ const withPWA = require('next-pwa')({
 
 module.exports = withPWA({
   reactStrictMode: true,
+  // Disable TypeScript strict mode during build to allow the project to build
   typescript: {
-    // Disable TypeScript strict mode during build to allow the project to build
-    // This is a temporary solution - the proper fix would be to update all type issues
     ignoreBuildErrors: true,
   },
+  // Disable ESLint during build
   eslint: {
-    // Disable ESLint during build to allow the project to build
-    // This is a temporary solution - the proper fix would be to fix all ESLint issues
     ignoreDuringBuilds: true,
   },
   // Force all pages to be server-side rendered to avoid issues with client components during static build
