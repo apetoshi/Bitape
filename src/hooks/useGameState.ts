@@ -5,13 +5,13 @@ import { MINERS, MinerType, MinerData } from '../config/miners';
 import { useEffect, useState } from 'react';
 
 interface PlayerFacility {
-  power: bigint;
-  level: bigint;
-  miners: bigint;
-  capacity: bigint;
-  used: bigint;
-  resources: bigint;
-  spaces: bigint;
+  facilityIndex: bigint;
+  maxMiners: bigint;
+  currMiners: bigint;
+  totalPowerOutput: bigint;
+  currPowerOutput: bigint;
+  x: bigint;
+  y: bigint;
 }
 
 interface PlayerStats {
@@ -33,6 +33,7 @@ export interface PlayerMiner {
   inProduction?: boolean;
   image?: string;
   type?: number;
+  name?: string;
 }
 
 export interface GameState {
@@ -111,6 +112,9 @@ export interface GameState {
   
   // Player miners
   miners: PlayerMiner[];
+
+  // Miner types directly from contract
+  minerTypesFromContract: Record<number, any>;
 }
 
 export function useGameState(): GameState {
@@ -137,7 +141,49 @@ export function useGameState(): GameState {
   const [totalBitEarned, setTotalBitEarned] = useState('0');
   const [miners, setMiners] = useState<PlayerMiner[]>([]);
   const [isPurchasingMiner, setIsPurchasingMiner] = useState(false);
+  const [forceRender, setForceRender] = useState(false);
 
+  // Track the current connected wallet to clear state on wallet changes
+  const [lastConnectedAddress, setLastConnectedAddress] = useState<string | undefined>(undefined);
+
+  // Clear state when wallet changes
+  useEffect(() => {
+    if (address && lastConnectedAddress && address !== lastConnectedAddress) {
+      console.log('Wallet changed, clearing state...');
+      // Reset all user-specific state
+      setHasFacility(false);
+      setMiners([]);
+      // Store new address
+      setLastConnectedAddress(address);
+      
+      // Clear any localStorage data from previous wallet
+      if (typeof window !== 'undefined') {
+        try {
+          // Clear any miner data for the previous wallet
+          const allKeys = Object.keys(localStorage);
+          const minerKeys = allKeys.filter(key => 
+            key.startsWith('miner_') || 
+            key.includes('_position') || 
+            key.includes('_purchased')
+          );
+          
+          for (const key of minerKeys) {
+            localStorage.removeItem(key);
+          }
+          console.log('Cleared miner data from localStorage for wallet change');
+        } catch (err) {
+          console.error('Error clearing localStorage during wallet change:', err);
+        }
+      }
+    } else if (address && !lastConnectedAddress) {
+      // First connection
+      setLastConnectedAddress(address);
+    }
+  }, [address, lastConnectedAddress]);
+
+  // Define the facility data state
+  const [facilityData, setFacilityData] = useState<PlayerFacility | null>(null);
+  
   // Contract reads
   const { data: gameActiveState } = useContractRead({
     address: CONTRACT_ADDRESSES.MAIN,
@@ -145,16 +191,6 @@ export function useGameState(): GameState {
     functionName: 'miningHasStarted',
     query: {
       enabled: true,
-    },
-  });
-
-  const { data: userActiveState } = useContractRead({
-    address: CONTRACT_ADDRESSES.MAIN,
-    abi: MAIN_CONTRACT_ABI,
-    functionName: 'initializedStarterFacility',
-    args: [address || zeroAddress],
-    query: {
-      enabled: !!address,
     },
   });
 
@@ -178,26 +214,16 @@ export function useGameState(): GameState {
     },
   });
 
-  // Get facility data
-  const { data: facilityData } = useContractRead({
+  // Direct contract read for facilityData using ownerToFacility
+  const { data: rawFacilityData, isLoading: isFacilityLoading, refetch: refetchFacility } = useContractRead({
     address: CONTRACT_ADDRESSES.MAIN,
     abi: MAIN_CONTRACT_ABI,
-    functionName: 'getPlayerFacility',
+    functionName: 'ownerToFacility',
     args: [address || zeroAddress],
     query: {
-      enabled: !!address,
-    },
-  }) as { data: PlayerFacility | undefined };
-
-  // Check if player has initialized facility
-  const { data: hasInitializedFacility, refetch: refetchInitialized } = useContractRead({
-    address: CONTRACT_ADDRESSES.MAIN,
-    abi: MAIN_CONTRACT_ABI,
-    functionName: 'initializedStarterFacility',
-    args: [address as `0x${string}`],
-    query: {
-      enabled: !!address,
-    },
+      enabled: Boolean(address),
+      refetchInterval: 10000, // Refetch every 10 seconds
+    }
   });
 
   // Get referral info
@@ -210,6 +236,70 @@ export function useGameState(): GameState {
       enabled: !!address,
     },
   });
+
+  // Process facility data from contract - THIS IS NOW THE SINGLE SOURCE OF TRUTH FOR FACILITY OWNERSHIP
+  useEffect(() => {
+    if (rawFacilityData) {
+      try {
+        console.log('🔍 GameState - Raw facility data received:', rawFacilityData);
+        
+        if (Array.isArray(rawFacilityData) && rawFacilityData.length >= 7) {
+          // Log each field with its name for debugging
+          console.log('ownerToFacility fields:');
+          console.log('facilityIndex:', Number(rawFacilityData[0]));
+          console.log('maxMiners:', Number(rawFacilityData[1]));
+          console.log('currMiners:', Number(rawFacilityData[2]));
+          console.log('totalPowerOutput:', Number(rawFacilityData[3]));
+          console.log('currPowerOutput:', Number(rawFacilityData[4]));
+          console.log('x:', Number(rawFacilityData[5]));
+          console.log('y:', Number(rawFacilityData[6]));
+          
+          // [facilityIndex, maxMiners, currMiners, totalPowerOutput, currPowerOutput, x, y]
+          const facilityProcessed = {
+            facilityIndex: Number(rawFacilityData[0]),
+            maxMiners: Number(rawFacilityData[1]),
+            currMiners: Number(rawFacilityData[2]),
+            totalPowerOutput: Number(rawFacilityData[3]),
+            currPowerOutput: Number(rawFacilityData[4]),
+            x: Number(rawFacilityData[5]),
+            y: Number(rawFacilityData[6])
+          };
+          
+          console.log('📊 GameState - Processed facility data:', facilityProcessed);
+          
+          // Update facility data in state
+          setFacilityData({
+            facilityIndex: BigInt(facilityProcessed.facilityIndex),
+            maxMiners: BigInt(facilityProcessed.maxMiners),
+            currMiners: BigInt(facilityProcessed.currMiners),
+            totalPowerOutput: BigInt(facilityProcessed.totalPowerOutput),
+            currPowerOutput: BigInt(facilityProcessed.currPowerOutput),
+            x: BigInt(facilityProcessed.x),
+            y: BigInt(facilityProcessed.y)
+          });
+          
+          // If we have a facility, mark as true (facilityIndex > 0)
+          const userHasFacility = facilityProcessed.facilityIndex > 0;
+          setHasFacility(userHasFacility);
+          
+          if (userHasFacility) {
+            console.log('✅ User has a facility with index:', facilityProcessed.facilityIndex);
+          } else {
+            console.log('❌ User does not have a facility (facilityIndex is 0)');
+          }
+        } else {
+          console.warn('⚠️ GameState - Facility data format unexpected:', rawFacilityData);
+          setHasFacility(false);
+        }
+      } catch (error) {
+        console.error('🛑 GameState - Error processing facility data:', error);
+        setHasFacility(false);
+      }
+    } else {
+      console.warn('⚠️ GameState - No facility data received from ownerToFacility call');
+      setHasFacility(false);
+    }
+  }, [rawFacilityData, address]);
 
   // Get player stats
   const { data: playerStats, refetch: refetchStats } = useContractRead({
@@ -244,6 +334,163 @@ export function useGameState(): GameState {
     },
   });
 
+  // Get miner types directly from contract
+  const { data: miner1Data } = useContractRead({
+    address: CONTRACT_ADDRESSES.MAIN,
+    abi: MAIN_CONTRACT_ABI,
+    functionName: 'miners',
+    args: [BigInt(1)], // Get BANANA_MINER data (type 1)
+    query: {
+      enabled: !!address,
+    }
+  });
+
+  const { data: miner2Data } = useContractRead({
+    address: CONTRACT_ADDRESSES.MAIN,
+    abi: MAIN_CONTRACT_ABI,
+    functionName: 'miners',
+    args: [BigInt(2)], // Get MONKEY_TOASTER data (type 2)
+    query: {
+      enabled: !!address,
+    }
+  });
+
+  const { data: miner3Data } = useContractRead({
+    address: CONTRACT_ADDRESSES.MAIN,
+    abi: MAIN_CONTRACT_ABI,
+    functionName: 'miners',
+    args: [BigInt(3)], // Get GORILLA_GADGET data (type 3)
+    query: {
+      enabled: !!address,
+    }
+  });
+
+  // Store contract miner type data
+  const [minerTypesFromContract, setMinerTypesFromContract] = useState<Record<number, any>>({});
+
+  // Process miner type data from direct contract reads
+  useEffect(() => {
+    const minerTypes: Record<number, any> = {};
+    
+    // Process miner type 1 (BANANA_MINER)
+    if (miner1Data) {
+      minerTypes[1] = {
+        minerIndex: Number(miner1Data[0] || 0),
+        hashrate: Number(miner1Data[4] || 0),
+        powerConsumption: Number(miner1Data[5] || 0),
+        cost: Number(miner1Data[6] || 0),
+        inProduction: Boolean(miner1Data[7] || false),
+      };
+      console.log('Loaded BANANA_MINER data from contract:', minerTypes[1]);
+    }
+    
+    // Process miner type 2 (MONKEY_TOASTER)
+    if (miner2Data) {
+      minerTypes[2] = {
+        minerIndex: Number(miner2Data[0] || 0),
+        hashrate: Number(miner2Data[4] || 0),
+        powerConsumption: Number(miner2Data[5] || 0),
+        cost: Number(miner2Data[6] || 0),
+        inProduction: Boolean(miner2Data[7] || false),
+      };
+      console.log('Loaded MONKEY_TOASTER data from contract:', minerTypes[2]);
+    }
+    
+    // Process miner type 3 (GORILLA_GADGET)
+    if (miner3Data) {
+      minerTypes[3] = {
+        minerIndex: Number(miner3Data[0] || 0),
+        hashrate: Number(miner3Data[4] || 0),
+        powerConsumption: Number(miner3Data[5] || 0),
+        cost: Number(miner3Data[6] || 0),
+        inProduction: Boolean(miner3Data[7] || false),
+      };
+      console.log('Loaded GORILLA_GADGET data from contract:', minerTypes[3]);
+    }
+    
+    setMinerTypesFromContract(minerTypes);
+  }, [miner1Data, miner2Data, miner3Data]);
+
+  // Process miner data from contract
+  useEffect(() => {
+    const fetchMinersData = async () => {
+      if (!address || !playerMiners || !Array.isArray(playerMiners) || playerMiners.length === 0) {
+        console.log('No miners to fetch or user not connected');
+        setMiners([]);
+        return;
+      }
+      
+      console.log('Found player miners:', playerMiners.length);
+      
+      try {
+        // Since getPlayerMinersPaginated already returns full miner data, we can parse it directly
+        const minersList: PlayerMiner[] = playerMiners.map((miner: any, index: number) => {
+          // Important: Make sure we're interpreting the minerIndex field correctly
+          // Based on user info, minerType 1 = Banana Miner, minerType 2 = Monkey Toaster
+          const minerType = Number(miner.minerIndex || 1);
+          // Enhance with contract data if available
+          const contractData = minerTypesFromContract[minerType];
+          
+          console.log(`Processing miner ${index}:`, miner);
+          console.log(`Miner type from contract: ${minerType}`);
+          
+          // Get associated data from our config
+          const minerConfig = MINERS[minerType];
+          const minerImage = minerConfig?.image || '/banana-miner.gif';
+          const minerName = minerConfig?.name || (minerType === 1 ? 'BANANA MINER' : 
+                           (minerType === 2 ? 'MONKEY TOASTER' : 
+                           (minerType === 3 ? 'GORILLA GADGET' : 'UNKNOWN')));
+          
+          console.log(`Miner name from config: ${minerName}`);
+          
+          return {
+            id: Number(miner.id || index),
+            minerType: minerType,
+            x: Number(miner.x || 0),
+            y: Number(miner.y || 0),
+            hashrate: Number(contractData?.hashrate || (minerConfig?.hashrate || 0)),
+            powerConsumption: Number(contractData?.powerConsumption || (minerConfig?.energyConsumption || 0)),
+            cost: Number(contractData?.cost || (minerConfig?.price || 0)),
+            inProduction: Boolean(miner.inProduction),
+            // Add miner image based on type
+            image: minerImage,
+            name: minerName
+          };
+        });
+        
+        console.log('Processed miners:', minersList);
+        setMiners(minersList);
+      } catch (error) {
+        console.error('Error processing miner data:', error);
+        setMiners([]);
+      }
+    };
+    
+    // Call the fetch function
+    fetchMinersData();
+  }, [address, playerMiners, hasFacility, minerTypesFromContract]);
+
+  // Add debug function to print miner information
+  useEffect(() => {
+    if (miners.length > 0) {
+      console.log('========= MINER INFORMATION (DEBUG) =========');
+      console.log(`Total miners: ${miners.length}`);
+      
+      miners.forEach((miner, index) => {
+        console.log(`Miner #${index + 1}:`);
+        console.log(`- ID: ${miner.id}`);
+        console.log(`- Type: ${miner.minerType} (${miner.name || 'Unknown'})`);
+        console.log(`- Position: (${miner.x}, ${miner.y})`);
+        console.log(`- Hashrate: ${miner.hashrate} GH/s`);
+        console.log(`- Power: ${miner.powerConsumption} GW`);
+        console.log(`- In Production: ${miner.inProduction ? 'Yes' : 'No'}`);
+        console.log(`- Image: ${miner.image}`);
+      });
+      
+      console.log('============================================');
+    }
+  }, [miners]);
+
   // Update state when data changes
   useEffect(() => {
     if (apeBalanceData) {
@@ -257,29 +504,102 @@ export function useGameState(): GameState {
     }
   }, [bitBalanceData]);
   
-  useEffect(() => {
-    if (hasInitializedFacility !== undefined) {
-      setHasFacility(!!hasInitializedFacility);
-    }
-  }, [hasInitializedFacility]);
-
   // Contract write functions
   const { writeContract } = useWriteContract();
 
   const handlePurchaseFacility = async () => {
+    if (!address) {
+      console.error('Cannot purchase facility: wallet not connected');
+      alert('Please connect your wallet to purchase a facility');
+      return;
+    }
+
     try {
+      console.log('Starting facility purchase transaction...');
       setIsPurchasingFacility(true);
-      await writeContract({
+      
+      // Validate APE balance first
+      const requiredBalance = parseEther('0.005');
+      const currentBalance = apeBalanceData?.value || BigInt(0);
+      
+      if (currentBalance < requiredBalance) {
+        console.error(`Insufficient APE balance: have ${formatEther(currentBalance)}, need 0.005`);
+        alert('You need at least 0.005 APE to purchase a facility');
+        return;
+      }
+      
+      // Verify we're on ApeChain
+      if (publicClient?.chain?.id !== APECHAIN_ID) {
+        console.error(`Wrong network: connected to ${publicClient?.chain?.name} but need ApeChain`);
+        alert('Please switch to ApeChain network to purchase a facility');
+        return;
+      }
+
+      // Log transaction details for debugging
+      console.log('Facility purchase transaction details:', {
+        contractAddress: CONTRACT_ADDRESSES.MAIN,
+        function: 'purchaseInitialFacility',
+        args: [zeroAddress],
+        value: formatEther(requiredBalance),
+        userAddress: address
+      });
+      
+      // Execute the transaction using wagmi's writeContract
+      writeContract({
         address: CONTRACT_ADDRESSES.MAIN,
         abi: MAIN_CONTRACT_ABI,
         functionName: 'purchaseInitialFacility',
         args: [zeroAddress],
-        value: parseEther('0.005')
+        value: requiredBalance
+      }, {
+        onSuccess: async (txHash) => {
+          console.log('Facility purchase transaction submitted:', txHash);
+          
+          // Wait for the transaction receipt to confirm success
+          if (publicClient) {
+            console.log('Waiting for transaction confirmation...');
+            try {
+              const receipt = await publicClient.waitForTransactionReceipt({
+                hash: txHash
+              });
+              
+              console.log('Facility purchase confirmed:', receipt);
+              
+              // Force refresh state to reflect the new facility
+              await refetchStats();
+              await refetchFacility();
+              
+              // Update local state immediately without waiting for contract read
+              setHasFacility(true);
+              
+              alert('Facility purchased successfully! You can now start mining.');
+            } catch (receiptError) {
+              console.error('Failed to get transaction receipt:', receiptError);
+            } finally {
+              setIsPurchasingFacility(false);
+            }
+          }
+        },
+        onError: (error) => {
+          console.error('Error purchasing facility:', error);
+          
+          // User-friendly error messages
+          if (error.message?.includes('user rejected')) {
+            alert('Transaction cancelled by user');
+          } else if (error.message?.includes('insufficient funds')) {
+            alert('Insufficient funds for transaction. You need 0.005 APE plus gas fees.');
+          } else if (error.message?.includes('gas')) {
+            alert('Gas estimation failed. Please try again with more APE for gas fees.');
+          } else {
+            alert(`Failed to purchase facility: ${error.message || 'Unknown error'}`);
+          }
+          
+          setIsPurchasingFacility(false);
+        }
       });
-      await refetchStats();
-    } catch (error) {
-      console.error('Error purchasing facility:', error);
-    } finally {
+    } catch (error: any) {
+      console.error('Unexpected error during facility purchase:', error);
+      alert(`An unexpected error occurred. Please try again later.`);
       setIsPurchasingFacility(false);
     }
   };
@@ -324,17 +644,58 @@ export function useGameState(): GameState {
 
     try {
       setIsGettingStarterMiner(true);
-      await writeContract({
+      
+      // Submit transaction but don't show success yet
+      writeContract({
         address: CONTRACT_ADDRESSES.MAIN,
         abi: MAIN_CONTRACT_ABI,
         functionName: 'getFreeStarterMiner',
         args: [BigInt(x), BigInt(y)],
+      }, {
+        onSuccess: async (txHash) => {
+          console.log('Starter miner transaction submitted:', txHash);
+          
+          // Wait for confirmation before showing success
+          if (publicClient) {
+            try {
+              const receipt = await publicClient.waitForTransactionReceipt({
+                hash: txHash
+              });
+              
+              console.log('Starter miner transaction confirmed:', receipt);
+              
+              // Only now show success message
+              alert('Starter miner claimed successfully!');
+              
+              // Update data after success
+              await refetchStarterMiner();
+              await refetchMinerIds();
+            } catch (error) {
+              console.error('Error waiting for starter miner confirmation:', error);
+              alert('Error confirming starter miner. Please check your wallet for status.');
+            } finally {
+              setIsGettingStarterMiner(false);
+            }
+          }
+        },
+        onError: (error) => {
+          console.error('Error claiming starter miner:', error);
+          
+          // Show user-friendly error
+          if (error.message?.includes('user rejected')) {
+            alert('Transaction cancelled by user');
+          } else if (error.message?.includes('insufficient funds')) {
+            alert('Insufficient funds for gas. Please make sure you have enough APE for transaction fees.');
+          } else {
+            alert(`Failed to claim starter miner: ${error.message || 'Unknown error'}`);
+          }
+          
+          setIsGettingStarterMiner(false);
+        }
       });
-      await refetchStarterMiner();
-      await refetchMinerIds();
     } catch (error) {
-      console.error('Error claiming starter miner:', error);
-    } finally {
+      console.error('Error preparing starter miner transaction:', error);
+      alert('Failed to prepare starter miner transaction. Please try again.');
       setIsGettingStarterMiner(false);
     }
   };
@@ -348,44 +709,6 @@ export function useGameState(): GameState {
     }
   }, [referralData]);
 
-  // Process miner data - completely revise to use the two-step fetch process
-  useEffect(() => {
-    const fetchMinersData = async () => {
-      if (!address || !playerMiners || !Array.isArray(playerMiners) || playerMiners.length === 0) {
-        console.log('No miners to fetch or user not connected');
-        setMiners([]);
-        return;
-      }
-      
-      console.log('Found player miners:', playerMiners.length);
-      
-      try {
-        // Since getPlayerMinersPaginated already returns full miner data, we can parse it directly
-        const minersList: PlayerMiner[] = playerMiners.map((miner: any) => ({
-          id: Number(miner.id),
-          minerType: Number(miner.minerIndex),
-          x: Number(miner.x),
-          y: Number(miner.y),
-          hashrate: Number(miner.hashrate),
-          powerConsumption: Number(miner.powerConsumption),
-          cost: Number(miner.cost),
-          inProduction: miner.inProduction,
-          // Add miner image based on type
-          image: MINERS[Number(miner.minerIndex) as MinerType]?.image || '',
-        }));
-        
-        console.log('Processed miners:', minersList);
-        setMiners(minersList);
-      } catch (error) {
-        console.error('Error fetching miner data:', error);
-        setMiners([]);
-      }
-    };
-    
-    // Call the fetch function
-    fetchMinersData();
-  }, [address, playerMiners, hasFacility]);
-
   // Make refetchMiners include the new IDs fetch + individual miners fetch
   const refetchMiners = async () => {
     console.log('Refetching all miner data...');
@@ -394,7 +717,11 @@ export function useGameState(): GameState {
 
   // Add purchase miner function
   const handlePurchaseMiner = async (minerType: MinerType, x: number, y: number) => {
-    if (!address) return;
+    if (!address) {
+      console.error('Cannot purchase miner: wallet not connected');
+      alert('Please connect your wallet to purchase a miner');
+      return;
+    }
     
     try {
       console.log(`=== MINER PURCHASE FLOW STARTED ===`);
@@ -404,9 +731,28 @@ export function useGameState(): GameState {
       
       setIsPurchasingMiner(true);
       
+      // Validate contract addresses first to prevent undefined errors
+      if (!BIT_TOKEN_ADDRESS) {
+        throw new Error('BIT token address is not defined');
+      }
+      
+      if (!CONTRACT_ADDRESSES.MAIN) {
+        throw new Error('Main contract address is not defined');
+      }
+      
+      // Verify we're on ApeChain
+      if (publicClient?.chain?.id !== APECHAIN_ID) {
+        console.error(`Wrong network: connected to ${publicClient?.chain?.name} but need ApeChain`);
+        alert('Please switch to ApeChain network to purchase a miner');
+        setIsPurchasingMiner(false);
+        return;
+      }
+      
       // Validate that user has a facility
       if (!hasFacility) {
         console.error('You must purchase a facility before buying miners');
+        alert('You need to purchase a facility before buying miners. Please buy a facility first.');
+        setIsPurchasingMiner(false);
         return;
       }
       
@@ -418,190 +764,241 @@ export function useGameState(): GameState {
       }
       
       // For paid miners
-      const minerPrice = MINERS[minerType].price.toString();
+      const minerConfig = MINERS[minerType];
+      console.log(`Miner config for type ${minerType}:`, minerConfig);
+      
+      // Log miner type information
+      if (minerType === MinerType.BANANA_MINER) {
+        console.log('Purchasing a BANANA MINER (Type 1)');
+      } else if (minerType === MinerType.MONKEY_TOASTER) {
+        console.log('Purchasing a MONKEY TOASTER (Type 2)');
+      } else if (minerType === MinerType.GORILLA_GADGET) {
+        console.log('Purchasing a GORILLA GADGET (Type 3)');
+      }
+      
+      const minerPrice = minerConfig.price.toString();
       const formattedPrice = parseEther(minerPrice);
       
       console.log(`=== MINER TRANSACTION INFO ===`);
-      // Print the contract interface for debugging
-      console.log(`Contract ABI functions:`, MAIN_CONTRACT_ABI
-        .filter(item => item.type === 'function')
-        .map(item => item.name)
-      );
+      console.log(`Miner price: ${minerPrice} BIT (${formattedPrice} wei)`);
       
-      // Skip approval check for free miners
+      // Check if user has enough BIT tokens
+      const bitBalanceBigInt = bitBalanceData ? (bitBalanceData as bigint) : BigInt(0);
+      if (bitBalanceBigInt < formattedPrice) {
+        console.error(`Insufficient BIT balance: have ${formatEther(bitBalanceBigInt)}, need ${minerPrice}`);
+        alert(`You don't have enough BIT tokens. You need ${minerPrice} BIT to purchase this miner.`);
+        setIsPurchasingMiner(false);
+        return;
+      }
+      
+      // Check and handle token approval for paid miners
       if (minerPrice !== '0') {
         console.log(`=== CHECKING TOKEN APPROVAL ===`);
-        console.log(`Miner price: ${minerPrice} BIT (${formattedPrice} wei)`);
         
         // IMPORTANT: Make sure we have publicClient before proceeding
         if (!publicClient) {
           throw new Error('Public client not available, cannot check allowance');
         }
         
+        // First check current allowance
         try {
-          // CRITICAL: Wait for the allowance call to complete before proceeding
-          // Use the complete BITAPE_TOKEN_ABI that has the proper allowance function
           const allowanceResult = await publicClient.readContract({
-            address: BIT_TOKEN_ADDRESS,
-            abi: BIT_TOKEN_ABI,  // Changed from BITAPE_TOKEN_ABI to BIT_TOKEN_ABI
+            address: BIT_TOKEN_ADDRESS as `0x${string}`,
+            abi: BIT_TOKEN_ABI,
             functionName: 'allowance',
-            args: [address as `0x${string}`, CONTRACT_ADDRESSES.MAIN]
+            args: [address as `0x${string}`, CONTRACT_ADDRESSES.MAIN as `0x${string}`]
           });
           
           const currentAllowance = allowanceResult as bigint;
           console.log(`Current token allowance: ${formatEther(currentAllowance)} BIT`);
-          console.log(`Required allowance: ${formatEther(formattedPrice)} BIT`);
           
-          // Strict comparison to ensure we only approve if absolutely necessary
-          // Add a small buffer to avoid unnecessary approvals
+          // If allowance is insufficient, request approval first
           if (currentAllowance < formattedPrice) {
-            console.log(`=== TOKEN APPROVAL NEEDED ===`);
-            console.log(`Approving ${minerPrice} BIT for spending`);
+            console.log('Insufficient allowance. Requesting approval first...');
             
-            // First approve the token spending - using the same ABI for consistency
-            const approvalTx = await writeContract({
-              address: BIT_TOKEN_ADDRESS, 
-              abi: BIT_TOKEN_ABI,  // Changed from BITAPE_TOKEN_ABI to BIT_TOKEN_ABI
+            // Use a safe approval amount (100 BIT)
+            const safeApprovalAmount = parseEther('100');
+            
+            // Request token approval
+            writeContract({
+              address: BIT_TOKEN_ADDRESS as `0x${string}`,
+              abi: BIT_TOKEN_ABI,
               functionName: 'approve',
-              args: [CONTRACT_ADDRESSES.MAIN, formattedPrice]
+              args: [CONTRACT_ADDRESSES.MAIN as `0x${string}`, safeApprovalAmount]
+            }, {
+              onSuccess: async (txHash) => {
+                console.log('Approval transaction submitted:', txHash);
+                
+                try {
+                  // Wait for approval to be confirmed
+                  const receipt = await publicClient.waitForTransactionReceipt({
+                    hash: txHash
+                  });
+                  
+                  console.log('Approval confirmed:', receipt);
+                  
+                  // Now proceed with the purchase
+                  purchaseMinerAfterApproval(minerType, x, y);
+                } catch (error) {
+                  console.error('Error waiting for approval confirmation:', error);
+                  alert('There was an error confirming your approval transaction. Please try again.');
+                  setIsPurchasingMiner(false);
+                }
+              },
+              onError: (error) => {
+                console.error('Error approving token spend:', error);
+                alert('Failed to approve BIT token spending: ' + error.message);
+                setIsPurchasingMiner(false);
+              }
             });
-            
-            console.log(`Token approval transaction submitted: ${approvalTx}`);
-            
-            // Wait for approval transaction confirmation
-            console.log(`Waiting for approval transaction confirmation...`);
-            await new Promise(resolve => setTimeout(resolve, 8000));
-            
-            console.log(`Token approval should be complete, proceeding to purchase`);
           } else {
-            console.log(`Token already has sufficient allowance - SKIPPING APPROVAL`);
+            // Allowance is sufficient, proceed with purchase
+            console.log('Token allowance is sufficient. Proceeding with purchase...');
+            purchaseMinerAfterApproval(minerType, x, y);
           }
-        } catch (allowanceError) {
-          console.error(`Error checking token allowance:`, allowanceError);
-          throw new Error(`Failed to check token allowance: ${allowanceError instanceof Error ? allowanceError.message : 'Unknown error'}`);
+        } catch (error) {
+          console.error('Error checking allowance:', error);
+          alert('Failed to check your token allowance. Please try again.');
+          setIsPurchasingMiner(false);
         }
+      } else {
+        // Free miner (should not reach here, as free miners are handled above)
+        console.log('Free miner detected, proceeding with purchase...');
+        purchaseMinerAfterApproval(minerType, x, y);
       }
-      
-      // Now proceed with the buyMiner transaction - use exact name from ABI
-      console.log(`=== EXECUTING MINER PURCHASE ===`);
-      
-      // Debug the actual function we're going to call
-      const minerFunction = MAIN_CONTRACT_ABI.find(item => 
-        item.type === 'function' && item.name === 'buyMiner'
-      );
-      console.log('Found function in ABI:', minerFunction);
-      
-      // Ensure we're using the correct 1-based miner index values
-      console.log(`Selected Miner Type:`, {
-        minerType,
-        minerEnumValue: MinerType[minerType],
-        minerDisplayName: MINERS[minerType].name,
-        contractIndex: Number(minerType) // This is now correctly 1-based
-      });
-      
-      // Convert parameters - Use the MinerType enum value directly as the index since it's now 1-based
-      const minerIndex = BigInt(minerType);
-      const xPos = BigInt(x);
-      const yPos = BigInt(y);
-      
-      // Log the expected hex representation of the calldata (for debugging)
-      console.log(`Function selector: 0x476e2e66 (buyMiner)`);
-      console.log(`Expected calldata pattern: 0x476e2e66...${minerIndex.toString().padStart(8, '0')}...${xPos.toString().padStart(8, '0')}...${yPos.toString().padStart(8, '0')}`);
-      
-      console.log(`Calling contract with exact parameters:`, {
-        contract: CONTRACT_ADDRESSES.MAIN,
-        function: 'buyMiner',
-        minerIndex: minerIndex.toString(), 
-        minerName: MINERS[minerType].name,
-        minerType,
-        x: xPos.toString(), 
-        y: yPos.toString()
-      });
-      
-      // Double-check the MinerType enum matches expected contract values
-      console.log(`MinerType Contract Validation: BANANA_MINER=${MinerType.BANANA_MINER}, MONKEY_TOASTER=${MinerType.MONKEY_TOASTER}, GORILLA_GADGET=${MinerType.GORILLA_GADGET}, APEPAD_MINI=${MinerType.APEPAD_MINI}`);
-      
-      // Execute the transaction with explicit logging
-      const buyTx = await writeContract({
-        address: CONTRACT_ADDRESSES.MAIN,
-        abi: MAIN_CONTRACT_ABI,
-        functionName: 'buyMiner',
-        args: [minerIndex, xPos, yPos]
-      });
-      
-      console.log(`Miner purchase transaction hash: ${buyTx}`);
-      console.log(`=== MINER PURCHASE COMPLETED ===`);
-      
-      // Refetch all relevant data
-      console.log(`Refreshing game state data...`);
-      
-      // Wait for the transaction to be confirmed before refetching
-      console.log(`Waiting for transaction confirmation and blockchain updates...`);
-      // Add a delay to ensure blockchain has time to update
-      await new Promise(resolve => setTimeout(resolve, 10000));
-      
-      // Now refetch all data with explicit logging
-      console.log(`Refetching player stats...`);
-      await refetchStats();
-      
-      console.log(`Refetching miner data...`);
-      await refetchMiners();
-      
-      // Add another delay then refetch again to ensure we get the latest data
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      console.log(`Performing second refetch of miner data...`);
-      await refetchMiners();
-      
-      console.log(`All data refreshed. Current miners:`, miners);
-      
-      // Force a page refresh if the miners array is still empty
-      if (miners.length === 0) {
-        console.log(`Warning: Miners array is still empty after refresh. Suggesting manual page refresh.`);
-        if (typeof window !== 'undefined') {
-          console.log(`You may need to refresh the page to see your new miner.`);
-        }
-      }
-    } catch (error) {
-      // Better error handling
-      const errorDetails = {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        name: error instanceof Error ? error.name : 'Unknown error type',
-        details: JSON.stringify(error, (key, value) => 
-          typeof value === 'bigint' ? value.toString() : value, 2)
-      };
-      
-      console.error(`ERROR IN MINER PURCHASE FLOW:`, errorDetails);
-      throw error; // Re-throw to let UI handle it
-    } finally {
+    } catch (error: any) {
+      console.error('Error during miner purchase flow:', error);
+      alert(`Error purchasing miner: ${error.message || 'Unknown error'}`);
       setIsPurchasingMiner(false);
     }
   };
+  
+  // Helper function to handle the actual miner purchase after approval
+  const purchaseMinerAfterApproval = (minerType: MinerType, x: number, y: number) => {
+    console.log(`Executing miner purchase for type ${minerType} at (${x}, ${y})`);
+    
+    writeContract({
+      address: CONTRACT_ADDRESSES.MAIN,
+      abi: MAIN_CONTRACT_ABI,
+      functionName: 'buyMiner',
+      args: [BigInt(minerType), BigInt(x), BigInt(y)]
+    }, {
+      onSuccess: async (txHash) => {
+        console.log('Miner purchase transaction submitted:', txHash);
+        
+        try {
+          if (publicClient) {
+            const receipt = await publicClient.waitForTransactionReceipt({
+              hash: txHash
+            });
+            
+            console.log('Miner purchase confirmed:', receipt);
+            
+            // Update data after successful purchase
+            console.log('Updating game state after miner purchase...');
+            
+            // Add miner to local cache for UI consistency
+            if (address) {
+              // Create a new PlayerMiner object that matches the interface
+              const newMiner: PlayerMiner = {
+                id: `miner-${Date.now()}`, // Generate a unique ID
+                minerType: minerType,
+                x: x,
+                y: y,
+                hashrate: MINERS[minerType]?.hashrate,
+                powerConsumption: MINERS[minerType]?.energyConsumption,
+                cost: MINERS[minerType]?.price,
+                type: minerType
+              };
+              
+              // Update miners array locally
+              setMiners(prev => [...prev, newMiner]);
+            }
+            
+            // Refresh all data
+            await refetchMiners();
+            await refetchStats();
+            
+            // Update UI to show the new miner
+            alert('Miner purchased successfully!');
+            
+            // Force re-render of the game grid
+            setForceRender(prev => !prev);
+          }
+        } catch (error) {
+          console.error('Error confirming miner purchase:', error);
+        } finally {
+          setIsPurchasingMiner(false);
+        }
+      },
+      onError: (error) => {
+        console.error('Error purchasing miner:', error);
+        
+        // Show user-friendly error
+        if (error.message?.includes('user rejected')) {
+          alert('Transaction cancelled by user');
+        } else if (error.message?.includes('insufficient funds')) {
+          alert('Insufficient funds for gas. Please make sure you have enough APE for transaction fees.');
+        } else if (error.message?.includes('facility')) {
+          alert('You need a facility to place miners. Please purchase a facility first.');
+        } else if (error.message?.includes('tile occupied')) {
+          alert('This tile is already occupied. Please select an empty tile.');
+        } else {
+          alert(`Failed to purchase miner: ${error.message || 'Unknown error'}`);
+        }
+        
+        setIsPurchasingMiner(false);
+      }
+    });
+  };
 
-  return {
+  const refetchAll = () => {
+    console.log('Refetching all game state data...');
+    refetchFacility();
+    refetchStats();
+    refetchStarterMiner();
+    refetchMinerIds();
+  };
+
+  // Add a final check before return to ensure hardcoded values are used
+  const finalGameState = {
+    // User state
     isConnected,
     address,
+    
+    // Resources - Use real data from contract
     apeBalance,
     bitBalance,
-    spacesLeft,
-    gigawattsAvailable,
+    spacesLeft: facilityData ? 
+      Number(facilityData.maxMiners) - Number(facilityData.currMiners) : 0,
+    gigawattsAvailable: facilityData ? 
+      Number(facilityData.totalPowerOutput) - Number(facilityData.currPowerOutput) : 0,
+    
+    // Mining stats
     miningRate,
     hashRate,
     blocksUntilHalving,
     networkHashRatePercentage,
     totalNetworkHashRate,
+    
+    // Network stats
     totalMinedBit: playerStats ? playerStats[0].toString() : '0',
     burnedBit: '1,238,626.5',
     rewardPerBlock: '2.5',
+    
+    // Mining rewards
     minedBit,
-    hasFacility,
+    
+    // Facility state - Use actual contract data
+    hasFacility, // Use the real value from contract
     facilityData: facilityData ? {
-      power: Number(facilityData.power),
-      level: Number(facilityData.level),
-      miners: Number(facilityData.miners),
-      capacity: Number(facilityData.capacity),
-      used: Number(facilityData.used),
-      resources: Number(facilityData.resources),
-      spaces: Number(facilityData.spaces),
+      power: Number(facilityData.totalPowerOutput),
+      level: Number(facilityData.facilityIndex),
+      miners: Number(facilityData.currMiners),
+      capacity: Number(facilityData.maxMiners),
+      used: Number(facilityData.currPowerOutput),
+      resources: 0,
+      spaces: Number(facilityData.maxMiners) - Number(facilityData.currMiners)
     } : null,
     stats: playerStats ? {
       totalMined: playerStats[0],
@@ -614,32 +1011,50 @@ export function useGameState(): GameState {
       miningRate: BigInt(0),
       networkShare: BigInt(0),
     },
+    
+    // Actions
     purchaseFacility: handlePurchaseFacility,
     getStarterMiner: handleGetStarterMiner,
+    purchaseMiner: handlePurchaseMiner,
     claimReward: handleClaimRewards,
     upgradeFacility: handleUpgradeFacility,
+    
+    // Loading states
     isPurchasingFacility,
     isGettingStarterMiner,
+    isPurchasingMiner,
     isClaimingReward,
     isUpgradingFacility: isUpgrading,
-    isGameActive: !!gameActiveState,
-    isUserActive: !!userActiveState,
+
+    // Game status
+    isGameActive: Boolean(gameActiveState),
+    isUserActive: Boolean(gameActiveState),
+
     totalReferrals,
     totalBitEarned,
-    refetch: () => {
-      refetchInitialized();
-      refetchStats();
-      refetchMiners();
-    },
+    refetch: refetchAll,
+
+    // Referral info
     referralInfo: {
       referralCode: address ? address.slice(2, 8).toUpperCase() : '',
       totalReferrals: Number(totalReferrals),
       rewardsEarned: totalBitEarned,
     },
-    initialFacilityPrice: '0.005',
-    hasClaimedStarterMiner: !!hasClaimedStarterMiner,
-    purchaseMiner: handlePurchaseMiner,
-    isPurchasingMiner,
-    miners,
+
+    // Facility price
+    initialFacilityPrice: '5',
+
+    // Miner status
+    hasClaimedStarterMiner: Boolean(hasClaimedStarterMiner),
+    
+    // Player miners - ONLY return actual miners, no default dummy miners
+    miners: miners,
+
+    // Miner types from contract
+    minerTypesFromContract
   };
+
+  console.log('🔄 RETURNING GameState with facilityData:', finalGameState.facilityData);
+  console.log('🔄 RETURNING GameState with miners count:', miners.length, 'hasClaimedStarterMiner:', Boolean(hasClaimedStarterMiner));
+  return finalGameState;
 }
