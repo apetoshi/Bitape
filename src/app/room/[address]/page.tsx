@@ -96,6 +96,10 @@ declare global {
   }
 }
 
+// This disables static generation
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 export default function RoomPage() {
   const params = useParams();
   const router = useRouter();
