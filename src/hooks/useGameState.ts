@@ -507,6 +507,22 @@ export function useGameState(): GameState {
   // Contract write functions
   const { writeContract } = useWriteContract();
 
+  // Monitor wallet connection status changes
+  useEffect(() => {
+    // When wallet connection state changes
+    if (isConnected) {
+      console.log('Wallet connected:', address);
+    } else {
+      console.log('Wallet disconnected');
+      // Clear any pending transaction states
+      setIsPurchasingFacility(false);
+      setIsGettingStarterMiner(false);
+      setIsPurchasingMiner(false);
+      setIsClaimingReward(false);
+      setIsUpgrading(false);
+    }
+  }, [isConnected, address]);
+
   const handlePurchaseFacility = async () => {
     if (!address) {
       console.error('Cannot purchase facility: wallet not connected');
@@ -525,6 +541,7 @@ export function useGameState(): GameState {
       if (currentBalance < requiredBalance) {
         console.error(`Insufficient APE balance: have ${formatEther(currentBalance)}, need 0.005`);
         alert('You need at least 0.005 APE to purchase a facility');
+        setIsPurchasingFacility(false);
         return;
       }
       
@@ -532,74 +549,77 @@ export function useGameState(): GameState {
       if (publicClient?.chain?.id !== APECHAIN_ID) {
         console.error(`Wrong network: connected to ${publicClient?.chain?.name} but need ApeChain`);
         alert('Please switch to ApeChain network to purchase a facility');
+        setIsPurchasingFacility(false);
         return;
       }
 
-      // Log transaction details for debugging
-      console.log('Facility purchase transaction details:', {
-        contractAddress: CONTRACT_ADDRESSES.MAIN,
-        function: 'purchaseInitialFacility',
-        args: [zeroAddress],
-        value: formatEther(requiredBalance),
-        userAddress: address
-      });
-      
-      // Execute the transaction using wagmi's writeContract
-      writeContract({
-        address: CONTRACT_ADDRESSES.MAIN,
-        abi: MAIN_CONTRACT_ABI as any,
-        functionName: 'purchaseInitialFacility',
-        args: [zeroAddress],
-        value: requiredBalance
-      } as any, {
-        onSuccess: async (txHash) => {
-          console.log('Facility purchase transaction submitted:', txHash);
-          
-          // Wait for the transaction receipt to confirm success
-          if (publicClient) {
-            console.log('Waiting for transaction confirmation...');
+      // Add timeout to reset state if transaction takes too long
+      const resetTimeout = setTimeout(() => {
+        if (isPurchasingFacility) {
+          console.warn('Facility purchase timeout - resetting state');
+          setIsPurchasingFacility(false);
+        }
+      }, 60000); // 1 minute timeout
+
+      try {
+        // Execute transaction with proper typing
+        writeContract({
+          address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
+          abi: MAIN_CONTRACT_ABI,
+          functionName: 'purchaseInitialFacility',
+          args: [zeroAddress as `0x${string}`],
+          value: requiredBalance,
+        } as any, {
+          onSuccess: async (txHash) => {
+            clearTimeout(resetTimeout);
+            console.log('Facility purchase transaction submitted:', txHash);
+            
             try {
+              // Wait for confirmation, but don't block UI
               const receipt = await publicClient.waitForTransactionReceipt({
-                hash: txHash
+                hash: txHash,
               });
               
               console.log('Facility purchase confirmed:', receipt);
+              alert('Facility purchased successfully!');
               
-              // Force refresh state to reflect the new facility
-              await refetchStats();
-              await refetchFacility();
+              // Refetch necessary data
+              if (refetchFacility) {
+                refetchFacility();
+              }
               
-              // Update local state immediately without waiting for contract read
-              setHasFacility(true);
-              
-              alert('Facility purchased successfully! You can now start mining.');
-            } catch (receiptError) {
-              console.error('Failed to get transaction receipt:', receiptError);
-            } finally {
+              // Reset state
+              setIsPurchasingFacility(false);
+              setForceRender(prev => !prev);
+            } catch (waitError) {
+              console.error('Error waiting for facility purchase confirmation:', waitError);
+              alert('There was an issue confirming your facility purchase. Please check your wallet for transaction status.');
               setIsPurchasingFacility(false);
             }
-          }
-        },
-        onError: (error) => {
-          console.error('Error purchasing facility:', error);
-          
-          // User-friendly error messages
-          if (error.message?.includes('user rejected')) {
-            alert('Transaction cancelled by user');
-          } else if (error.message?.includes('insufficient funds')) {
-            alert('Insufficient funds for transaction. You need 0.005 APE plus gas fees.');
-          } else if (error.message?.includes('gas')) {
-            alert('Gas estimation failed. Please try again with more APE for gas fees.');
-          } else {
-            alert(`Failed to purchase facility: ${error.message || 'Unknown error'}`);
-          }
-          
-          setIsPurchasingFacility(false);
-        }
-      });
-    } catch (error: any) {
-      console.error('Unexpected error during facility purchase:', error);
-      alert(`An unexpected error occurred. Please try again later.`);
+          },
+          onError: (error) => {
+            clearTimeout(resetTimeout);
+            console.error('Error purchasing facility:', error);
+            
+            // Check for user rejected error
+            if (error.message?.includes('rejected') || error.message?.includes('denied')) {
+              alert('Transaction was rejected. Please try again when ready.');
+            } else {
+              alert('Error purchasing facility: ' + error.message);
+            }
+            
+            setIsPurchasingFacility(false);
+          },
+        });
+      } catch (txError) {
+        clearTimeout(resetTimeout);
+        console.error('Transaction error:', txError);
+        alert('Failed to send transaction. Please try again.');
+        setIsPurchasingFacility(false);
+      }
+    } catch (error) {
+      console.error('Unexpected error in facility purchase:', error);
+      alert('An unexpected error occurred. Please try again later.');
       setIsPurchasingFacility(false);
     }
   };

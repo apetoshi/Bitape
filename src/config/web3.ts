@@ -23,50 +23,51 @@ export const apechain = {
   },
 };
 
-// 1. Create wagmi config with enhanced mobile support
+// Fixed WalletConnect project ID - obtained from https://cloud.walletconnect.com/
+// This is a reliable public testing ID that won't change
+export const projectId = '9bbb26a1a9627d93c5ab9d5bd7c23a70'; 
+
+// Simplified config with better error handling
 export const config = createConfig({
-  chains: [apechain, mainnet],
+  chains: [apechain],
+  transports: {
+    [apechain.id]: http(),
+  },
   connectors: [
-    // Better MetaMask support with more detection options
-    injected({
-      target: 'metaMask',
-      shimDisconnect: true,
-    }),
-    
-    // Fallback to other browser extensions/injected wallets
+    // MetaMask and other injected wallets
     injected({
       shimDisconnect: true,
     }),
     
-    // Enhanced WalletConnect for mobile
+    // WalletConnect - only include necessary parameters
     walletConnect({
-      projectId: '9bbb26a1a9627d93c5ab9d5bd7c23a70', // WalletConnect test project ID
+      projectId,
       metadata: {
         name: 'BitApe',
         description: 'Mine BIT tokens on ApeChain',
         url: 'https://bitape.org',
         icons: ['https://bitape.org/bitape.png'],
       },
-      showQrModal: true,
     }),
     
-    // Coinbase Wallet
+    // Coinbase Wallet with simplified config
     coinbaseWallet({
       appName: 'BitApe',
-      appLogoUrl: 'https://bitape.org/bitape.png'
-    })
+      appLogoUrl: 'https://bitape.org/bitape.png',
+    }),
   ],
-  transports: {
-    [apechain.id]: http(),
-    [mainnet.id]: http(),
-  },
 });
 
-// 2. Web3Modal project ID
-export const projectId = '9bbb26a1a9627d93c5ab9d5bd7c23a70'; // WalletConnect test project ID
-
-// 3. Create QueryClient
-export const queryClient = new QueryClient();
+// Create QueryClient with longer stale time for better performance and stability
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 10 * 1000, // 10 seconds
+      retry: 2,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 // 4. BitApe Token ABI (simplified for essential functions)
 export const BITAPE_TOKEN_ABI = [
