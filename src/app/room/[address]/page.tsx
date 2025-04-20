@@ -18,7 +18,7 @@ import AccountModal from '@/components/AccountModal';
 import ReferralModal from '@/components/ReferralModal';
 import { RoomVisualization } from '@/components/RoomVisualization';
 import { ResourcesPanel } from '@/components/ResourcesPanel';
-import SpaceTab from '@/components/SpaceTab';
+import { SpaceTab } from '@/components';
 import { MiningClaimSection } from '@/components/MiningClaimSection';
 import { EnhancedMiningClaimSection } from '@/components/EnhancedMiningClaimSection';
 import { useIsMounted } from '@/hooks/useIsMounted';
