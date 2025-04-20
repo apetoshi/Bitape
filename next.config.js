@@ -15,5 +15,8 @@ module.exports = withPWA({
     // Disable ESLint during build to allow the project to build
     // This is a temporary solution - the proper fix would be to fix all ESLint issues
     ignoreDuringBuilds: true,
-  }
+  },
+  // This prevents static optimization and forces all pages to be rendered at request time
+  // which solves the issue with WagmiProvider not being available during build time
+  output: 'export',
 }) 
