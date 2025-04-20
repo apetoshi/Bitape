@@ -40,7 +40,7 @@ export const config = createConfig({
     
     // Enhanced WalletConnect for mobile
     walletConnect({
-      projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'YOUR_WEB3MODAL_PROJECT_ID',
+      projectId: '9bbb26a1a9627d93c5ab9d5bd7c23a70', // WalletConnect test project ID
       metadata: {
         name: 'BitApe',
         description: 'Mine BIT tokens on ApeChain',
@@ -63,7 +63,7 @@ export const config = createConfig({
 });
 
 // 2. Web3Modal project ID
-export const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'YOUR_WEB3MODAL_PROJECT_ID';
+export const projectId = '9bbb26a1a9627d93c5ab9d5bd7c23a70'; // WalletConnect test project ID
 
 // 3. Create QueryClient
 export const queryClient = new QueryClient();
