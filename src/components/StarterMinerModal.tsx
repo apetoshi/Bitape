@@ -49,7 +49,15 @@ const StarterMinerModal: React.FC<StarterMinerModalProps> = ({
   selectedTile,
   isProcessing
 }) => {
-  // Remove the internal isShowing state which could cause render issues
+  // Track error state
+  const [error, setError] = useState<string | null>(null);
+  
+  // Reset error when the modal opens/closes
+  useEffect(() => {
+    if (isOpen) {
+      setError(null);
+    }
+  }, [isOpen]);
   
   // Add escape key handler as another way to close
   useEffect(() => {
@@ -63,12 +71,35 @@ const StarterMinerModal: React.FC<StarterMinerModalProps> = ({
     return () => window.removeEventListener('keydown', handleEscapeKey);
   }, [isOpen, onClose]);
 
+  // Safe claim function with error handling
+  const handleClaim = async () => {
+    if (!selectedTile) return;
+    
+    try {
+      setError(null);
+      
+      // Add a timeout to detect wallet-related issues
+      const timeoutId = setTimeout(() => {
+        if (isProcessing) {
+          console.warn('Miner claim is taking too long - likely wallet issue');
+          setError('Wallet not responding. Try closing and reopening your wallet.');
+        }
+      }, 15000);
+      
+      await onClaim(selectedTile.x, selectedTile.y);
+      clearTimeout(timeoutId);
+    } catch (err: any) {
+      console.error('Error claiming starter miner:', err);
+      setError(err?.message || 'Failed to claim starter miner. Please try again.');
+    }
+  };
+
   // Don't render anything if not open
   if (!isOpen) return null;
 
   return (
     <Dialog
-      open={true} // Always true when rendered 
+      open={true}
       onClose={onClose}
       className="relative z-50"
     >
@@ -82,6 +113,19 @@ const StarterMinerModal: React.FC<StarterMinerModalProps> = ({
           
           <div className="bg-royal-dark p-6 mb-8 border border-banana/20">
             <div className="space-y-4 font-press-start">
+              {/* Show error message if present */}
+              {error && (
+                <div className="bg-red-900/50 border border-red-500 p-3 mb-4">
+                  <p className="text-red-400 text-sm break-words">{error}</p>
+                  <button 
+                    onClick={() => setError(null)}
+                    className="text-yellow-300 text-xs mt-2 underline"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
+              
               <div className="mb-4 border border-banana/50 p-3 bg-black/50">
                 <p className="text-white text-center font-bold">HOW TO CLAIM YOUR MINER:</p>
                 <ol className="list-decimal pl-6 text-white mt-2 space-y-2">
@@ -148,16 +192,17 @@ const StarterMinerModal: React.FC<StarterMinerModalProps> = ({
             <button
               onClick={onClose}
               className="font-press-start px-6 py-2 border-2 border-banana text-banana hover:bg-banana hover:text-royal transition-colors"
+              disabled={isProcessing}
             >
-              CLOSE
+              {isProcessing ? 'PROCESSING...' : 'CLOSE'}
             </button>
             {selectedTile ? (
               <button
-                onClick={() => selectedTile && onClaim(selectedTile.x, selectedTile.y)}
+                onClick={handleClaim}
                 disabled={!selectedTile || isProcessing}
                 className="font-press-start px-6 py-2 bg-banana text-royal hover:bg-opacity-90 transition-colors disabled:opacity-50"
               >
-                {isProcessing ? 'CLAIMING...' : 'CLAIM FREE MINER'}
+                {isProcessing ? 'PROCESSING...' : 'CLAIM FREE MINER'}
               </button>
             ) : (
               <button
@@ -168,6 +213,17 @@ const StarterMinerModal: React.FC<StarterMinerModalProps> = ({
               </button>
             )}
           </div>
+          
+          {isProcessing && (
+            <div className="mt-4 text-center">
+              <p className="text-yellow-400 text-sm animate-pulse">
+                Transaction in progress... Please confirm in your wallet.
+              </p>
+              <p className="text-gray-400 text-xs mt-2">
+                If your wallet doesn't open, try clicking the wallet icon in your browser.
+              </p>
+            </div>
+          )}
         </Dialog.Panel>
       </div>
     </Dialog>
