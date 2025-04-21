@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ViewModeToggle } from '.';
-import { ViewMode } from './ViewModeToggle';
+import { ViewModeToggle, ViewMode } from '.';
 import { formatUnits } from 'viem';
 import { useContractRead } from 'wagmi';
 import { CONTRACT_ADDRESSES, BIT_TOKEN_ABI } from '../config/contracts';
