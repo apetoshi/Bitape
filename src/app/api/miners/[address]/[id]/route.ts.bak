@@ -1,0 +1,77 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { CONTRACT_ADDRESSES, MAIN_CONTRACT_ABI_EXTENDED } from '@/config/contracts';
+import { createPublicClient, http } from 'viem';
+import { apechain } from '@/config/web3';
+
+interface RequestContext {
+  params: {
+    address: string;
+    id: string;
+  };
+}
+
+// Update to match Next.js 15 API route signature
+export async function GET(request: NextRequest, { params }: RequestContext) {
+  try {
+    const { address, id } = params;
+    
+    if (!address || !id) {
+      return NextResponse.json(
+        { error: 'Missing required parameters' },
+        { status: 400 }
+      );
+    }
+
+    console.log(`API: Fetching miner ${id} for address ${address}...`);
+
+    // Create a public client to interact with the contract
+    const publicClient = createPublicClient({
+      chain: apechain,
+      transport: http(),
+    });
+
+    // Call the contract to get miner data
+    const minerData = await publicClient.readContract({
+      address: CONTRACT_ADDRESSES.MAIN,
+      abi: MAIN_CONTRACT_ABI_EXTENDED,
+      functionName: 'getMiner',
+      args: [BigInt(id)],
+    });
+
+    console.log(`API: Raw miner data:`, minerData);
+
+    // If minerData is array-like, extract properties
+    if (Array.isArray(minerData)) {
+      // Format miner data based on the contract's return structure
+      const formattedData = {
+        id: Number(id),
+        minerIndex: Number(minerData[0] || 0),
+        minerType: Number(minerData[0] || 0), // Alias for frontend compatibility
+        x: Number(minerData[1] || 0),
+        y: Number(minerData[2] || 0),
+        hashrate: Number(minerData[3] || 0),
+        powerConsumption: Number(minerData[4] || 0),
+        cost: Number(minerData[5] || 0),
+        owner: String(minerData[6] || ''),
+        inProduction: Boolean(minerData[7] || false),
+      };
+
+      console.log(`API: Formatted miner ${id} for address ${address}:`, formattedData);
+      
+      return NextResponse.json(formattedData);
+    } 
+
+    // If we reach here, something went wrong
+    console.error(`API: Could not process miner data for ID ${id}:`, minerData);
+    return NextResponse.json(
+      { error: 'Could not process miner data', rawData: JSON.stringify(minerData) },
+      { status: 500 }
+    );
+  } catch (error) {
+    console.error(`API: Error fetching miner data for address ${params.address}, ID ${params.id}:`, error);
+    return NextResponse.json(
+      { error: 'Failed to fetch miner data from contract', details: String(error) },
+      { status: 500 }
+    );
+  }
+} 

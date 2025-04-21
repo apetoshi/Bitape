@@ -38,10 +38,14 @@ const createModal = () => {
   if (typeof window === 'undefined') return null;
   
   try {
-    console.log('Initializing Web3Modal with simplified configuration');
+    console.log('Initializing Web3Modal with project ID:', 
+      projectId ? `${projectId.substring(0, 6)}...` : 'MISSING');
     
-    // Clean localStorage to remove stale wallet data
-    cleanLocalStorage();
+    // Validate projectId is available
+    if (!projectId || projectId.trim() === '') {
+      console.error('WalletConnect projectId is missing! Web3Modal will not work properly.');
+      throw new Error('WalletConnect configuration error: Missing projectId');
+    }
     
     return createWeb3Modal({
       wagmiConfig: config,
@@ -50,14 +54,21 @@ const createModal = () => {
       themeMode: 'dark',
       themeVariables: {
         '--w3m-accent': '#ffc107',
-      },
+        '--w3m-color-bg-1': '#001824',
+        '--w3m-color-fg-1': '#ffffff',
+        '--w3m-border-radius-master': '8px',
+      } as any,
       metadata: {
-        name: 'BitApe Mining',
-        description: 'Mine BIT tokens on ApeChain',
+        name: 'BitApe',
+        description: 'A Peer-to-Peer Electronic Ape Cash System',
         url: 'https://bitape.org',
         icons: ['https://bitape.org/bitape.png'],
       },
       defaultChain: config.chains[0],
+      featuredWalletIds: [
+        'c57ca95b47569778a828d19178114f4db188b89b763c899ba0be274e97267d96', // MetaMask
+        'ecc4036f814562b41a5268adc86270fba1365471402006302e70169465b7ac18', // Phantom
+      ],
     });
   } catch (err) {
     console.error('Failed to initialize Web3Modal:', err);
@@ -66,40 +77,11 @@ const createModal = () => {
 };
 
 /**
- * Clean localStorage of problematic wallet data
- */
-const cleanLocalStorage = () => {
-  if (typeof window === 'undefined') return;
-  
-  try {
-    // Remove the most common keys that cause issues
-    const problematicKeys = [
-      'wagmi.store',
-      'wagmi.wallet',
-      'wagmi.connected',
-      'wagmi.injected',
-      'walletconnect',
-      'wc@2:client:0'
-    ];
-    
-    problematicKeys.forEach(key => {
-      try {
-        localStorage.removeItem(key);
-      } catch (e) {
-        // Ignore errors when removing
-      }
-    });
-  } catch (e) {
-    console.error('Error cleaning localStorage:', e);
-  }
-};
-
-/**
  * Reset wallet connection in case of issues
  */
 const resetWallet = () => {
-  cleanLocalStorage();
-  window.location.reload();
+  // Simply reload the page to reset the connection state
+  window.location.href = '/';
 };
 
 /**

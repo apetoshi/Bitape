@@ -33,92 +33,17 @@ const AccountModal: React.FC<AccountModalProps> = ({
       // Immediately close the modal to prevent multiple clicks
       onClose();
       
-      // Create a timeout to ensure we don't get stuck
-      const timeoutId = setTimeout(() => {
-        console.log('Disconnect timeout triggered - forcing page reload');
-        window.location.replace('/');
-      }, 5000); // 5 second safety timeout
-      
-      // First disconnect using wagmi's hook
+      // Disconnect using wagmi's hook
       await disconnect();
-      console.log('Wagmi disconnect completed');
+      console.log('Wallet disconnected successfully');
       
-      // Clear the timeout since disconnect succeeded
-      clearTimeout(timeoutId);
-      
-      // Force cleanup all wallet-related items in localStorage
-      if (typeof window !== 'undefined') {
-        console.log('Cleaning up localStorage wallet items');
-        
-        try {
-          // Only remove specific known keys rather than looping through all localStorage
-          const problematicKeys = [
-            'wagmi.store', 
-            'wagmi.wallet', 
-            'wagmi.connected',
-            'walletconnect',
-            'WALLETCONNECT_DEEPLINK_CHOICE',
-            'WALLETCONNECT_DEEPLINK_CHOICE_WC_V2',
-            'w3m_connected_wallet',
-            'w3m_preferences',
-            'w3m_recent',
-            'wc@2:client:0.3',
-            'WALLETCONNECT_DEEPLINK_CHOICE',
-            'WALLET_TYPE',
-            'wallet-provider'
-          ];
-          
-          problematicKeys.forEach(key => {
-            if (localStorage.getItem(key)) {
-              console.log(`Removing known problematic key: ${key}`);
-              localStorage.removeItem(key);
-            }
-          });
-        } catch (error) {
-          console.error('Error cleaning localStorage:', error);
-        }
-      }
-      
-      // Clear any pending WalletConnect sessions
-      if (typeof window !== 'undefined') {
-        try {
-          // Attempt to clear Ethereum provider
-          if (window.ethereum && window.ethereum.close) {
-            console.log('Closing ethereum provider connection');
-            await window.ethereum.close();
-          }
-          
-          // Reset any global WalletConnect variables
-          if ((window as any).walletConnect) {
-            console.log('Deleting global walletConnect object');
-            delete (window as any).walletConnect;
-          }
-          
-          if ((window as any).WalletConnect) {
-            console.log('Deleting global WalletConnect object');
-            delete (window as any).WalletConnect;
-          }
-          
-          // Try to reset any web3Modal instances
-          if ((window as any).web3Modal) {
-            console.log('Clearing web3Modal');
-            (window as any).web3Modal = null;
-          }
-        } catch (err) {
-          console.error('Error clearing provider connections:', err);
-        }
-      }
-      
-      console.log('Disconnect cleanup completed, redirecting to home');
-      
-      // Force a complete page refresh to reset all app state
-      window.location.replace('/');
+      // Simple reload to reset the app state
+      window.location.href = '/';
       
     } catch (error) {
       console.error('Error during wallet disconnection:', error);
-      
-      // As a last resort, force a hard refresh
-      window.location.replace('/');
+      // As a last resort, force a refresh
+      window.location.href = '/';
     }
   };
 

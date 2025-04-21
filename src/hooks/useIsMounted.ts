@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useEffect } from 'react';
 
 /**
@@ -6,12 +8,26 @@ import { useState, useEffect } from 'react';
  * 
  * @returns {boolean} True if component is mounted, false otherwise
  */
-export function useIsMounted() {
-  const [isMounted, setIsMounted] = useState(false);
+export function useIsMounted(): boolean {
+  const [mounted, setMounted] = useState<boolean>(false);
 
   useEffect(() => {
-    setIsMounted(true);
+    setMounted(true);
   }, []);
 
-  return isMounted;
+  return mounted;
+}
+
+/**
+ * A utility hook that always returns consistent values for conditional rendering
+ * This helps prevent React hooks ordering issues
+ */
+export function useSafeHookValues<T>(value: T, defaultValue: T): T {
+  const isMounted = useIsMounted();
+  
+  if (!isMounted) {
+    return defaultValue;
+  }
+  
+  return value;
 } 

@@ -45,10 +45,17 @@ export const SelectedTileTab: React.FC<SelectedTileTabProps> = ({
 
   // Check if the selected tile has a miner
   const selectedTileHasMiner = (x: number, y: number): boolean => {
+    console.log(`SelectedTileTab - Checking for miner at (${x}, ${y})`, {
+      hasMiners: Boolean(gameState.miners && gameState.miners.length > 0),
+      minerCount: gameState.miners?.length || 0,
+      hasFacility: gameState.hasFacility,
+      isStarterPosition: x === 0 && y === 0
+    });
+    
     if (!gameState.miners || gameState.miners.length === 0) {
       // Fallback: If no miners data but has facility, assume starter miner at (0,0)
-      if (gameState.hasFacility && x === 0 && y === 0) {
-        console.log('No miners data, but has facility - assuming starter miner at (0,0)');
+      if (gameState.hasFacility && x === 0 && y === 0 && gameState.hasClaimedStarterMiner) {
+        console.log('SelectedTileTab - No miners data but has claimed starter miner - assuming at (0,0)');
         return true;
       }
       return false;
@@ -58,43 +65,83 @@ export const SelectedTileTab: React.FC<SelectedTileTabProps> = ({
     const targetX = Number(x);
     const targetY = Number(y);
     
+    // Special handling for starter miner at (0,0)
+    if (targetX === 0 && targetY === 0 && gameState.hasClaimedStarterMiner) {
+      console.log('SelectedTileTab - Starter miner position detected and claimed');
+      return true;
+    }
+    
     // Check if any miner in the array has the given coordinates
-    return gameState.miners.some(miner => {
+    const hasMiner = gameState.miners.some(miner => {
       const minerX = Number(miner.x);
       const minerY = Number(miner.y);
-      return minerX === targetX && minerY === targetY;
+      const matches = minerX === targetX && minerY === targetY;
+      if (matches) {
+        console.log(`SelectedTileTab - Found miner match at (${x}, ${y}):`, miner);
+      }
+      return matches;
     });
+    
+    console.log(`SelectedTileTab - Miner check result for (${x}, ${y}): ${hasMiner ? 'FOUND' : 'NOT FOUND'}`);
+    return hasMiner;
   };
 
   // Get miner at the selected tile
   const getMinerAtTile = (x: number, y: number) => {
-    if (!gameState.miners || gameState.miners.length === 0) {
-      // Fallback: If no miners data but has facility, return hardcoded starter miner at (0,0)
-      if (gameState.hasFacility && x === 0 && y === 0) {
-        console.log('No miners data, but has facility - returning hardcoded starter miner at (0,0)');
-        return {
-          id: '1',
-          minerType: 1, // BANANA_MINER
-          x: 0,
-          y: 0,
-          hashrate: 100,
-          powerConsumption: 1,
-          cost: 0,
-          inProduction: true,
-          image: '/banana-miner.gif'
-        };
+    console.log(`SelectedTileTab - Getting miner at (${x}, ${y})`, {
+      hasMiners: Boolean(gameState.miners && gameState.miners.length > 0),
+      hasFacility: gameState.hasFacility,
+      hasClaimedStarter: gameState.hasClaimedStarterMiner,
+      isStarterPosition: x === 0 && y === 0
+    });
+    
+    // Special handling for starter miner
+    if (x === 0 && y === 0 && gameState.hasClaimedStarterMiner) {
+      console.log('SelectedTileTab - Checking for starter miner at (0,0) - claimed:', gameState.hasClaimedStarterMiner);
+      
+      // First try to find it in miners array
+      if (gameState.miners && gameState.miners.length > 0) {
+        const starterMiner = gameState.miners.find(miner => 
+          Number(miner.x) === 0 && Number(miner.y) === 0
+        );
+        
+        if (starterMiner) {
+          console.log('SelectedTileTab - Found starter miner in miners array:', starterMiner);
+          return starterMiner;
+        }
       }
+      
+      // Fallback to hardcoded starter miner if not in array but claimed
+      console.log('SelectedTileTab - Using hardcoded starter miner data for (0,0)');
+      return {
+        id: '1',
+        minerType: 1, // BANANA_MINER
+        x: 0,
+        y: 0,
+        hashrate: 100,
+        powerConsumption: 1,
+        cost: 0,
+        inProduction: true,
+        image: '/banana-miner.gif'
+      };
+    }
+    
+    if (!gameState.miners || gameState.miners.length === 0) {
+      console.log(`SelectedTileTab - No miners array available for position (${x}, ${y})`);
       return null;
     }
     
     const targetX = Number(x);
     const targetY = Number(y);
     
-    return gameState.miners.find(miner => {
+    const miner = gameState.miners.find(miner => {
       const minerX = Number(miner.x);
       const minerY = Number(miner.y);
       return minerX === targetX && minerY === targetY;
-    }) || null;
+    });
+    
+    console.log(`SelectedTileTab - Miner lookup result for (${x}, ${y}):`, miner || 'NOT FOUND');
+    return miner || null;
   };
 
   // Get miner type name

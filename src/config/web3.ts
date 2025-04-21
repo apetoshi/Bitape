@@ -25,7 +25,7 @@ export const apechain = {
 
 // Fixed WalletConnect project ID - obtained from https://cloud.walletconnect.com/
 // This is a reliable public testing ID that won't change
-export const projectId = '9bbb26a1a9627d93c5ab9d5bd7c23a70'; 
+export const projectId = (process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'e117ce2d845e99a9a95b6aae4e00c27b').trim();
 
 // Simplified config with better error handling
 export const config = createConfig({
@@ -44,10 +44,11 @@ export const config = createConfig({
       projectId,
       metadata: {
         name: 'BitApe',
-        description: 'Mine BIT tokens on ApeChain',
+        description: 'A Peer-to-Peer Electronic Ape Cash System',
         url: 'https://bitape.org',
         icons: ['https://bitape.org/bitape.png'],
       },
+      showQrModal: true,
     }),
     
     // Coinbase Wallet with simplified config

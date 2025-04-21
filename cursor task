@@ -1,0 +1,32 @@
+Can you confirm you implemented : ownerToFacility: @https://apescan.io/address/0x409Ec46CdA55E8C7A2Ec971745985bf7Dd58f533#readContract#F26 
+
+<input> (address)
+0x0000003b0d921e12Cc0CdB780b476F966bB16DaE
+ facilityIndex uint256, maxMiners uint256, currMiners uint256, totalPowerOutput uint256, currPowerOutput uint256, x uint256, y uint256
+
+[ ownerToFacility(address) method Response ]
+  facilityIndex   uint256 :  1
+  maxMiners   uint256 :  4
+  currMiners   uint256 :  1
+  totalPowerOutput   uint256 :  28
+  currPowerOutput   uint256 :  1
+  x   uint256 :  2
+  y   uint256 :  2
+
+Here is the logic
+
+"Resources" Tab:
+
+APE BALANCE
+0.694053926946037457 APE
+BIT BALANCE [] BIT
+SPACES LEFT 0 SPACES (maxMiners   uint256 : []  - currMiners   uint256 : [] )
+GIGAWATTS AVAILABLE 0 GW (totalPowerOutput   uint256 :  [] - currPowerOutput   uint256 :  [] )
+
+"SPACE" TAB:
+
+YOUR MINING ROOM 1 (facilityIndex   uint256 :  1)
+TOTAL SPACES 0 SPACES (maxMiners   uint256 : [] )
+USED SPACES  0 SPACES (currMiners   uint256 : [] )
+TOTAL GIGAWATTS 0 GW (totalPowerOutput   uint256 : [] )
+

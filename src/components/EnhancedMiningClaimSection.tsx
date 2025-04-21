@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import '@/styles/animations.css';
 import { useWriteContract, useContractRead, useAccount } from 'wagmi';
 import { CONTRACT_ADDRESSES, MAIN_CONTRACT_ABI } from '@/config/contracts';
@@ -18,50 +18,56 @@ export const EnhancedMiningClaimSection: React.FC<EnhancedMiningClaimSectionProp
   miningRate
 }) => {
   const { address } = useAccount();
-  const [displayAmount, setDisplayAmount] = useState('0');
-  const [targetAmount, setTargetAmount] = useState(0);
-  const [showClaimSuccess, setShowClaimSuccess] = useState(false);
-  const [isManualClaiming, setIsManualClaiming] = useState(false);
-  const [isAnimating, setIsAnimating] = useState(false);
-  const [tickEffect, setTickEffect] = useState(false);
+  const [displayAmount, setDisplayAmount] = useState<string>('0');
+  const [targetAmount, setTargetAmount] = useState<number>(0);
+  const [showClaimSuccess, setShowClaimSuccess] = useState<boolean>(false);
+  const [isManualClaiming, setIsManualClaiming] = useState<boolean>(false);
+  const [isAnimating, setIsAnimating] = useState<boolean>(false);
+  const [tickEffect, setTickEffect] = useState<boolean>(false);
 
-  // Fetch pending rewards directly from contract
+  // Add refs for animation state that shouldn't trigger re-renders
+  const lastTickRef = useRef<number>(0);
+  const animationFrameIdRef = useRef<number>(0);
+
+  // Direct read from contract for most up-to-date rewards
   const { data: pendingRewardsData, isLoading: isLoadingRewards, refetch: refetchRewards } = useContractRead({
     address: CONTRACT_ADDRESSES.MAIN,
     abi: MAIN_CONTRACT_ABI,
     functionName: 'pendingRewards',
-    args: [address || zeroAddress],
+    args: address ? [address] : undefined,
     query: {
       enabled: Boolean(address),
-      refetchInterval: 15000, // Refetch every 15 seconds
+      refetchInterval: 30000, // Refetch every 30 seconds
     }
   });
 
-  // Format the pending rewards from bigint to a readable string and animate
+  // Animation for counting up the rewards
   useEffect(() => {
+    // Convert to number, handle empty string case
+    let end = 0;
+    
     if (pendingRewardsData) {
-      console.log('Pending rewards:', pendingRewardsData);
-      const formattedAmount = formatEther(pendingRewardsData as bigint);
-      const numAmount = parseFloat(formattedAmount);
-      setTargetAmount(numAmount);
-      
-      // Set immediate display for very small amounts
-      if (numAmount < 0.0001) {
-        setDisplayAmount(numAmount.toFixed(6));
-        return;
-      }
-      
-      // Animate number increasing
+      end = parseFloat(formatEther(pendingRewardsData));
+    } else if (initialMinedBit) {
+      const parsed = parseFloat(initialMinedBit);
+      if (!isNaN(parsed)) end = parsed;
+    }
+    
+    // Set target amount (current accumulated rewards)
+    setTargetAmount(end);
+    
+    // Only animate if there are rewards
+    if (end > 0) {
       setIsAnimating(true);
-      let start = 0;
-      const end = numAmount;
-      const duration = 2000; // 2 seconds animation
-      const startTime = Date.now();
-      const tickInterval = 150; // Tick sound/visual effect interval
-      let lastTick = 0;
+      const startTime = performance.now();
+      const duration = 1200; // 1.2 seconds
+      const tickInterval = 200; // Visual tick every 200ms
+      
+      // Reset variables
+      lastTickRef.current = performance.now();
       
       const animateValue = () => {
-        const now = Date.now();
+        const now = performance.now();
         const elapsed = now - startTime;
         const progress = Math.min(elapsed / duration, 1);
         
@@ -81,16 +87,18 @@ export const EnhancedMiningClaimSection: React.FC<EnhancedMiningClaimSectionProp
           formatted = currentValue.toFixed(5);
         }
         
-        setDisplayAmount(formatted);
+        // Important: Store the current value to prevent recursion
+        const newDisplayAmount = formatted;
+        setDisplayAmount(newDisplayAmount);
         
-        // Add tick effect at intervals
-        if (now - lastTick > tickInterval && progress < 0.95) {
+        // Add tick effect at intervals using the ref
+        if (now - lastTickRef.current > tickInterval && progress < 0.95) {
           setTickEffect(prev => !prev);
-          lastTick = now;
+          lastTickRef.current = now;
         }
         
         if (progress < 1) {
-          requestAnimationFrame(animateValue);
+          animationFrameIdRef.current = requestAnimationFrame(animateValue);
         } else {
           setIsAnimating(false);
           setDisplayAmount(end.toFixed(end >= 100 ? 2 : (end >= 10 ? 3 : 5)));
@@ -98,10 +106,17 @@ export const EnhancedMiningClaimSection: React.FC<EnhancedMiningClaimSectionProp
       };
       
       animateValue();
+      
+      // Cleanup function to cancel animation if component unmounts or dependencies change
+      return () => {
+        if (animationFrameIdRef.current) {
+          cancelAnimationFrame(animationFrameIdRef.current);
+        }
+      };
     } else {
       setDisplayAmount(isLoadingRewards ? 'Loading...' : '0');
     }
-  }, [pendingRewardsData, isLoadingRewards]);
+  }, [pendingRewardsData, isLoadingRewards, initialMinedBit]); // Only these dependencies
 
   // Access the writeContract hook
   const { writeContract, isPending, isSuccess, error } = useWriteContract();
@@ -135,19 +150,18 @@ export const EnhancedMiningClaimSection: React.FC<EnhancedMiningClaimSectionProp
     if (isClaimingReward || isPending || isManualClaiming || isLoadingRewards || targetAmount <= 0) return;
     
     try {
-      console.log('Calling claimRewards contract function directly...');
+      console.log('Calling claimRewards contract function...');
       setIsManualClaiming(true);
       
+      // Only use writeContract, don't call onClaimRewards as well
       writeContract({
         address: CONTRACT_ADDRESSES.MAIN,
         abi: MAIN_CONTRACT_ABI,
         functionName: 'claimRewards',
       } as any);
       
-      // Also call the original onClaimRewards to maintain compatibility
-      onClaimRewards().catch(err => {
-        console.log('Secondary claim method failed (this is normal):', err);
-      });
+      // DO NOT call onClaimRewards - that would cause duplicate transactions
+      // The success effect will trigger refetchRewards when the transaction completes
     } catch (error) {
       console.error("Error claiming rewards:", error);
       setIsManualClaiming(false);
@@ -164,23 +178,37 @@ export const EnhancedMiningClaimSection: React.FC<EnhancedMiningClaimSectionProp
     if (!isLoading && !showClaimSuccess && hasMinedBit && miningRate) {
       const rate = parseFloat(miningRate);
       if (!isNaN(rate) && rate > 0) {
-        const incrementInterval = setInterval(() => {
+        // Use ref to track the interval
+        const incrementRef = { current: 0 };
+        
+        incrementRef.current = window.setInterval(() => {
           setTargetAmount(prev => {
             // Add tiny amount every second (daily rate / 86400)
             const increment = rate / 86400;
             return prev + increment;
           });
           
-          // Update display periodically if not actively animating
+          // Only update display if not actively animating
           if (!isAnimating) {
-            setDisplayAmount(targetAmount.toFixed(targetAmount >= 100 ? 2 : (targetAmount >= 10 ? 3 : 5)));
+            setDisplayAmount(prev => {
+              const currentTarget = parseFloat(prev);
+              if (isNaN(currentTarget)) return '0';
+              // Format based on size
+              if (currentTarget >= 100) {
+                return currentTarget.toFixed(2);
+              } else if (currentTarget >= 10) {
+                return currentTarget.toFixed(3);
+              } else {
+                return currentTarget.toFixed(5);
+              }
+            });
           }
-        }, 1000);
+        }, 1000) as unknown as number;
         
-        return () => clearInterval(incrementInterval);
+        return () => window.clearInterval(incrementRef.current);
       }
     }
-  }, [isLoading, showClaimSuccess, hasMinedBit, miningRate, targetAmount, isAnimating]);
+  }, [isLoading, showClaimSuccess, hasMinedBit, miningRate, isAnimating]); // Only include stable dependencies
   
   return (
     <div className="relative p-4 bg-dark-blue border-2 border-banana rounded-lg text-center font-press-start overflow-hidden">

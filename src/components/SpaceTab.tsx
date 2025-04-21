@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useGameState } from '@/hooks/useGameState';
 import { Button } from './ui/button';
 import { useAccount, useContractRead } from 'wagmi';
 import { CONTRACT_ADDRESSES, MAIN_CONTRACT_ABI } from '@/config/contracts';
 import { zeroAddress } from 'viem';
+import { useIsMounted } from '@/hooks/useIsMounted';
 
 // Default facility data with zeros
 const DEFAULT_FACILITY_DATA = {
@@ -19,7 +20,10 @@ const DEFAULT_FACILITY_DATA = {
 export default function SpaceTab() {
   const { isConnected, address } = useAccount();
   const gameState = useGameState();
+  const isMounted = useIsMounted();
   const [facilityData, setFacilityData] = useState(DEFAULT_FACILITY_DATA);
+  
+  // Single source of truth for tracking which data source to use
   const [dataSource, setDataSource] = useState<'none' | 'contract' | 'gameState'>('none');
 
   // Direct contract read to get facility data using ownerToFacility
@@ -29,11 +33,11 @@ export default function SpaceTab() {
     functionName: 'ownerToFacility',
     args: [address || zeroAddress],
     query: {
-      enabled: Boolean(address),
+      enabled: Boolean(address) && isMounted,
     }
   });
 
-  // Process contract data with memoization
+  // Memoize facility data processing to avoid redundant updates
   const processedContractData = useMemo(() => {
     if (!rawFacilityData || !Array.isArray(rawFacilityData) || rawFacilityData.length < 5) {
       return null;
@@ -47,7 +51,7 @@ export default function SpaceTab() {
       const totalPowerOutput = Number(rawFacilityData[3] || 0);
       const currPowerOutput = Number(rawFacilityData[4] || 0);
       
-      // Only set facility data if facilityIndex > 0 (user has a facility)
+      // Only return valid facility data if facilityIndex > 0
       if (facilityIndex > 0) {
         return {
           level: facilityIndex,
@@ -64,7 +68,7 @@ export default function SpaceTab() {
     return null;
   }, [rawFacilityData]);
 
-  // Process gameState data with memoization
+  // Memoize gameState facility data
   const processedGameStateData = useMemo(() => {
     if (!gameState.hasFacility || !gameState.facilityData) {
       return null;
@@ -79,8 +83,11 @@ export default function SpaceTab() {
     };
   }, [gameState.hasFacility, gameState.facilityData]);
 
-  // Single effect to update facility data with priority
+  // Single update effect that prioritizes data sources
   useEffect(() => {
+    if (!isMounted) return;
+    
+    // Prevent update loops by using a single state update strategy
     // Priority: gameState > contract data > default
     if (processedGameStateData) {
       if (dataSource !== 'gameState' || 
@@ -101,19 +108,27 @@ export default function SpaceTab() {
       setFacilityData(DEFAULT_FACILITY_DATA);
       setDataSource('none');
     }
-  }, [processedGameStateData, processedContractData, dataSource, facilityData]);
+  }, [processedGameStateData, processedContractData, isMounted, dataSource, facilityData]);
   
-  // Reset data source when dependencies change
+  // Reset data source when dependencies change to force re-evaluation
   useEffect(() => {
     setDataSource('none');
   }, [address]);
 
-  // Calculate derived values using memoization
+  // Calculate spaces left and power available - memoized
   const { spacesLeft, gigawattsAvailable, userHasFacility } = useMemo(() => ({
     spacesLeft: facilityData.maxMiners - facilityData.currMiners,
     gigawattsAvailable: facilityData.totalPower - facilityData.usedPower,
     userHasFacility: facilityData.level > 0
   }), [facilityData]);
+
+  if (!isMounted) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center">
+        <div className="pixel-text text-white">Loading facility data...</div>
+      </div>
+    );
+  }
 
   if (!isConnected) {
     return (
@@ -174,6 +189,17 @@ export default function SpaceTab() {
               <div className="flex justify-between">
                 <span className="font-press-start text-white text-[9px]">USED: {facilityData.usedPower} GW</span>
                 <span className="font-press-start text-white text-[9px]">MAX: {facilityData.totalPower} GW</span>
+              </div>
+            </div>
+
+            {/* Upgrade Requirements (Shown only to keep UI consistent) */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="font-press-start text-white text-xs">UPGRADE REQUIREMENTS:</span>
+              </div>
+              <div className="pl-4 space-y-1">
+                <p className="font-press-start text-white text-[9px]">• LEVEL: {facilityData.level}</p>
+                <p className="font-press-start text-white text-[9px]">Upgrade in $BIT</p>
               </div>
             </div>
           </div>

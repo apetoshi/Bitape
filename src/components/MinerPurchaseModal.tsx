@@ -268,31 +268,8 @@ const MinerPurchaseModal: React.FC<MinerPurchaseModalProps> = ({
         setPurchaseStage('success');
         console.log("Purchase transaction submitted successfully");
         
-        // For any miner purchased, save to localStorage for UI persistence
-        if (typeof window !== 'undefined') {
-          try {
-            if (address) {
-              console.log(`Saving miner type ${selectedMiner} at position (${x}, ${y}) for address ${address}`);
-              
-              // Use wallet-specific keys to avoid conflicts between wallets
-              const walletPrefix = address.slice(0, 10).toLowerCase();
-              
-              // Create specific keys for this wallet and miner position
-              localStorage.setItem(`${walletPrefix}_miner_${x}_${y}`, selectedMiner.toString());
-              localStorage.setItem(`${walletPrefix}_miner_${x}_${y}_timestamp`, Date.now().toString());
-              
-              // Store the address to identify this wallet's data
-              localStorage.setItem('lastConnectedAddress', address);
-              
-              console.log(`Saved miner to localStorage with key: ${walletPrefix}_miner_${x}_${y}`);
-            } else {
-              console.warn('Could not save miner to localStorage: No user address found');
-            }
-          } catch (storageError) {
-            console.warn('Failed to save miner data to storage:', storageError);
-            // Continue anyway, as this is non-critical
-          }
-        }
+        // Remove localStorage persistence - rely only on contract data
+        console.log(`Purchased miner type ${selectedMiner} at position (${x}, ${y})`);
       } catch (error) {
         // Set error message for display
         let displayError = 'Transaction failed';

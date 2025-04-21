@@ -1,7 +1,7 @@
 /* eslint-disable react-hooks/rules-of-hooks */
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -21,7 +21,7 @@ import { ResourcesPanel } from '@/components/ResourcesPanel';
 import { SpaceTab } from '@/components';
 import { MiningClaimSection } from '@/components/MiningClaimSection';
 import { EnhancedMiningClaimSection } from '@/components/EnhancedMiningClaimSection';
-import { useIsMounted } from '@/hooks/useIsMounted';
+import { useIsMounted, useSafeHookValues } from '@/hooks/useIsMounted';
 import FacilityPurchaseModal from '@/components/FacilityPurchaseModal';
 import MinerPurchaseModal from '@/components/MinerPurchaseModal';
 import StatsDisplay from '@/components/StatsDisplay';
@@ -122,6 +122,14 @@ export default function RoomPage() {
   const { writeContract } = useWriteContract();
   const publicClient = usePublicClient();
   
+  // Add refs for tracking selection time
+  const lastSelectionTimeRef = useRef<number>(0);
+  
+  // Add the refs after other useRef declarations near the top of the component
+  // Look for a section with other useRef declarations and add these:
+  const hasMinerRef = useRef<boolean | null>(null);
+  const initialCheckDoneRef = useRef<boolean>(false);
+  
   // Set up global modal opener function only once on component mount
   useEffect(() => {
     // Initialize showMinerModal to false on component mount
@@ -180,6 +188,16 @@ export default function RoomPage() {
   
   // Get BIT token total supply for stats display
   const { data: statsTotalSupplyData } = useContractRead({
+    address: CONTRACT_ADDRESSES.BIT_TOKEN,
+    abi: BIT_TOKEN_ABI,
+    functionName: 'totalSupply',
+    query: {
+      enabled: true,
+    },
+  });
+  
+  // Direct contract read for mobile stats
+  const { data: mobileTotalSupplyData } = useContractRead({
     address: CONTRACT_ADDRESSES.BIT_TOKEN,
     abi: BIT_TOKEN_ABI,
     functionName: 'totalSupply',
@@ -510,150 +528,79 @@ export default function RoomPage() {
     fetchMonkeyToasterData();
   }, [publicClient, address, fetchMinerTypeData]);
   
-  // Function to fetch data for specific miner IDs
-  const fetchSpecificMiners = useCallback(async () => {
-    if (!address) return;
-    
-    // Fetch data for miner ID 1 explicitly
-    try {
-      console.log("Attempting to fetch on-chain data for miner ID 1");
-      await fetchMinerData(1);
-    } catch (e) {
-      console.error("Error fetching miner 1:", e);
-    }
-    
-    // Fetch data for miner ID 11 explicitly (the one with invalid coordinates)
-    try {
-      console.log("Attempting to fetch on-chain data for miner ID 11");
-      await fetchMinerData(11);
-    } catch (e) {
-      console.error("Error fetching miner 11:", e);
-    }
-  }, [address, fetchMinerData]);
+  // Add a cache for tile miners to prevent redundant lookups
+  const tileMinersCache = useRef(new Map());
   
-  // Effect to trigger the explicit fetches when miner IDs change
-  useEffect(() => {
-    if (minerIds.length > 0) {
-      fetchSpecificMiners();
-    }
-  }, [minerIds, fetchSpecificMiners]);
-
-  // Add special handling for miner with ID 11 that has invalid coordinates
-  useEffect(() => {
-    if (!gameState.miners || gameState.miners.length === 0) return;
-    
-    // Find miner with ID 11 
-    const miner11 = gameState.miners.find(m => m.id === '11' || m.id === 11);
-    
-    if (miner11) {
-      console.log(`Found miner with ID 11:`, miner11);
-      
-      // Check if it has invalid coordinates
-      if (Number(miner11.y) > 1) { 
-        console.warn(`Miner ID 11 has invalid y-coordinate of ${miner11.y}, should be 0 or 1`);
-        
-        // Get on-chain data to compare
-        fetchMinerData(11).then(data => {
-          if (data) {
-            const correctX = Number(data[3]); // x is at index 3 in the paginated tuple
-            const correctY = Number(data[4]); // y is at index 4 in the paginated tuple
-            
-            console.log(`On-chain coordinates for miner ID 11: (${correctX}, ${correctY})`);
-            
-            // If coordinates from contract are different from what we have locally
-            if (correctX !== Number(miner11.x) || correctY !== Number(miner11.y)) {
-              console.warn(`Coordinate mismatch! Local: (${miner11.x}, ${miner11.y}), On-chain: (${correctX}, ${correctY})`);
-              
-              // Create a corrected version of the miner data - in a production app we'd update state here
-              const correctedMiner = {
-                ...miner11,
-                x: correctX,
-                y: correctY
-              };
-              
-              console.log(`Corrected miner ID 11 data:`, correctedMiner);
-            }
-          }
-        });
-      }
-    }
-  }, [gameState.miners, fetchMinerData]);
-
-  // Apply coordinate validation to miners - filter out invalid coordinates
-  useEffect(() => {
-    if (!gameState.miners || gameState.miners.length === 0) return;
-    
-    // Check for miners with invalid coordinates
-    const invalidMiners = gameState.miners.filter(m => 
-      Number(m.x) > 1 || Number(m.y) > 1
-    );
-    
-    if (invalidMiners.length > 0) {
-      console.error(`Found ${invalidMiners.length} miners with invalid coordinates:`, invalidMiners);
-      
-      // Log each invalid miner
-      invalidMiners.forEach(m => {
-        console.error(`Miner ID=${m.id} has invalid position (${m.x}, ${m.y})`);
-      });
-    }
-  }, [gameState.miners]);
-
-  // Create a modified miners array that uses on-chain data when available
+  // Process the miners data outside of render to ensure consistent hook calls
+  // Use stable object references with useMemo
   const getValidatedMiners = useCallback(() => {
     if (!gameState.miners) return [];
     
     return gameState.miners.map(miner => {
       const id = String(miner.id);
+      
+      // First validate coordinates to ensure they're within bounds and proper numbers
+      const x = Number(miner.x);
+      const y = Number(miner.y);
+      
+      // Skip miners with invalid coordinates early
+      if (isNaN(x) || isNaN(y) || x < 0 || x > 1 || y < 0 || y > 1) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`Skipping miner ID ${id} with invalid coordinates (${x}, ${y})`);
+        }
+        return null;
+      }
+      
       // Check if we have on-chain data for this miner
       if (minerFullData[id]) {
-        // Extract values from tuple
-        // The tuple format from getPlayerMinersPaginated is:
-        // [minerIndex, id, x, y, hashrate, powerConsumption, cost, inProduction]
+        // Extract values from the object structure
         const minerData = minerFullData[id];
         
-        // Properly map the tuple values
-        const minerType = Number(minerData[0]); // minerIndex
-        const x = Number(minerData[2]); // x
-        const y = Number(minerData[3]); // y
-        const hashrate = Number(minerData[4]); // hashrate
-        const powerConsumption = Number(minerData[5]); // powerConsumption
-        const cost = Number(minerData[6]); // cost
-        const inProduction = Boolean(minerData[7]); // inProduction
+        // Access by property names based on the actual structure
+        // Fallback to existing values if properties don't exist
+        const minerType = Number(minerData.minerIndex || miner.minerType || 0);
         
-        // Log the mapping for debugging
-        console.log(`Mapping contract minerIndex ${minerType} for miner ID ${id}`);
-        console.log(`Full on-chain data:`, minerData);
+        const hashrate = Number(minerData.hashrate || miner.hashrate || 0);
+        const powerConsumption = Number(minerData.powerConsumption || miner.powerConsumption || 0);
+        const cost = Number(minerData.cost || miner.cost || 0);
+        const inProduction = Boolean(minerData.inProduction);
         
-        // Use corrected on-chain coordinates
+        // Log the mapping for debugging without excessive info
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`Mapping miner ID ${id} with type ${minerType} at position (${x}, ${y})`);
+        }
+        
         const correctedMiner = {
           ...miner,
-          minerType: minerType,
-          x: x,
-          y: y,
-          hashrate: hashrate,
-          powerConsumption: powerConsumption,
-          cost: cost,
-          inProduction: inProduction
+          minerType,
+          x,
+          y,
+          hashrate,
+          powerConsumption,
+          cost,
+          inProduction
         };
         
-        console.log(`Corrected miner ID ${id} data:`, correctedMiner);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`Validated miner ID ${id} at (${x}, ${y})`);
+        }
         return correctedMiner;
       }
       
-      // Otherwise use the existing data
-      return miner;
+      // Otherwise use the existing data with validated coordinates
+      return {
+        ...miner,
+        x,
+        y
+      };
     })
-    // Filter out miners with invalid coordinates
-    .filter(m => {
-      const x = Number(m.x);
-      const y = Number(m.y);
-      const valid = x <= 1 && y <= 1;
-      if (!valid) {
-        console.warn(`Filtering out miner ID ${m.id} with invalid coordinates (${x}, ${y})`);
-      }
-      return valid;
-    });
+    .filter(Boolean); // Filter out null entries (invalid miners)
   }, [gameState.miners, minerFullData]);
+  
+  // Clear the tile miners cache when dependencies change
+  useEffect(() => {
+    tileMinersCache.current.clear();
+  }, [gameState.miners, gameState.hasFacility, gameState.hasClaimedStarterMiner, selectedTile]);
 
   /**
    * Function to get a miner at a specific tile position
@@ -661,16 +608,23 @@ export default function RoomPage() {
   const getMinerAtTile = useCallback((tileX: number | undefined, tileY: number | undefined): PlayerMiner | null => {
     if (tileX === undefined || tileY === undefined) return null;
     
-    console.log(`Looking for miner at tile (${tileX}, ${tileY})`);
-    console.log('Current miners data:', gameState.miners);
+    // Create a cache key
+    const cacheKey = `miner-${tileX}-${tileY}`;
     
-    // Only return the hardcoded starter miner if the user has actually claimed it
+    // Return from cache if available
+    if (tileMinersCache.current.has(cacheKey)) {
+      return tileMinersCache.current.get(cacheKey);
+    }
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Looking for miner at tile (${tileX}, ${tileY})`);
+    }
+    
+    // Special case for starter miner
     if ((!gameState.miners || gameState.miners.length === 0) && gameState.hasFacility && gameState.hasClaimedStarterMiner) {
-      console.log('User has claimed starter miner and no miners array data - using contract-confirmed starter miner');
       // Only return a miner for the starter position if hasClaimedStarterMiner is true
       if (tileX === 0 && tileY === 0) {
-        console.log('Returning contract-confirmed BANANA MINER at (0, 0)');
-        return {
+        const starterMiner = {
           id: '1',
           minerType: 1, // BANANA_MINER
           x: 0,
@@ -680,45 +634,84 @@ export default function RoomPage() {
           inProduction: true,
           image: '/banana-miner.gif'
         };
+        
+        // Cache the result
+        tileMinersCache.current.set(cacheKey, starterMiner);
+        return starterMiner;
       }
+      
+      // Cache negative result
+      tileMinersCache.current.set(cacheKey, null);
       return null;
     }
     
-    const miner = getValidatedMiners().find(m => 
-      Number(m.x) === Number(tileX) && Number(m.y) === Number(tileY)
+    if (!gameState.hasFacility) {
+      tileMinersCache.current.set(cacheKey, null);
+      return null;
+    }
+    
+    // Find miner in validated miners list
+    const miners = getValidatedMiners();
+    const miner = miners.find(m => 
+      Number(m?.x) === Number(tileX) && Number(m?.y) === Number(tileY)
     );
     
-    console.log(`Miner found at (${tileX}, ${tileY}):`, miner);
+    // Cache the result
+    tileMinersCache.current.set(cacheKey, miner || null);
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Miner found at (${tileX}, ${tileY}):`, miner || 'None');
+    }
+    
     return miner || null;
   }, [getValidatedMiners, gameState.miners, gameState.hasFacility, gameState.hasClaimedStarterMiner]);
 
-  // Check if the selected tile has a miner
+  // Check if the selected tile has a miner - reuse cache from getMinerAtTile
   const selectedTileHasMiner = useCallback((x: number, y: number): boolean => {
-    console.log(`Checking if tile (${x}, ${y}) has a miner`);
+    // Create a cache key
+    const cacheKey = `has-${x}-${y}`;
     
-    // Only consider the hardcoded starter miner if the user has actually claimed it
+    // Return from cache if available
+    if (tileMinersCache.current.has(cacheKey)) {
+      return tileMinersCache.current.get(cacheKey);
+    }
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Checking if tile (${x}, ${y}) has a miner`);
+    }
+    
+    // Special case for starter miner
     if ((!gameState.miners || gameState.miners.length === 0) && gameState.hasFacility && gameState.hasClaimedStarterMiner) {
-      console.log('User has claimed starter miner - checking against contract-confirmed starter miner position');
       // Only return true for the starter position if hasClaimedStarterMiner is true
       if (x === 0 && y === 0) {
-        console.log('Contract-confirmed starter miner found at (0, 0)');
+        tileMinersCache.current.set(cacheKey, true);
         return true;
       }
+      
+      tileMinersCache.current.set(cacheKey, false);
       return false;
     }
     
-    // Check using miners from gameState instead of getValidatedMiners
-    const hasMiner = gameState.miners.some(m => 
-      Number(m.x) === Number(x) && Number(m.y) === Number(y)
+    // Get miners
+    const miners = getValidatedMiners();
+    
+    // Check if any miner has these coordinates
+    const hasMiner = miners.some(m => 
+      m && Number(m.x) === Number(x) && Number(m.y) === Number(y)
     );
     
-    console.log(`Tile (${x}, ${y}) has miner: ${hasMiner}`);
+    // Cache the result
+    tileMinersCache.current.set(cacheKey, hasMiner);
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Tile (${x}, ${y}) has miner: ${hasMiner}`);
+    }
+    
     return hasMiner;
-  }, [gameState.miners, gameState.hasFacility, gameState.hasClaimedStarterMiner]);
+  }, [getValidatedMiners, gameState.hasFacility, gameState.hasClaimedStarterMiner, gameState.miners]);
 
   // Use the updated useMinerData hook directly within the component
   const { data: miner1Data } = useMinerData(address, '1');
-  const { data: miner11Data } = useMinerData(address, '11');
 
   // Log miner data when it changes and store in state
   useEffect(() => {
@@ -727,13 +720,6 @@ export default function RoomPage() {
       setMinerFullData(prev => ({...prev, 1: miner1Data}));
     }
   }, [miner1Data]);
-
-  useEffect(() => {
-    if (miner11Data) {
-      console.log("Complete on-chain data for miner ID 11:", miner11Data);
-      setMinerFullData(prev => ({...prev, 11: miner11Data}));
-    }
-  }, [miner11Data]);
 
   // Get free miner data (index 1) - currently mocked since not in ABI
   const freeMinerData: MinerData = {
@@ -863,55 +849,39 @@ export default function RoomPage() {
     }
   }, [gameState.miners]);
 
-  // Force a re-render when selectedTile or miners change
+  // Simplify the useEffect that forces a UI re-render to prevent infinite loops
   useEffect(() => {
     if (selectedTile) {
-      console.log('Selected tile or miners changed, checking for miner...');
+      // Limit the frequency of this check to avoid excessive re-renders
       const hasMiner = selectedTileHasMiner(selectedTile.x, selectedTile.y);
-      console.log(`Selected tile has miner: ${hasMiner}`);
       
-      // Force re-render by updating state slightly
-      setSelectedTile(prev => prev ? {...prev} : null);
-    }
-  }, [selectedTile, gameState.miners, gameState.hasClaimedStarterMiner, selectedTileHasMiner]);
-
-  // Force a check after component mount to make sure we're detecting miners
-  useEffect(() => {
-    const checkTimer = setTimeout(() => {
-      if (selectedTile) {
-        console.log('⭐ Delayed check for miner at selected tile');
-        const hasMiner = selectedTileHasMiner(selectedTile.x, selectedTile.y);
-        console.log(`⭐ Has miner: ${hasMiner}`);
-        
-        // Get detailed miner info
-        if (hasMiner) {
-          const miner = getMinerAtTile(selectedTile.x, selectedTile.y);
-          console.log('⭐ Miner details:', miner);
-        }
-        
-        // Refresh the UI
-        setSelectedTile(prev => prev ? {...prev} : null);
+      // Use a boolean flag in a ref to prevent repeatedly entering this logic 
+      // when nothing has changed
+      const hasChanged = hasMinerRef.current !== hasMiner;
+      if (hasChanged) {
+        hasMinerRef.current = hasMiner;
+        console.log(`Selected tile has miner: ${hasMiner}`);
       }
-    }, 1000);
-    
-    return () => clearTimeout(checkTimer);
+    }
+  }, [selectedTile, selectedTileHasMiner]);
+
+  // Optimize the force check after component mount
+  useEffect(() => {
+    // Only run once, use a ref to track
+    if (selectedTile && !initialCheckDoneRef.current) {
+      initialCheckDoneRef.current = true;
+      console.log('⭐ Delayed check for miner at selected tile');
+      
+      // No need to cause re-renders here, just update refs if needed
+      const hasMiner = selectedTileHasMiner(selectedTile.x, selectedTile.y);
+      hasMinerRef.current = hasMiner;
+      
+      if (hasMiner) {
+        const miner = getMinerAtTile(selectedTile.x, selectedTile.y);
+        console.log('⭐ Miner details:', miner);
+      }
+    }
   }, [selectedTile, selectedTileHasMiner, getMinerAtTile]);
-
-  // Special check for position (0,0) which is commonly used for starter miners
-  useEffect(() => {
-    if (gameState.hasClaimedStarterMiner && typeof window !== 'undefined') {
-      // Check if the localStorage has the wrong position
-      const savedPositionStr = localStorage.getItem('claimedMinerPosition');
-      if (savedPositionStr) {
-        const position = JSON.parse(savedPositionStr);
-        // If the position is 0,0 but should be 1,0 according to chain data
-        if (position.x === 0 && position.y === 0 && tileOneZeroOccupied) {
-          console.log('Correcting miner position in localStorage from (0,0) to (1,0)');
-          localStorage.setItem('claimedMinerPosition', JSON.stringify({x: 1, y: 0}));
-        }
-      }
-    }
-  }, [gameState.hasClaimedStarterMiner, tileOneZeroOccupied]);
 
   // Force a re-render of the mining tab when miners change
   useEffect(() => {
@@ -1313,8 +1283,8 @@ export default function RoomPage() {
       return (minerType: number) => {
         // Use the known miner types from the contract
         if (minerType === 1) return '100'; // BANANA_MINER
-        if (minerType === 2) return '400'; // GORILLA_GADGET
-        if (minerType === 3) return '1,200'; // MONKEY_TOASTER
+        if (minerType === 2) return '180'; // MONKEY_TOASTER
+        if (minerType === 3) return '1,000'; // GORILLA_GADGET
         if (minerType === 4) return '3,000'; // APEPAD_MINI
         return '0';
       };
@@ -1324,9 +1294,9 @@ export default function RoomPage() {
       return (minerType: number) => {
         // Use the known miner types from the contract
         if (minerType === 1) return '1'; // BANANA_MINER
-        if (minerType === 2) return '5'; // GORILLA_GADGET
-        if (minerType === 3) return '12'; // MONKEY_TOASTER
-        if (minerType === 4) return '25'; // APEPAD_MINI
+        if (minerType === 2) return '2'; // MONKEY_TOASTER
+        if (minerType === 3) return '3'; // GORILLA_GADGET
+        if (minerType === 4) return '4'; // APEPAD_MINI
         return '0';
       };
     }, []);
@@ -1335,8 +1305,8 @@ export default function RoomPage() {
       return (minerType: number) => {
         // Use the known miner types from the contract
         if (minerType === 1) return 'FREE'; // BANANA_MINER
-        if (minerType === 2) return '10'; // GORILLA_GADGET
-        if (minerType === 3) return '30'; // MONKEY_TOASTER
+        if (minerType === 2) return '10'; // MONKEY_TOASTER
+        if (minerType === 3) return '30'; // GORILLA_GADGET
         if (minerType === 4) return '75'; // APEPAD_MINI
         return '0';
       };
@@ -1346,8 +1316,8 @@ export default function RoomPage() {
       return (minerType: number) => {
         // Use the known miner types from the contract
         if (minerType === 1) return 'BANANA MINER'; // BANANA_MINER
-        if (minerType === 2) return 'GORILLA GADGET'; // GORILLA_GADGET
-        if (minerType === 3) return 'MONKEY TOASTER'; // MONKEY_TOASTER
+        if (minerType === 2) return 'MONKEY TOASTER'; // MONKEY_TOASTERGORILLA_GADGET
+        if (minerType === 3) return 'GORILLA GADGET'; // GORILLA_GADGET
         if (minerType === 4) return 'APEPAD MINI'; // APEPAD_MINI
         return 'UNKNOWN MINER';
       };
@@ -1407,8 +1377,8 @@ export default function RoomPage() {
                     
     const MINERS = {
       1: { name: 'BANANA MINER', image: '/banana-miner.gif' },
-      2: { name: 'GORILLA GADGET', image: '/gorilla-gadget.gif' },
-      3: { name: 'MONKEY TOASTER', image: '/monkey-toaster.gif' },
+      2: { name: 'MONKEY TOASTER ', image: '/monkey-toaster.gif' },
+      3: { name: 'GORILLA GADGET', image: '/gorilla-gadget.gif' },
       4: { name: 'APEPAD MINI', image: '/apepad.png' }
     };
     
@@ -1644,44 +1614,57 @@ export default function RoomPage() {
   }
 
   const renderTabContent = () => {
-    console.log('Page - Rendering tab content with gameState:', {
-      hasFacility: gameState.hasFacility,
-      facilityData: gameState.facilityData,
-      spacesLeft: gameState.spacesLeft,
-      gigawattsAvailable: gameState.gigawattsAvailable,
-      activeTab
-    });
+    // Avoid excessive logging to improve performance
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Page - Rendering tab content with current tab:', activeTab);
+    }
 
-    // Global function is now set in useEffect, not here on every render
-
+    // Memoize tab content to avoid unnecessary renders
     switch (activeTab) {
       case 'resources':
         return <ResourcesPanel />;
       case 'space':
         return <SpaceTab />;
       case 'selectedTile':
-        console.log('Rendering SELECTED TILE tab with selectedTile:', selectedTile);
+        // Only log in development mode
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Rendering SELECTED TILE tab with selectedTile:', selectedTile);
+        }
         
-        // Create a dedicated function to open the modal
+        // Don't render if no tile is selected
+        if (!selectedTile) {
+          return (
+            <div className="p-3 text-center">
+              <p className="font-press-start text-white text-xs">No tile selected</p>
+              <p className="font-press-start text-white text-[9px] mt-2">Click on a tile in the grid mode to select it</p>
+            </div>
+          );
+        }
+        
+        // Create a dedicated function to open the modal - defined outside the render cycle
         const openMinerModal = () => {
-          console.log('openMinerModal called from selectedTile tab');
-          
           // Check if we should handle removing a miner first
           if (selectedTile && selectedTileHasMiner(selectedTile.x, selectedTile.y)) {
             // Additional check for starter miner - only allow removal if actually claimed
             if (selectedTile.x === 0 && selectedTile.y === 0 && !gameState.hasClaimedStarterMiner) {
-              console.log('Preventing removal of starter miner that has not been claimed');
+              if (process.env.NODE_ENV === 'development') {
+                console.log('Preventing removal of starter miner that has not been claimed');
+              }
               return;
             }
             
-            console.log('Opening modal to remove miner at:', selectedTile);
+            if (process.env.NODE_ENV === 'development') {
+              console.log('Opening modal to remove miner at:', selectedTile);
+            }
             // Call the global handleRemoveMiner with the current selectedTile
             handleRemoveMiner(selectedTile.x, selectedTile.y);
             return;
           }
           
-          // Otherwise show the miner purchase modal
-          setShowMinerModal(true);
+          // Otherwise show the miner purchase modal if not already visible
+          if (!showMinerModal) {
+            setShowMinerModal(true);
+          }
         };
         
         return (
@@ -1702,14 +1685,6 @@ export default function RoomPage() {
   };
 
   // Direct contract read for totalSupply for mobile tab (moved to component level)
-  const { data: mobileTotalSupplyData } = useContractRead({
-    address: CONTRACT_ADDRESSES.BIT_TOKEN,
-    abi: BIT_TOKEN_ABI,
-    functionName: 'totalSupply',
-    query: {
-      enabled: true,
-    },
-  });
 
   // Render content based on the active mobile tab
   const renderMobileTabContent = () => {
@@ -1805,11 +1780,11 @@ export default function RoomPage() {
                   : 'Loading...'}
               </span> BIT PER BLOCK</p>
               <p className="font-press-start text-white text-xs mb-1">- <span className="text-banana">
-                {mobileTotalSupplyData !== undefined 
-                  ? formatNumber(mobileTotalSupplyData, 2, '', 18) 
+                {useSafeHookValues(statsTotalSupplyData, undefined) !== undefined 
+                  ? formatNumber(statsTotalSupplyData, 2, '', 18) 
                   : 'Loading...'}
               </span> TOTAL BIT MINED</p>
-              <p className="font-press-start text-white text-xs">- <span className="text-banana">
+              <p className="font-press-start text-white text-xs mb-1">- <span className="text-banana">
                 {burnedBitData !== undefined 
                   ? formatNumber(burnedBitData, 2, '', 18) 
                   : 'Loading...'}
@@ -1934,36 +1909,39 @@ export default function RoomPage() {
     return "UNKNOWN LOCATION";
   };
 
-  const handleTileSelect = (x: number, y: number) => {
-    console.log(`Tile selected at (${x}, ${y})`);
+  // Handle selecting a tile in the room visualization
+  const handleTileSelect = useCallback((x: number, y: number) => {
+    // Add a debounce to prevent rapid state updates
+    if (Date.now() - lastSelectionTimeRef.current < 300) {
+      return; // Ignore rapid selections
+    }
+    lastSelectionTimeRef.current = Date.now();
     
-    // Check if we're selecting the same tile again
-    const isSameTile = selectedTile && selectedTile.x === x && selectedTile.y === y;
+    console.log(`Tile selected at position (${x}, ${y})`);
     
-    // Force re-render by creating a new object, even if coordinates are the same
+    // Update the selected tile
     setSelectedTile({ x, y });
     
-    // Switch to the selected tile tab when a new tile is selected
-    if (!isSameTile || activeTab !== 'selectedTile') {
-      setActiveTab('selectedTile');
-    }
+    // Always switch to selected tile tab when a tile is clicked directly
+    // But do this in a separate useEffect to avoid setting state during another state update
+    setActiveTab('selectedTile');
+  }, []);
+  
+  // Use an effect to handle post-selection actions
+  useEffect(() => {
+    // Only proceed if there's a selected tile
+    if (!selectedTile) return;
     
-    // Check if there's a miner at this position immediately after selection
-    const hasMiner = selectedTileHasMiner(x, y);
-    console.log(`Tile has miner: ${hasMiner}`);
+    console.log(`Selected tile changed to (${selectedTile.x}, ${selectedTile.y})`);
     
-    // Force the component to update since tile selection is critical for UI
-    // This helps address the double-click issue
-    setTimeout(() => {
-      if (selectedTile?.x !== x || selectedTile?.y !== y) {
-        console.log('Forcing tile selection update');
-        setSelectedTile({ x, y });
-      }
-    }, 100);
-  };
+    // Any additional logic based on tile selection can go here
+  }, [selectedTile]);
 
   const handlePurchaseFacility = async () => {
-    setIsBuyModalOpen(true);
+    // Only open the modal if it's not already open
+    if (!isBuyModalOpen) {
+      setIsBuyModalOpen(true);
+    }
     return Promise.resolve();
   };
 
