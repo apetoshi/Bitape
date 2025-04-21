@@ -49,34 +49,27 @@ const StarterMinerModal: React.FC<StarterMinerModalProps> = ({
   selectedTile,
   isProcessing
 }) => {
-  const [isShowing, setIsShowing] = useState(isOpen);
+  // Remove the internal isShowing state which could cause render issues
   
-  // Use useCallback to prevent recreation on every render
-  const handleForceClose = useCallback(() => {
-    setIsShowing(false);
-    setTimeout(() => {
-      onClose();
-    }, 300);
-  }, [onClose]);
-
   // Add escape key handler as another way to close
   useEffect(() => {
     const handleEscapeKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        handleForceClose();
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
       }
     };
     
     window.addEventListener('keydown', handleEscapeKey);
     return () => window.removeEventListener('keydown', handleEscapeKey);
-  }, [handleForceClose]);
+  }, [isOpen, onClose]);
 
-  if (!isShowing) return null;
+  // Don't render anything if not open
+  if (!isOpen) return null;
 
   return (
     <Dialog
-      open={isShowing}
-      onClose={() => {}} // Prevent automatic closing on backdrop click 
+      open={true} // Always true when rendered 
+      onClose={onClose}
       className="relative z-50"
     >
       <style jsx global>{minerPreviewStyle}</style>
@@ -93,16 +86,16 @@ const StarterMinerModal: React.FC<StarterMinerModalProps> = ({
                 <p className="text-white text-center font-bold">HOW TO CLAIM YOUR MINER:</p>
                 <ol className="list-decimal pl-6 text-white mt-2 space-y-2">
                   <li className="text-yellow-300 font-bold">
-                    Click "CLOSE" button below
+                    Select a tile for your miner
                   </li>
                   <li className="text-yellow-300 font-bold">
-                    Click "SHOW GRID" button in the top-left
+                    Click "CLAIM FREE MINER" button below
                   </li>
                   <li className="text-yellow-300 font-bold">
-                    Click one of the highlighted tiles
+                    Confirm the transaction in your wallet
                   </li>
                   <li className="text-yellow-300 font-bold">
-                    Click "CLAIM STARTER MINER" button
+                    Start earning BIT!
                   </li>
                 </ol>
               </div>
@@ -153,7 +146,7 @@ const StarterMinerModal: React.FC<StarterMinerModalProps> = ({
 
           <div className="flex justify-between space-x-4">
             <button
-              onClick={handleForceClose}
+              onClick={onClose}
               className="font-press-start px-6 py-2 border-2 border-banana text-banana hover:bg-banana hover:text-royal transition-colors"
             >
               CLOSE
@@ -168,7 +161,7 @@ const StarterMinerModal: React.FC<StarterMinerModalProps> = ({
               </button>
             ) : (
               <button
-                onClick={handleForceClose}
+                onClick={onClose}
                 className="font-press-start px-6 py-2 bg-banana text-royal hover:bg-opacity-90 transition-colors"
               >
                 CLOSE & SELECT TILE

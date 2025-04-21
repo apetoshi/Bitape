@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import '@/styles/animations.css';
-import { useWriteContract } from 'wagmi';
+import { useWriteContract, useContractRead, useAccount } from 'wagmi';
 import { CONTRACT_ADDRESSES, MAIN_CONTRACT_ABI } from '@/config/contracts';
+import { formatEther, zeroAddress } from 'viem';
 
 interface EnhancedMiningClaimSectionProps {
   minedBit: string;
@@ -11,42 +12,115 @@ interface EnhancedMiningClaimSectionProps {
 }
 
 export const EnhancedMiningClaimSection: React.FC<EnhancedMiningClaimSectionProps> = ({
-  minedBit,
+  minedBit: initialMinedBit,
   onClaimRewards,
   isClaimingReward,
   miningRate
 }) => {
-  // Parse minedBit as a number to handle both "0" and "Loading..." cases
-  const parsedAmount = isNaN(parseFloat(minedBit)) ? 0 : parseFloat(minedBit);
-  const hasMinedBit = parsedAmount > 0;
-  
-  // Track claim success for animation
+  const { address } = useAccount();
+  const [displayAmount, setDisplayAmount] = useState('0');
+  const [targetAmount, setTargetAmount] = useState(0);
   const [showClaimSuccess, setShowClaimSuccess] = useState(false);
-  const [previousAmount, setPreviousAmount] = useState(parsedAmount);
   const [isManualClaiming, setIsManualClaiming] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [tickEffect, setTickEffect] = useState(false);
+
+  // Fetch pending rewards directly from contract
+  const { data: pendingRewardsData, isLoading: isLoadingRewards, refetch: refetchRewards } = useContractRead({
+    address: CONTRACT_ADDRESSES.MAIN,
+    abi: MAIN_CONTRACT_ABI,
+    functionName: 'pendingRewards',
+    args: [address || zeroAddress],
+    query: {
+      enabled: Boolean(address),
+      refetchInterval: 15000, // Refetch every 15 seconds
+    }
+  });
+
+  // Format the pending rewards from bigint to a readable string and animate
+  useEffect(() => {
+    if (pendingRewardsData) {
+      console.log('Pending rewards:', pendingRewardsData);
+      const formattedAmount = formatEther(pendingRewardsData as bigint);
+      const numAmount = parseFloat(formattedAmount);
+      setTargetAmount(numAmount);
+      
+      // Set immediate display for very small amounts
+      if (numAmount < 0.0001) {
+        setDisplayAmount(numAmount.toFixed(6));
+        return;
+      }
+      
+      // Animate number increasing
+      setIsAnimating(true);
+      let start = 0;
+      const end = numAmount;
+      const duration = 2000; // 2 seconds animation
+      const startTime = Date.now();
+      const tickInterval = 150; // Tick sound/visual effect interval
+      let lastTick = 0;
+      
+      const animateValue = () => {
+        const now = Date.now();
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Easing function for smooth animation
+        const easeOutQuad = (t: number) => t * (2 - t);
+        const currentValue = end * easeOutQuad(progress);
+        
+        // Format based on size
+        let formatted;
+        if (end >= 1000) {
+          formatted = currentValue.toFixed(2);
+        } else if (end >= 100) {
+          formatted = currentValue.toFixed(3);
+        } else if (end >= 10) {
+          formatted = currentValue.toFixed(4);
+        } else {
+          formatted = currentValue.toFixed(5);
+        }
+        
+        setDisplayAmount(formatted);
+        
+        // Add tick effect at intervals
+        if (now - lastTick > tickInterval && progress < 0.95) {
+          setTickEffect(prev => !prev);
+          lastTick = now;
+        }
+        
+        if (progress < 1) {
+          requestAnimationFrame(animateValue);
+        } else {
+          setIsAnimating(false);
+          setDisplayAmount(end.toFixed(end >= 100 ? 2 : (end >= 10 ? 3 : 5)));
+        }
+      };
+      
+      animateValue();
+    } else {
+      setDisplayAmount(isLoadingRewards ? 'Loading...' : '0');
+    }
+  }, [pendingRewardsData, isLoadingRewards]);
 
   // Access the writeContract hook
   const { writeContract, isPending, isSuccess, error } = useWriteContract();
   
-  // Check for successful claim (when rewards drop to 0 after claiming)
-  useEffect(() => {
-    if (previousAmount > 0 && parsedAmount === 0 && !isClaimingReward && !isManualClaiming) {
-      setShowClaimSuccess(true);
-      const timer = setTimeout(() => setShowClaimSuccess(false), 3000);
-      return () => clearTimeout(timer);
-    }
-    setPreviousAmount(parsedAmount);
-  }, [parsedAmount, isClaimingReward, previousAmount, isManualClaiming]);
-  
-  // Monitor the claim transaction status
+  // Monitor claim success for animation
   useEffect(() => {
     if (isSuccess && isManualClaiming) {
       console.log('Claim transaction successful!');
       setShowClaimSuccess(true);
+      setDisplayAmount('0');
+      setTargetAmount(0);
+      
+      // Reset states after animation
       const timer = setTimeout(() => {
         setShowClaimSuccess(false);
         setIsManualClaiming(false);
+        refetchRewards(); // Refresh rewards after claim
       }, 3000);
+      
       return () => clearTimeout(timer);
     }
     
@@ -54,30 +128,21 @@ export const EnhancedMiningClaimSection: React.FC<EnhancedMiningClaimSectionProp
       console.error('Claim transaction failed:', error);
       setIsManualClaiming(false);
     }
-  }, [isSuccess, error, isManualClaiming]);
+  }, [isSuccess, error, isManualClaiming, refetchRewards]);
   
   // Handle claim with direct contract call
   const handleClaim = async () => {
-    if (isClaimingReward || isPending || isManualClaiming || !hasMinedBit) return;
+    if (isClaimingReward || isPending || isManualClaiming || isLoadingRewards || targetAmount <= 0) return;
     
     try {
       console.log('Calling claimRewards contract function directly...');
       setIsManualClaiming(true);
       
-      // Use custom ABI with the correct function name
-      const claimRewardsAbi = [{
-        inputs: [],
-        name: 'claimRewards',
-        outputs: [],
-        stateMutability: 'nonpayable',
-        type: 'function',
-      }];
-      
       writeContract({
         address: CONTRACT_ADDRESSES.MAIN,
-        abi: claimRewardsAbi,
+        abi: MAIN_CONTRACT_ABI,
         functionName: 'claimRewards',
-      });
+      } as any);
       
       // Also call the original onClaimRewards to maintain compatibility
       onClaimRewards().catch(err => {
@@ -90,7 +155,32 @@ export const EnhancedMiningClaimSection: React.FC<EnhancedMiningClaimSectionProp
   };
   
   // Determine if we're in a loading state
-  const isLoading = isClaimingReward || isPending || isManualClaiming;
+  const isLoading = isClaimingReward || isPending || isManualClaiming || isLoadingRewards;
+  const hasMinedBit = targetAmount > 0;
+  
+  // Calculate real-time BIT accumulation to show increasing
+  useEffect(() => {
+    // Only increment if not in claim/loading state and there are rewards
+    if (!isLoading && !showClaimSuccess && hasMinedBit && miningRate) {
+      const rate = parseFloat(miningRate);
+      if (!isNaN(rate) && rate > 0) {
+        const incrementInterval = setInterval(() => {
+          setTargetAmount(prev => {
+            // Add tiny amount every second (daily rate / 86400)
+            const increment = rate / 86400;
+            return prev + increment;
+          });
+          
+          // Update display periodically if not actively animating
+          if (!isAnimating) {
+            setDisplayAmount(targetAmount.toFixed(targetAmount >= 100 ? 2 : (targetAmount >= 10 ? 3 : 5)));
+          }
+        }, 1000);
+        
+        return () => clearInterval(incrementInterval);
+      }
+    }
+  }, [isLoading, showClaimSuccess, hasMinedBit, miningRate, targetAmount, isAnimating]);
   
   return (
     <div className="relative p-4 bg-dark-blue border-2 border-banana rounded-lg text-center font-press-start overflow-hidden">
@@ -107,8 +197,10 @@ export const EnhancedMiningClaimSection: React.FC<EnhancedMiningClaimSectionProp
         <h3 className="text-banana text-base mb-2">MINING REWARDS</h3>
         <div className="flex items-center justify-center gap-2">
           <span className="text-white text-sm">YOU HAVE MINED</span>
-          <span className={`text-banana font-bold ${hasMinedBit ? 'text-xl animate-pulse-custom' : 'text-lg'}`}>
-            {minedBit}
+          <span className={`text-banana font-bold ${hasMinedBit ? 'text-xl' : 'text-lg'} ${
+            isAnimating || tickEffect ? 'animate-pulse-custom' : hasMinedBit ? 'animate-pulse-slow' : ''
+          }`}>
+            {displayAmount}
           </span>
           <span className="text-white text-sm">BIT</span>
         </div>
@@ -122,7 +214,7 @@ export const EnhancedMiningClaimSection: React.FC<EnhancedMiningClaimSectionProp
       
       <button 
         onClick={handleClaim}
-        disabled={isLoading || parsedAmount <= 0}
+        disabled={isLoading || targetAmount <= 0}
         className={`w-full py-2 px-3 text-sm border-2 transition-all duration-200 ${
           hasMinedBit && !isLoading
             ? 'bg-banana text-royal hover:bg-opacity-90 border-royal relative overflow-hidden'

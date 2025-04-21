@@ -12,70 +12,70 @@ interface ConnectWalletButtonProps {
 }
 
 const ConnectWalletButton: React.FC<ConnectWalletButtonProps> = ({ className }) => {
-  const { open } = useWeb3Modal();
+  // Track component mount state to avoid hydration issues
+  const [mounted, setMounted] = useState(false);
+  const [buttonText, setButtonText] = useState('CONNECT WALLET');
+  
+  // Always call the hook unconditionally at the top level
+  const web3Modal = useWeb3Modal();
+  
   const { isConnected, address } = useAccount();
   const router = useRouter();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { apeBalance, bitBalance } = useTokenBalance();
+  
+  // Only check connection after component mounts on client
+  useEffect(() => {
+    setMounted(true);
+    setButtonText(isConnected ? 'PROFILE' : 'CONNECT WALLET');
+  }, [isConnected]);
 
   // Handle routing when wallet is connected
   useEffect(() => {
-    if (isConnected && address) {
+    if (isConnected && address && mounted) {
       router.push(`/room/${address}`);
     }
-  }, [isConnected, address, router]);
+  }, [isConnected, address, router, mounted]);
 
   const handleClick = async () => {
     if (isConnected) {
       setIsModalOpen(true);
     } else {
       try {
-        // Check if we're on mobile
-        const isMobile = typeof window !== 'undefined' && 
-          /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        
-        // Check for specific mobile wallet support
-        const hasMetaMaskInBrowser = typeof window !== 'undefined' && 
-          typeof window.ethereum !== 'undefined' && 
-          window.ethereum.isMetaMask;
-        
-        // Open the appropriate web3modal view based on device and available wallets
-        if (isMobile) {
-          if (hasMetaMaskInBrowser) {
-            // Use injected MetaMask if available in browser
-            await open({
-              view: 'Connect'
-            });
-          } else {
-            // Launch WalletConnect QR or deep link options for mobile
-            await open({
-              view: 'Connect'
-            });
-            
-            // For MetaMask app - direct deep link if Web3Modal fails to open it
-            if (isMobile && !hasMetaMaskInBrowser) {
-              // Try direct deep linking to MetaMask as fallback
-              const mmDeepLink = `https://metamask.app.link/dapp/${window.location.host}${window.location.pathname}`;
-              window.open(mmDeepLink, '_blank');
-            }
-          }
-        } else {
-          // Standard flow for desktop
-          await open();
+        // Simple check if web3Modal is available
+        if (!web3Modal) {
+          console.warn('Web3Modal not ready yet - please wait a moment and try again');
+          return;
         }
+        
+        // Use a simpler approach to handle wallet connection
+        await web3Modal.open();
       } catch (error) {
         console.error('Failed to connect wallet:', error);
       }
     }
   };
 
+  // If not mounted yet, show minimal loading state to avoid hydration issues
+  if (!mounted) {
+    return (
+      <button 
+        className={`bg-transparent border-2 border-banana text-banana opacity-70 font-press-start ${className}`}
+        aria-label="Loading wallet connection"
+      >
+        LOADING...
+      </button>
+    );
+  }
+
   return (
     <>
       <button 
         onClick={handleClick} 
         className={`bg-transparent border-2 border-banana text-banana hover:bg-banana hover:text-royal transition-colors font-press-start ${className}`}
+        aria-label={isConnected ? "Open profile" : "Connect wallet"}
       >
-        {isConnected ? 'PROFILE' : 'CONNECT WALLET'}
+        {buttonText}
       </button>
 
       {isConnected && address && (

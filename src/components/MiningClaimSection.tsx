@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useWriteContract } from 'wagmi';
+import { useWriteContract, useContractRead, useAccount } from 'wagmi';
 import { CONTRACT_ADDRESSES, MAIN_CONTRACT_ABI } from '@/config/contracts';
+import { formatEther, zeroAddress } from 'viem';
 
 interface MiningClaimSectionProps {
   minedBit: string;
@@ -9,17 +10,63 @@ interface MiningClaimSectionProps {
 }
 
 export const MiningClaimSection: React.FC<MiningClaimSectionProps> = ({
-  minedBit,
+  minedBit: initialMinedBit,
   onClaimRewards,
   isClaimingReward
 }) => {
-  // Parse minedBit as a number to handle both "0" and "Loading..." cases
-  const parsedAmount = isNaN(parseFloat(minedBit)) ? 0 : parseFloat(minedBit);
-  const hasMinedBit = parsedAmount > 0;
-  
-  // State for direct contract calling
+  const { address } = useAccount();
+  const [displayAmount, setDisplayAmount] = useState('0');
   const [isManualClaiming, setIsManualClaiming] = useState(false);
-  
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  // Fetch pending rewards directly from contract
+  const { data: pendingRewardsData, isLoading: isLoadingRewards, refetch: refetchRewards } = useContractRead({
+    address: CONTRACT_ADDRESSES.MAIN,
+    abi: MAIN_CONTRACT_ABI,
+    functionName: 'pendingRewards',
+    args: [address || zeroAddress],
+    query: {
+      enabled: Boolean(address),
+      refetchInterval: 15000, // Refetch every 15 seconds
+    }
+  });
+
+  // Format the pending rewards from bigint to a readable string
+  useEffect(() => {
+    if (pendingRewardsData) {
+      const formattedAmount = formatEther(pendingRewardsData as bigint);
+      
+      // Animate number increasing
+      setIsAnimating(true);
+      let start = 0;
+      const end = parseFloat(formattedAmount);
+      const duration = 1500;
+      const startTime = Date.now();
+      
+      const animateValue = () => {
+        const now = Date.now();
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Easing function for smooth animation
+        const easeOutQuad = (t: number) => t * (2 - t);
+        const currentValue = (end * easeOutQuad(progress)).toFixed(4);
+        
+        setDisplayAmount(currentValue);
+        
+        if (progress < 1) {
+          requestAnimationFrame(animateValue);
+        } else {
+          setIsAnimating(false);
+        }
+      };
+      
+      animateValue();
+    } else {
+      setDisplayAmount(isLoadingRewards ? 'Loading...' : '0');
+    }
+  }, [pendingRewardsData, isLoadingRewards]);
+
   // Access the writeContract hook
   const { writeContract, isPending, isSuccess, error } = useWriteContract();
   
@@ -28,16 +75,21 @@ export const MiningClaimSection: React.FC<MiningClaimSectionProps> = ({
     if (isSuccess && isManualClaiming) {
       console.log('Claim transaction successful!');
       setIsManualClaiming(false);
+      refetchRewards(); // Refresh rewards after successful claim
     }
     
     if (error && isManualClaiming) {
       console.error('Claim transaction failed:', error);
       setIsManualClaiming(false);
     }
-  }, [isSuccess, error, isManualClaiming]);
+  }, [isSuccess, error, isManualClaiming, refetchRewards]);
+  
+  // Parse minedBit as a number to handle both "0" and "Loading..." cases
+  const parsedAmount = isNaN(parseFloat(displayAmount)) ? 0 : parseFloat(displayAmount);
+  const hasMinedBit = parsedAmount > 0;
   
   // Determine if we're in a loading state
-  const isLoading = isClaimingReward || isPending || isManualClaiming;
+  const isLoading = isClaimingReward || isPending || isManualClaiming || isLoadingRewards;
   
   // Handle claim with direct contract call
   const handleClaim = async () => {
@@ -51,7 +103,7 @@ export const MiningClaimSection: React.FC<MiningClaimSectionProps> = ({
         address: CONTRACT_ADDRESSES.MAIN,
         abi: MAIN_CONTRACT_ABI,
         functionName: 'claimRewards',
-      });
+      } as any);
       
       // Also call the original onClaimRewards to maintain compatibility
       onClaimRewards().catch(err => {
@@ -70,7 +122,7 @@ export const MiningClaimSection: React.FC<MiningClaimSectionProps> = ({
         <div className="flex items-center justify-center gap-2">
           <span className="text-white text-sm">YOU HAVE MINED</span>
           <span className={`text-banana font-bold ${hasMinedBit ? 'text-xl animate-pulse' : 'text-lg'}`}>
-            {minedBit}
+            {displayAmount}
           </span>
           <span className="text-white text-sm">BIT</span>
         </div>

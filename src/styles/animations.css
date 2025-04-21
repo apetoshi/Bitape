@@ -2,70 +2,70 @@
 
 /* Fade Out Animation */
 @keyframes fadeOut {
-  from { opacity: 1; }
-  to { opacity: 0; }
+  0% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0; }
 }
         
 .animate-fade-out {
-  animation: fadeOut 3s forwards;
+  animation: fadeOut 3s ease-in-out;
 }
 
 /* Shine Effect Animation */
 @keyframes shine {
-  from { transform: translateX(-100%) rotate(35deg); }
-  to { transform: translateX(150%) rotate(35deg); }
+  0% { left: -100%; }
+  20% { left: 100%; }
+  100% { left: 100%; }
 }
         
 .shine-effect {
   position: absolute;
   top: 0;
-  left: 0;
+  left: -100%;
   width: 50%;
   height: 100%;
   background: linear-gradient(
-    90deg,
-    rgba(255,255,255,0) 0%,
-    rgba(255,255,255,0.2) 50%,
-    rgba(255,255,255,0) 100%
+    to right,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.2) 50%,
+    rgba(255, 255, 255, 0) 100%
   );
-  animation: shine 2s infinite;
-  transform: translateX(-100%) rotate(35deg);
+  transform: skewX(-25deg);
+  animation: shine 3s infinite;
 }
 
 /* Pulse Animation */
-@keyframes pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-  100% { transform: scale(1); }
+@keyframes pulseCustom {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.05); opacity: 0.9; }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 .animate-pulse-custom {
-  animation: pulse 2s infinite ease-in-out;
+  animation: pulseCustom 0.75s ease-in-out infinite;
 }
 
 /* Mining Animation */
-@keyframes mining {
-  0% { transform: translateY(0px); }
-  50% { transform: translateY(-3px); }
-  100% { transform: translateY(0px); }
+@keyframes miningIcon {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+  100% { transform: translateY(0); }
 }
 
 .mining-icon {
   display: inline-block;
-  animation: mining 1s infinite ease-in-out;
+  animation: miningIcon 1.5s ease-in-out infinite;
 }
 
 /* Success Animation */
-@keyframes success {
-  0% { transform: scale(0.8); opacity: 0; }
-  25% { transform: scale(1.1); opacity: 1; }
-  50% { transform: scale(0.95); opacity: 1; }
-  75% { transform: scale(1.05); opacity: 1; }
+@keyframes popIn {
+  0% { transform: scale(0.6); opacity: 0; }
+  70% { transform: scale(1.1); opacity: 1; }
   100% { transform: scale(1); opacity: 1; }
 }
 
 .success-animation {
-  animation: success 0.5s forwards;
+  animation: popIn 0.5s ease-out;
 }
 
 /* Float Animation */
@@ -88,4 +88,15 @@
 .number-tick {
   display: inline-block;
   animation: numberTick 0.3s forwards;
+}
+
+/* Slower pulse animation for idle numbers */
+@keyframes pulseSlow {
+  0% { opacity: 0.9; }
+  50% { opacity: 1; }
+  100% { opacity: 0.9; }
+}
+
+.animate-pulse-slow {
+  animation: pulseSlow 3s ease-in-out infinite;
 } 

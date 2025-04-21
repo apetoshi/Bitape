@@ -1,8 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { Dialog } from '@headlessui/react';
 import { MINERS, MinerType, MinerData, getActiveMiners } from '@/config/miners';
 import { addMinerToMap } from '@/app/room/[address]/fixedMinerMap';
+import { APECHAIN_ID, CONTRACT_ADDRESSES } from '@/config/contracts';
+import { usePublicClient, useAccount } from 'wagmi';
+import { formatEther, parseEther, parseUnits } from 'viem';
+import {
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalCloseButton,
+  Button,
+  Grid,
+  GridItem,
+  Text,
+  Flex,
+  Box,
+  Progress,
+  Tooltip,
+  useColorModeValue
+} from '@chakra-ui/react';
+import { BITAPE_TOKEN_ABI, BITAPE_TOKEN_ADDRESS } from '@/config/web3';
 
 interface MinerPurchaseModalProps {
   isOpen: boolean;
@@ -39,46 +60,58 @@ const MinerPurchaseModal: React.FC<MinerPurchaseModalProps> = ({
   const [selectedMiner, setSelectedMiner] = useState<MinerType>(defaultMiner);
   const [purchaseStage, setPurchaseStage] = useState<'initial' | 'approving' | 'purchasing' | 'success'>('initial');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [hasEnoughAllowance, setHasEnoughAllowance] = useState<boolean>(false);
+  const [isCheckingAllowance, setIsCheckingAllowance] = useState<boolean>(false);
+  const [minerCost, setMinerCost] = useState<string>('0');
   const activeMiners = getActiveMiners();
+  const publicClient = usePublicClient();
+  const { address } = useAccount();
   
-  // Convert bitBalance to a number
+  // Convert bitBalance to a number - ensure it's properly formatted from wei to ether
   const bitBalanceNumber = parseFloat(bitBalance);
   
-  // Get the details of the selected miner
-  const minerDetails = MINERS[selectedMiner];
-  
-  // Update where the miner details are displayed to use contract data when available
-  const getMinerInfo = (minerType: MinerType, property: 'hashrate' | 'powerConsumption' | 'cost') => {
-    // Use contract data for Monkey Toaster if available
-    if (minerType === MinerType.MONKEY_TOASTER && minerTypeData[MinerType.MONKEY_TOASTER]) {
-      const data = minerTypeData[MinerType.MONKEY_TOASTER];
-      if (property === 'hashrate') {
-        return Number(data[4]).toString(); // hashrate is at index 4
-      } else if (property === 'powerConsumption') {
-        return Number(data[5]).toString(); // powerConsumption is at index 5
-      } else if (property === 'cost') {
-        return Number(data[6]).toString(); // cost is at index 6
-      }
-    }
-    
-    // Fallback to config data
-    const miner = MINERS[minerType];
-    if (property === 'hashrate') {
-      return miner.hashrate.toString();
-    } else if (property === 'powerConsumption') {
-      return miner.energyConsumption.toString();
-    } else if (property === 'cost') {
-      return miner.price.toString();
-    }
-    return '0';
+  // Get miner info from contract data or fallback to config
+  const getMinerInfo = (minerType: MinerType) => {
+    const configMiner = MINERS[minerType];
+    return {
+      hashrate: configMiner.hashrate,
+      powerConsumption: configMiner.energyConsumption,
+      cost: configMiner.price
+    };
   };
+
+  // Memoize the selected miner details
+  const minerDetails = useMemo(() => {
+    const miner = MINERS[selectedMiner];
+    const isFreeMiner = selectedMiner === MinerType.BANANA_MINER && !hasClaimedStarterMiner;
+    const price = isFreeMiner ? 0 : getMinerInfo(selectedMiner).cost;
+    const hashrate = getMinerInfo(selectedMiner).hashrate;
+    const powerConsumption = getMinerInfo(selectedMiner).powerConsumption;
+
+    return {
+      name: miner.name,
+      image: miner.image,
+      description: miner.description,
+      price: typeof price === 'string' ? parseFloat(price) : price,
+      hashrate: typeof hashrate === 'string' ? parseFloat(hashrate) : hashrate,
+      powerConsumption: typeof powerConsumption === 'string' ? parseFloat(powerConsumption) : powerConsumption
+    };
+  }, [selectedMiner, hasClaimedStarterMiner]);
+  
+  // Memoize the miner cost value for allowance checks
+  const minerCostValue = useMemo(() => {
+    const isFreeMiner = selectedMiner === MinerType.BANANA_MINER && !hasClaimedStarterMiner;
+    if (isFreeMiner) return '0';
+    const price = minerDetails.price;
+    return price !== undefined ? price.toString() : '0';
+  }, [minerDetails.price, selectedMiner, hasClaimedStarterMiner]);
   
   // Check if user can afford the selected miner using contract data when available
-  const minerCost = Number(getMinerInfo(selectedMiner, 'cost'));
-  const canAfford = minerCost <= bitBalanceNumber;
+  const minerCostNumber = Number(minerCostValue);
+  const canAfford = minerCostNumber <= bitBalanceNumber;
   
   // For the free starter miner, check if user has already claimed it
-  const isFreeMiner = selectedMiner === MinerType.BANANA_MINER && minerCost === 0;
+  const isFreeMiner = selectedMiner === MinerType.BANANA_MINER && minerCostNumber === 0;
   const canGetFreeMiner = isFreeMiner && !hasClaimedStarterMiner;
   
   // Determine if user can purchase this miner
@@ -105,6 +138,94 @@ const MinerPurchaseModal: React.FC<MinerPurchaseModalProps> = ({
     .map(minerType => MINERS[minerType])
     .filter(miner => miner.isActive);
   
+  // Check allowance when the modal opens or miner type changes
+  useEffect(() => {
+    const checkAllowance = async () => {
+      if (!isOpen || !publicClient || !address || isFreeMiner) return;
+
+      try {
+        setIsCheckingAllowance(true);
+        // Get the miner cost to check against allowance
+        const cost = minerCostValue;
+        if (!cost) {
+          console.error('Failed to get miner cost for allowance check');
+          return;
+        }
+
+        // Log to help debug
+        console.log('Checking allowance with params:', {
+          tokenAddress: BITAPE_TOKEN_ADDRESS,
+          ownerAddress: address,
+          spenderAddress: CONTRACT_ADDRESSES.MAIN,
+          minerCost: cost
+        });
+
+        // Parse the miner cost as a bigint for comparison
+        const minerCostBigInt = parseEther(cost);
+        
+        // Read the current allowance with added error handling
+        try {
+          const allowance = await publicClient.readContract({
+            address: BITAPE_TOKEN_ADDRESS as `0x${string}`,
+            abi: BITAPE_TOKEN_ABI,
+            functionName: 'allowance',
+            args: [address, CONTRACT_ADDRESSES.MAIN as `0x${string}`]
+          });
+
+          console.log('Allowance check result:', {
+            allowance: allowance?.toString(),
+            minerCost: minerCostBigInt.toString(),
+            hasEnough: (allowance as bigint) >= minerCostBigInt
+          });
+
+          // Compare allowance to cost
+          setHasEnoughAllowance((allowance as bigint) >= minerCostBigInt);
+        } catch (allowanceError) {
+          console.error('Specific error checking allowance:', allowanceError);
+          // Fallback: Treat as not having enough allowance so user can approve
+          setHasEnoughAllowance(false);
+        }
+      } catch (error) {
+        console.error('Error checking allowance:', error);
+        setHasEnoughAllowance(false);
+      } finally {
+        setIsCheckingAllowance(false);
+      }
+    };
+
+    if (isOpen && address) {
+      checkAllowance();
+    }
+  }, [isOpen, selectedMiner, publicClient, isFreeMiner, address, minerCostValue]);
+
+  // Get button text based on current state
+  const getButtonText = () => {
+    if (isPurchasing || purchaseStage !== 'initial') {
+      if (purchaseStage === 'approving') return 'APPROVING TOKENS...';
+      if (purchaseStage === 'purchasing') return 'PURCHASING...';
+      if (purchaseStage === 'success') return 'PURCHASED!';
+      return 'PROCESSING...';
+    }
+    
+    if (isFreeMiner) return 'CLAIM FREE MINER';
+    
+    // Format price safely
+    const price = minerDetails.price;
+    const formattedPrice = typeof price === 'number' 
+      ? price.toFixed(2)
+      : price;
+    
+    return `BUY FOR ${formattedPrice} BIT`;
+  };
+
+  // Get button tooltip based on conditions
+  const getButtonTooltip = () => {
+    if (!selectedTile) return "Select a tile first";
+    if (!canAfford && !canGetFreeMiner) return "Insufficient BIT balance";
+    if (isPurchasing) return "Transaction in progress";
+    return isFreeMiner ? "Claim your free starter miner" : "Purchase this miner";
+  };
+
   // Handle the purchase
   const handlePurchase = async () => {
     // Reset any previous error message
@@ -116,17 +237,8 @@ const MinerPurchaseModal: React.FC<MinerPurchaseModalProps> = ({
       isPurchasing,
       canPurchase,
       selectedMiner,
-      minerIndex: selectedMiner,  // Important: Use consistent naming with contract
-      minerIndexValue: Number(selectedMiner),
-      minerName: MINERS[selectedMiner].name
-    });
-    
-    // Add explicit mapping information for clarity
-    console.log("Miner index mapping information:", {
-      BANANA_MINER: MinerType.BANANA_MINER,
-      MONKEY_TOASTER: MinerType.MONKEY_TOASTER,
-      GORILLA_GADGET: MinerType.GORILLA_GADGET,
-      APEPAD_MINI: MinerType.APEPAD_MINI
+      hasEnoughAllowance,
+      minerCost: minerCostValue
     });
     
     if (!selectedTile || isPurchasing || !canPurchase) {
@@ -139,17 +251,16 @@ const MinerPurchaseModal: React.FC<MinerPurchaseModalProps> = ({
     }
     
     try {
-      // Always start with approving state first
-      setPurchaseStage('approving');
+      // Set appropriate initial state
+      setPurchaseStage(hasEnoughAllowance ? 'purchasing' : 'approving');
       
       // Ensure coordinates are numbers
       const x = Number(selectedTile.x);
       const y = Number(selectedTile.y);
       
-      console.log(`Initiating purchase of miner index ${selectedMiner} (${MINERS[selectedMiner].name}) at position (${x}, ${y})`);
-      console.log(`Expected contract calldata will contain: minerIndex=${selectedMiner}, x=${x}, y=${y}`);
+      console.log(`Initiating purchase for ${MINERS[selectedMiner].name} on tile (${x}, ${y})`);
       
-      // Now call the purchase function
+      // Process the purchase
       try {
         await onPurchase(selectedMiner, x, y);
         
@@ -159,34 +270,60 @@ const MinerPurchaseModal: React.FC<MinerPurchaseModalProps> = ({
         
         // For any miner purchased, save to localStorage for UI persistence
         if (typeof window !== 'undefined') {
-          // Create a standard key for Monkey Toaster position
-          if (selectedMiner === MinerType.MONKEY_TOASTER) {
-            console.log(`Saving ${MINERS[selectedMiner].name} purchase to localStorage`);
-            localStorage.setItem('monkey_toaster_purchased', 'true');
-            localStorage.setItem('monkey_toaster_position', JSON.stringify({x, y}));
-          }
-          
-          // Also save to fixedMinerMap for all miner types for consistent storage
           try {
-            // We need a user address to save to the miner map
-            const userAddress = localStorage.getItem('lastConnectedAddress');
-            if (userAddress) {
-              console.log(`Saving miner to fixedMinerMap for address ${userAddress}`);
-              addMinerToMap(userAddress, {x, y}, selectedMiner);
+            if (address) {
+              console.log(`Saving miner type ${selectedMiner} at position (${x}, ${y}) for address ${address}`);
+              
+              // Use wallet-specific keys to avoid conflicts between wallets
+              const walletPrefix = address.slice(0, 10).toLowerCase();
+              
+              // Create specific keys for this wallet and miner position
+              localStorage.setItem(`${walletPrefix}_miner_${x}_${y}`, selectedMiner.toString());
+              localStorage.setItem(`${walletPrefix}_miner_${x}_${y}_timestamp`, Date.now().toString());
+              
+              // Store the address to identify this wallet's data
+              localStorage.setItem('lastConnectedAddress', address);
+              
+              console.log(`Saved miner to localStorage with key: ${walletPrefix}_miner_${x}_${y}`);
             } else {
-              console.warn('Could not save to fixedMinerMap: No user address found');
+              console.warn('Could not save miner to localStorage: No user address found');
             }
-          } catch (err) {
-            console.error('Error saving to fixedMinerMap:', err);
+          } catch (storageError) {
+            console.warn('Failed to save miner data to storage:', storageError);
+            // Continue anyway, as this is non-critical
           }
         }
-        
-        // Don't automatically close modal, let user see success message and refresh option
       } catch (error) {
         // Set error message for display
-        const message = error instanceof Error ? error.message : 'Unknown error occurred';
-        setErrorMessage(message);
-        console.error('Purchase transaction failed:', message);
+        let displayError = 'Transaction failed';
+        
+        if (error instanceof Error) {
+          // Format the error message to be more user-friendly
+          if (error.message.includes('user rejected') || error.message.includes('rejected') || error.message.includes('denied')) {
+            displayError = 'You declined the transaction in your wallet';
+          } else if (error.message.includes('insufficient funds for gas')) {
+            displayError = 'Not enough APE tokens for transaction fees';
+          } else if (error.message.includes('Invalid price data') || error.message.includes('Failed to convert')) {
+            displayError = 'Price data error - please try again';
+          } else if (error.message.includes('network') || error.message.includes('connection')) {
+            displayError = 'Network connection issue - please check your internet connection';
+          } else if (error.message.includes('MetaMask') || error.message.includes('wallet')) {
+            displayError = 'Wallet error: ' + error.message.split(':')[0]; // Get just the first part
+          } else if (error.message.includes('Token approval failed')) {
+            // Keep the original message for token approval errors as they're already well-formatted
+            displayError = error.message;
+          } else {
+            // For other errors, keep the original message but cap the length
+            displayError = error.message.length > 100 
+              ? `${error.message.substring(0, 100)}...` 
+              : error.message;
+          }
+        } else {
+          displayError = 'Unknown error occurred';
+        }
+        
+        console.error('Purchase transaction failed:', error);
+        setErrorMessage(displayError);
         setPurchaseStage('initial');
       }
     } catch (error) {
@@ -224,10 +361,11 @@ const MinerPurchaseModal: React.FC<MinerPurchaseModalProps> = ({
         isFreeMiner,
         canGetFreeMiner,
         canPurchase,
+        hasEnoughAllowance,
         selectedTile
       });
     }
-  }, [isOpen, selectedMiner, purchaseStage, isPurchasing, bitBalance, canAfford, isFreeMiner, canGetFreeMiner, canPurchase, selectedTile]);
+  }, [isOpen, selectedMiner, purchaseStage, isPurchasing, bitBalance, canAfford, isFreeMiner, canGetFreeMiner, canPurchase, hasEnoughAllowance, selectedTile]);
 
   // Function to refresh the page
   const refreshPage = () => {
@@ -236,28 +374,12 @@ const MinerPurchaseModal: React.FC<MinerPurchaseModalProps> = ({
     }
   };
 
+  // Update miner cost when the selected miner changes
+  useEffect(() => {
+    setMinerCost(minerCostValue);
+  }, [minerCostValue]);
+
   if (!isOpen) return null;
-
-  // Get button text based on current state
-  const getButtonText = () => {
-    if (isPurchasing || purchaseStage !== 'initial') {
-      if (purchaseStage === 'approving') return 'APPROVING TOKENS...';
-      if (purchaseStage === 'purchasing') return 'PURCHASING...';
-      if (purchaseStage === 'success') return 'PURCHASED!';
-      return 'PROCESSING...';
-    }
-    
-    if (isFreeMiner) return 'CLAIM FREE MINER';
-    return `BUY FOR ${minerDetails.price} BIT`;
-  };
-
-  // Get button tooltip based on conditions
-  const getButtonTooltip = () => {
-    if (!selectedTile) return "Select a tile first";
-    if (!canAfford && !canGetFreeMiner) return "Insufficient BIT balance";
-    if (isPurchasing) return "Transaction in progress";
-    return isFreeMiner ? "Claim your free starter miner" : "Purchase this miner";
-  };
 
   return (
     <Dialog
@@ -279,6 +401,9 @@ const MinerPurchaseModal: React.FC<MinerPurchaseModalProps> = ({
             </p>
             <p className="text-banana font-press-start text-xs mt-1">
               YOUR BALANCE: {bitBalance} BIT
+            </p>
+            <p className="text-gray-400 font-press-start text-xs mt-1">
+              Transactions will be executed on Apechain
             </p>
           </div>
           
@@ -312,7 +437,7 @@ const MinerPurchaseModal: React.FC<MinerPurchaseModalProps> = ({
                       <span className="text-white font-press-start text-xs">
                         {isFreeMiner 
                           ? (hasClaimedStarterMiner ? 'ALREADY CLAIMED' : 'FREE STARTER') 
-                          : `${miner.price} BIT`}
+                          : `${typeof miner.price === 'number' ? miner.price.toFixed(2) : miner.price} BIT`}
                       </span>
                     </div>
                   </div>
@@ -334,10 +459,10 @@ const MinerPurchaseModal: React.FC<MinerPurchaseModalProps> = ({
                 />
               </div>
               <div className="space-y-2 font-press-start text-xs">
-                <p className="text-white mb-1">- HASH RATE: {getMinerInfo(selectedMiner, 'hashrate')} GH/S</p>
-                <p className="text-white mb-1">- PRICE: {getMinerInfo(selectedMiner, 'cost')} BIT</p>
-                <p className="text-white mb-1">- ENERGY: {getMinerInfo(selectedMiner, 'powerConsumption')} WATT</p>
-                <p className="text-white mb-1">- MINER INDEX: {selectedMiner} ({minerMapping[selectedMiner].name})</p>
+                <p className="text-white mb-1">- HASH RATE: {minerDetails.hashrate} GH/S</p>
+                <p className="text-white mb-1">- PRICE: {minerCostValue} BIT</p>
+                <p className="text-white mb-1">- ENERGY: {minerDetails.powerConsumption} WATT</p>
+                <p className="text-white mb-1">- MINER INDEX: {selectedMiner} ({minerDetails.name})</p>
                 {minerDetails.description && (
                   <p className={`mt-3 text-center ${isFreeMiner ? 'text-green-400' : 'text-yellow-300'}`}>
                     {minerDetails.description}
@@ -350,16 +475,54 @@ const MinerPurchaseModal: React.FC<MinerPurchaseModalProps> = ({
                   </p>
                 )}
                 
-                {purchaseStage === 'approving' && (
-                  <p className="text-green-400 mt-3 text-center animate-pulse">
-                    APPROVING TOKEN SPEND...
+                {!hasEnoughAllowance && !isFreeMiner && canAfford && purchaseStage === 'initial' && (
+                  <p className="text-yellow-500 mt-3 text-center">
+                    TOKEN APPROVAL NEEDED
                   </p>
                 )}
                 
+                {purchaseStage === 'approving' && (
+                  <div>
+                    <p className="text-green-400 mt-3 text-center animate-pulse">
+                      APPROVING TOKEN SPEND...
+                      <br />
+                      <span className="text-white text-xs mt-1 block">
+                        Please check your wallet and confirm the transaction.
+                        <br />
+                        If your wallet isn't responding, try refreshing the page.
+                      </span>
+                    </p>
+                    <div className="mt-2 text-center">
+                      <button
+                        onClick={refreshPage}
+                        className="mt-1 font-press-start text-xs px-3 py-1 bg-gray-700 text-white hover:bg-gray-600 transition-colors rounded"
+                      >
+                        WALLET NOT RESPONDING? REFRESH
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
                 {purchaseStage === 'purchasing' && (
-                  <p className="text-green-400 mt-3 text-center animate-pulse">
-                    PURCHASING MINER...
-                  </p>
+                  <div>
+                    <p className="text-green-400 mt-3 text-center animate-pulse">
+                      PURCHASING MINER...
+                      <br />
+                      <span className="text-white text-xs mt-1 block">
+                        Please check your wallet and confirm the transaction.
+                        <br />
+                        If your wallet isn't responding, try refreshing the page.
+                      </span>
+                    </p>
+                    <div className="mt-2 text-center">
+                      <button
+                        onClick={refreshPage}
+                        className="mt-1 font-press-start text-xs px-3 py-1 bg-gray-700 text-white hover:bg-gray-600 transition-colors rounded"
+                      >
+                        WALLET NOT RESPONDING? REFRESH
+                      </button>
+                    </div>
+                  </div>
                 )}
                 
                 {purchaseStage === 'success' && (
@@ -388,9 +551,7 @@ const MinerPurchaseModal: React.FC<MinerPurchaseModalProps> = ({
                 {/* Add more detailed explanation of the purchase process */}
                 {canPurchase && purchaseStage === 'initial' && !isFreeMiner && (
                   <p className="text-xs text-gray-300 mt-3 text-center">
-                    When you click BUY, you'll need to approve the transaction. 
-                    If it's your first time, two wallet prompts may appear: 
-                    one for token approval and one for the purchase.
+                    Click BUY to purchase this miner. Your wallet will prompt you to approve token spending if needed.
                   </p>
                 )}
               </div>
@@ -412,15 +573,15 @@ const MinerPurchaseModal: React.FC<MinerPurchaseModalProps> = ({
             {purchaseStage !== 'success' ? (
               <button
                 onClick={handlePurchase}
-                disabled={!canPurchase || isPurchasing || purchaseStage !== 'initial'}
+                disabled={!canPurchase || isPurchasing || purchaseStage !== 'initial' || isCheckingAllowance}
                 title={getButtonTooltip()}
                 className={`font-press-start px-6 py-2 ${
-                  canPurchase && purchaseStage === 'initial'
+                  canPurchase && purchaseStage === 'initial' && !isCheckingAllowance
                     ? 'bg-banana text-royal hover:bg-opacity-90'
                     : 'bg-gray-700 text-gray-400 cursor-not-allowed'
                 } transition-colors`}
               >
-                {getButtonText()}
+                {isCheckingAllowance ? 'CHECKING...' : getButtonText()}
               </button>
             ) : (
               <button
