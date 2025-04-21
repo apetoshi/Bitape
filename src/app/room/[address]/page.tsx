@@ -664,12 +664,12 @@ export default function RoomPage() {
     console.log(`Looking for miner at tile (${tileX}, ${tileY})`);
     console.log('Current miners data:', gameState.miners);
     
-    // If we don't have miners data yet but user has facility, use hardcoded data
-    if ((!gameState.miners || gameState.miners.length === 0) && gameState.hasFacility) {
-      console.log('Using hardcoded miner data because no miners found but user has facility');
-      // Hardcoded miner at position (0, 0) - the default starter miner position
+    // Only return the hardcoded starter miner if the user has actually claimed it
+    if ((!gameState.miners || gameState.miners.length === 0) && gameState.hasFacility && gameState.hasClaimedStarterMiner) {
+      console.log('User has claimed starter miner and no miners array data - using contract-confirmed starter miner');
+      // Only return a miner for the starter position if hasClaimedStarterMiner is true
       if (tileX === 0 && tileY === 0) {
-        console.log('Returning hardcoded BANANA MINER at (0, 0)');
+        console.log('Returning contract-confirmed BANANA MINER at (0, 0)');
         return {
           id: '1',
           minerType: 1, // BANANA_MINER
@@ -690,18 +690,18 @@ export default function RoomPage() {
     
     console.log(`Miner found at (${tileX}, ${tileY}):`, miner);
     return miner || null;
-  }, [getValidatedMiners, gameState.miners, gameState.hasFacility]);
+  }, [getValidatedMiners, gameState.miners, gameState.hasFacility, gameState.hasClaimedStarterMiner]);
 
   // Check if the selected tile has a miner
   const selectedTileHasMiner = useCallback((x: number, y: number): boolean => {
     console.log(`Checking if tile (${x}, ${y}) has a miner`);
     
-    // If we don't have miners data yet but user has facility, use hardcoded data
-    if ((!gameState.miners || gameState.miners.length === 0) && gameState.hasFacility) {
-      console.log('Using hardcoded miner data for selectedTileHasMiner check');
-      // Hardcoded miner at position (0, 0) - the default starter miner position
+    // Only consider the hardcoded starter miner if the user has actually claimed it
+    if ((!gameState.miners || gameState.miners.length === 0) && gameState.hasFacility && gameState.hasClaimedStarterMiner) {
+      console.log('User has claimed starter miner - checking against contract-confirmed starter miner position');
+      // Only return true for the starter position if hasClaimedStarterMiner is true
       if (x === 0 && y === 0) {
-        console.log('Hardcoded miner found at (0, 0)');
+        console.log('Contract-confirmed starter miner found at (0, 0)');
         return true;
       }
       return false;
@@ -714,7 +714,7 @@ export default function RoomPage() {
     
     console.log(`Tile (${x}, ${y}) has miner: ${hasMiner}`);
     return hasMiner;
-  }, [gameState.miners, gameState.hasFacility]);
+  }, [gameState.miners, gameState.hasFacility, gameState.hasClaimedStarterMiner]);
 
   // Use the updated useMinerData hook directly within the component
   const { data: miner1Data } = useMinerData(address, '1');
@@ -1583,14 +1583,15 @@ export default function RoomPage() {
   }) {
     if (!selectedTile) {
       return (
-              <div className="text-center py-4">
-                <p className="text-sm">Click a tile to select it</p>
-              </div>
+        <div className="text-center py-4">
+          <p className="text-sm">Click a tile to select it</p>
+        </div>
       );
     }
 
     // Debug logging to help diagnose the issue
     console.log(`SelectedTileContent: Checking for miner at (${selectedTile.x}, ${selectedTile.y})`);
+    console.log(`hasClaimedStarterMiner status:`, gameState.hasClaimedStarterMiner);
     
     // Validate the function is available
     console.log('getMinerAtTile function available:', Boolean(getMinerAtTile));
@@ -1609,10 +1610,17 @@ export default function RoomPage() {
     const miner = getMinerAtTile(selectedTile.x, selectedTile.y);
     console.log('SelectedTileContent: Miner found via getMinerAtTile:', miner);
     
-    // If we have a direct miner but not from the function, something's wrong
-    if (directMiner && !miner) {
-      console.error('MISMATCH: Direct check found miner but getMinerAtTile did not!');
-    }
+    // Final miner check - only show miners if they're actually owned per contract state
+    // This overrides any hardcoded data being returned for the starter miner
+    const finalMiner = 
+      // For starter miner (0,0), only show if hasClaimedStarterMiner is true
+      (selectedTile.x === 0 && selectedTile.y === 0) ? 
+        (gameState.hasClaimedStarterMiner ? miner : null) : 
+        // For other positions, use the direct miner from miners array
+        directMiner || miner;
+        
+    console.log(`Final miner determination for (${selectedTile.x}, ${selectedTile.y}):`, 
+                finalMiner ? 'MINER PRESENT' : 'NO MINER');
     
     return (
       <div>
@@ -1622,17 +1630,17 @@ export default function RoomPage() {
           <span className="bigcoin-text text-xs mt-1">POSITION: X: {selectedTile.x}, Y: {selectedTile.y}</span>
         </div>
         
-        {miner ? (
-          <SelectedTileWithMiner miner={miner} onOpenMinerModal={onOpenMinerModal} />
+        {finalMiner ? (
+          <SelectedTileWithMiner miner={finalMiner} onOpenMinerModal={onOpenMinerModal} />
         ) : (
           <EmptySelectedTile 
             hasFacility={hasFacility} 
             parsedFacility={parsedFacility} 
             onOpenMinerModal={onOpenMinerModal}
           />
-            )}
-          </div>
-        );
+        )}
+      </div>
+    );
   }
 
   const renderTabContent = () => {
@@ -1660,6 +1668,12 @@ export default function RoomPage() {
           
           // Check if we should handle removing a miner first
           if (selectedTile && selectedTileHasMiner(selectedTile.x, selectedTile.y)) {
+            // Additional check for starter miner - only allow removal if actually claimed
+            if (selectedTile.x === 0 && selectedTile.y === 0 && !gameState.hasClaimedStarterMiner) {
+              console.log('Preventing removal of starter miner that has not been claimed');
+              return;
+            }
+            
             console.log('Opening modal to remove miner at:', selectedTile);
             // Call the global handleRemoveMiner with the current selectedTile
             handleRemoveMiner(selectedTile.x, selectedTile.y);

@@ -117,6 +117,49 @@ export interface GameState {
   minerTypesFromContract: Record<number, any>;
 }
 
+/**
+ * Utility to retry failed contract calls with exponential backoff
+ */
+async function retryContractCall<T>(
+  fn: () => Promise<T>,
+  maxRetries = 3,
+  initialDelay = 200
+): Promise<T> {
+  let retries = 0;
+  let delay = initialDelay;
+  
+  while (true) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      retries++;
+      
+      // Don't retry user rejections
+      if (error.code === 4001 || 
+          error.message?.includes('user rejected') || 
+          error.message?.includes('user denied')) {
+        throw error;
+      }
+      
+      // MetaMask specific errors that should be retried
+      const isMetaMaskError = error.message?.includes('MetaMask') || 
+                             error.message?.includes('disconnected') ||
+                             error.message?.includes('trouble starting');
+      
+      if (retries >= maxRetries || (!isMetaMaskError && !error.message?.includes('network'))) {
+        console.error(`Contract call failed after ${retries} retries:`, error);
+        throw error;
+      }
+      
+      console.log(`Retrying contract call (${retries}/${maxRetries}) after ${delay}ms delay. Error:`, error.message);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      
+      // Exponential backoff
+      delay *= 2;
+    }
+  }
+}
+
 export function useGameState(): GameState {
   const { address, isConnected } = useAccount();
   const publicClient = usePublicClient();
@@ -322,6 +365,13 @@ export function useGameState(): GameState {
       enabled: !!address,
     },
   });
+
+  // Log the exact value coming from the contract for debugging
+  useEffect(() => {
+    console.log('Raw starter miner claimed status from contract:', hasClaimedStarterMiner);
+    console.log('Data type of hasClaimedStarterMiner:', typeof hasClaimedStarterMiner);
+    console.log('After Boolean conversion:', Boolean(hasClaimedStarterMiner));
+  }, [hasClaimedStarterMiner]);
 
   // Get user miners - update to use correct contract calls pattern
   const { data: playerMiners, refetch: refetchMinerIds } = useContractRead({
@@ -562,59 +612,35 @@ export function useGameState(): GameState {
       }, 60000); // 1 minute timeout
 
       try {
-        // Execute transaction with proper typing
-        writeContract({
-          address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
-          abi: MAIN_CONTRACT_ABI,
-          functionName: 'purchaseInitialFacility',
-          args: [zeroAddress as `0x${string}`],
-          value: requiredBalance,
-        } as any, {
-          onSuccess: async (txHash) => {
-            clearTimeout(resetTimeout);
-            console.log('Facility purchase transaction submitted:', txHash);
-            
-            try {
-              // Wait for confirmation, but don't block UI
-              const receipt = await publicClient.waitForTransactionReceipt({
-                hash: txHash,
-              });
-              
-              console.log('Facility purchase confirmed:', receipt);
-              alert('Facility purchased successfully!');
-              
-              // Refetch necessary data
-              if (refetchFacility) {
-                refetchFacility();
-              }
-              
-              // Reset state
-              setIsPurchasingFacility(false);
-              setForceRender(prev => !prev);
-            } catch (waitError) {
-              console.error('Error waiting for facility purchase confirmation:', waitError);
-              alert('There was an issue confirming your facility purchase. Please check your wallet for transaction status.');
-              setIsPurchasingFacility(false);
-            }
-          },
-          onError: (error) => {
-            clearTimeout(resetTimeout);
-            console.error('Error purchasing facility:', error);
-            
-            // Check for user rejected error
-            if (error.message?.includes('rejected') || error.message?.includes('denied')) {
-              alert('Transaction was rejected. Please try again when ready.');
-            } else {
-              alert('Error purchasing facility: ' + error.message);
-            }
-            
-            setIsPurchasingFacility(false);
-          },
+        // Execute transaction with retry logic
+        await retryContractCall(async () => {
+          const config = {
+            address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
+            abi: MAIN_CONTRACT_ABI,
+            functionName: 'purchaseInitialFacility',
+            args: [zeroAddress as `0x${string}`],
+            value: requiredBalance,
+          };
+          
+          return writeContract({
+            ...config,
+            chain: publicClient?.chain,
+            account: address
+          } as any);
         });
       } catch (txError) {
         clearTimeout(resetTimeout);
         console.error('Transaction error:', txError);
-        alert('Failed to send transaction. Please try again.');
+        
+        // Provide helpful message based on error type
+        if (txError.message?.includes('MetaMask') && txError.message?.includes('restart')) {
+          alert('MetaMask requires a restart. Please refresh your browser and try again.');
+        } else if (txError.message?.includes('underpriced')) {
+          alert('Transaction underpriced. Please try again with higher gas settings.');
+        } else {
+          alert('Failed to send transaction. Please try again.');
+        }
+        
         setIsPurchasingFacility(false);
       }
     } catch (error) {
@@ -897,77 +923,29 @@ export function useGameState(): GameState {
   const purchaseMinerAfterApproval = (minerType: MinerType, x: number, y: number) => {
     console.log(`Executing miner purchase for type ${minerType} at (${x}, ${y})`);
     
-    writeContract({
-      address: CONTRACT_ADDRESSES.MAIN,
-      abi: MAIN_CONTRACT_ABI,
-      functionName: 'buyMiner',
-      args: [BigInt(minerType), BigInt(x), BigInt(y)]
-    }, {
-      onSuccess: async (txHash) => {
-        console.log('Miner purchase transaction submitted:', txHash);
-        
-        try {
-          if (publicClient) {
-            const receipt = await publicClient.waitForTransactionReceipt({
-              hash: txHash
-            });
-            
-            console.log('Miner purchase confirmed:', receipt);
-            
-            // Update data after successful purchase
-            console.log('Updating game state after miner purchase...');
-            
-            // Add miner to local cache for UI consistency
-            if (address) {
-              // Create a new PlayerMiner object that matches the interface
-              const newMiner: PlayerMiner = {
-                id: `miner-${Date.now()}`, // Generate a unique ID
-                minerType: minerType,
-                x: x,
-                y: y,
-                hashrate: MINERS[minerType]?.hashrate,
-                powerConsumption: MINERS[minerType]?.energyConsumption,
-                cost: MINERS[minerType]?.price,
-                type: minerType
-              };
-              
-              // Update miners array locally
-              setMiners(prev => [...prev, newMiner]);
-            }
-            
-            // Refresh all data
-            await refetchMiners();
-            await refetchStats();
-            
-            // Update UI to show the new miner
-            alert('Miner purchased successfully!');
-            
-            // Force re-render of the game grid
-            setForceRender(prev => !prev);
-          }
-        } catch (error) {
-          console.error('Error confirming miner purchase:', error);
-        } finally {
-          setIsPurchasingMiner(false);
-        }
-      },
-      onError: (error) => {
-        console.error('Error purchasing miner:', error);
-        
-        // Show user-friendly error
-        if (error.message?.includes('user rejected')) {
-          alert('Transaction cancelled by user');
-        } else if (error.message?.includes('insufficient funds')) {
-          alert('Insufficient funds for gas. Please make sure you have enough APE for transaction fees.');
-        } else if (error.message?.includes('facility')) {
-          alert('You need a facility to place miners. Please purchase a facility first.');
-        } else if (error.message?.includes('tile occupied')) {
-          alert('This tile is already occupied. Please select an empty tile.');
-        } else {
-          alert(`Failed to purchase miner: ${error.message || 'Unknown error'}`);
-        }
-        
-        setIsPurchasingMiner(false);
+    // Add retry logic for the miner purchase
+    retryContractCall(async () => {
+      const config = {
+        address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
+        abi: MAIN_CONTRACT_ABI,
+        functionName: 'buyMiner',
+        args: [BigInt(minerType), BigInt(x), BigInt(y)]
+      };
+      
+      return writeContract({
+        ...config,
+        chain: publicClient?.chain,
+        account: address
+      } as any);
+    }).catch(error => {
+      console.error('Final miner purchase error:', error);
+      setIsPurchasingMiner(false);
+      
+      // Provide specific error message for MetaMask issues
+      if (error.message?.includes('MetaMask')) {
+        alert('MetaMask is having trouble. Please refresh the page or restart MetaMask, then try again.');
+      } else {
+        alert(`Error purchasing miner: ${error.message || 'Unknown error'}`);
       }
     });
   };
