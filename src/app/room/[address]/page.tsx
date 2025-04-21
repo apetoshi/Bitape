@@ -1169,82 +1169,86 @@ export default function RoomPage() {
 
   // Utility functions for working with miners
   const getMinerTypeName = (minerType: number) => {
-    const minerNames = {
-      [MinerType.BANANA_MINER]: "BANANA MINER",
-      [MinerType.MONKEY_TOASTER]: "MONKEY TOASTER",
-      [MinerType.GORILLA_GADGET]: "GORILLA GADGET",
-      [MinerType.APEPAD_MINI]: "APEPAD MINI"
-    };
-    return minerNames[minerType as keyof typeof minerNames] || "UNKNOWN";
+    switch (minerType) {
+      case 1: return "BANANA MINER";
+      case 2: return "MONKEY TOASTER";
+      case 3: return "APEPAD MINI";
+      case 4: return "GORILLA GADGET";
+      default: return "UNKNOWN";
+    }
   };
   
   const getMinerMiningRate = (minerType: number) => {
     // Use contract data for the Monkey Toaster if available
-    if (minerType === MinerType.MONKEY_TOASTER && minerTypeData[MinerType.MONKEY_TOASTER]) {
-      const hashrate = Number(minerTypeData[MinerType.MONKEY_TOASTER][4]); // hashrate is at index 4
+    if (minerType === 2 && minerTypeData[2]) {
+      const hashrate = Number(minerTypeData[2][4]); // hashrate is at index 4
       console.log(`Using contract data for MONKEY_TOASTER mining rate: ${hashrate}`);
       return hashrate.toString();
     }
     
-    const miningRates = {
-      [MinerType.BANANA_MINER]: "100",
-      [MinerType.MONKEY_TOASTER]: "1000", // Fallback if contract data not available
-      [MinerType.GORILLA_GADGET]: "750",
-      [MinerType.APEPAD_MINI]: "2000"
-    };
-    return miningRates[minerType as keyof typeof miningRates] || "0";
+    // Fallback mining rates from miners.ts if contract data not available
+    switch (minerType) {
+      case 1: return "100";   // BANANA_MINER
+      case 2: return "180";   // MONKEY_TOASTER
+      case 3: return "1000";  // APEPAD_MINI
+      case 4: return "5000";  // GORILLA_GADGET
+      default: return "0";
+    }
   };
   
   const getMinerHashRate = (minerType: number) => {
     // Use contract data for the Monkey Toaster if available
-    if (minerType === MinerType.MONKEY_TOASTER && minerTypeData[MinerType.MONKEY_TOASTER]) {
-      const hashrate = Number(minerTypeData[MinerType.MONKEY_TOASTER][4]); // hashrate is at index 4
+    if (minerType === 2 && minerTypeData[2]) {
+      const hashrate = Number(minerTypeData[2][4]); // hashrate is at index 4
       console.log(`Using contract data for MONKEY_TOASTER hashrate: ${hashrate}`);
       return hashrate.toString();
     }
     
-    const hashRates = {
-      [MinerType.BANANA_MINER]: "100",
-      [MinerType.MONKEY_TOASTER]: "1000", // Fallback if contract data not available
-      [MinerType.GORILLA_GADGET]: "750",
-      [MinerType.APEPAD_MINI]: "2000"
-    };
-    return hashRates[minerType as keyof typeof hashRates] || "0";
+    // Fallback hash rates from miners.ts if contract data not available
+    switch (minerType) {
+      case 1: return "100";   // BANANA_MINER
+      case 2: return "180";   // MONKEY_TOASTER
+      case 3: return "1000";  // APEPAD_MINI
+      case 4: return "5000";  // GORILLA_GADGET
+      default: return "0";
+    }
   };
   
   const getMinerPowerConsumption = (minerType: number) => {
     // Use contract data for the Monkey Toaster if available
-    if (minerType === MinerType.MONKEY_TOASTER && minerTypeData[MinerType.MONKEY_TOASTER]) {
-      const powerConsumption = Number(minerTypeData[MinerType.MONKEY_TOASTER][5]); // powerConsumption is at index 5
+    if (minerType === 2 && minerTypeData[2]) {
+      const powerConsumption = Number(minerTypeData[2][5]); // powerConsumption is at index 5
       console.log(`Using contract data for MONKEY_TOASTER power consumption: ${powerConsumption}`);
       return powerConsumption.toString();
     }
     
-    const powerConsumptions = {
-      [MinerType.BANANA_MINER]: "1",
-      [MinerType.GORILLA_GADGET]: "5",
-      [MinerType.MONKEY_TOASTER]: "10", // Fallback if contract data not available
-      [MinerType.APEPAD_MINI]: "100"
-    };
-    return powerConsumptions[minerType as keyof typeof powerConsumptions] || "0";
+    // Fallback power consumption values from miners.ts if contract data not available
+    switch (minerType) {
+      case 1: return "1";    // BANANA_MINER
+      case 2: return "6";    // MONKEY_TOASTER
+      case 3: return "10";   // APEPAD_MINI
+      case 4: return "30";   // GORILLA_GADGET
+      default: return "0";
+    }
   };
   
   // Add a new function to get the miner cost from contract data
   const getMinerCost = (minerType: number) => {
     // Use contract data for the Monkey Toaster if available
-    if (minerType === MinerType.MONKEY_TOASTER && minerTypeData[MinerType.MONKEY_TOASTER]) {
-      const cost = Number(minerTypeData[MinerType.MONKEY_TOASTER][6]); // cost is at index 6
+    if (minerType === 2 && minerTypeData[2]) {
+      const cost = Number(minerTypeData[2][6]); // cost is at index 6
       console.log(`Using contract data for MONKEY_TOASTER cost: ${cost}`);
       return cost.toString();
     }
     
-    const costs = {
-      [MinerType.BANANA_MINER]: "0",
-      [MinerType.GORILLA_GADGET]: "60",
-      [MinerType.MONKEY_TOASTER]: "20", // Fallback if contract data not available
-      [MinerType.APEPAD_MINI]: "5000"
-    };
-    return costs[minerType as keyof typeof costs] || "0";
+    // Fallback costs from miners.ts if contract data not available
+    switch (minerType) {
+      case 1: return "0";    // BANANA_MINER (Free starter miner)
+      case 2: return "20";   // MONKEY_TOASTER
+      case 3: return "40";   // APEPAD_MINI
+      case 4: return "100";  // GORILLA_GADGET
+      default: return "0";
+    }
   };
 
   // Force refresh miners data when the component mounts
@@ -1281,44 +1285,44 @@ export default function RoomPage() {
     
     const getMinerHashRate = useMemo(() => {
       return (minerType: number) => {
-        // Use the known miner types from the contract
+        // Use the correct hashrates from miners.ts
         if (minerType === 1) return '100'; // BANANA_MINER
-        if (minerType === 2) return '180'; // MONKEY_TOASTER
-        if (minerType === 3) return '1,000'; // GORILLA_GADGET
-        if (minerType === 4) return '3,000'; // APEPAD_MINI
+        if (minerType === 2) return '180'; // MONKEY_TOASTER 
+        if (minerType === 3) return '1000'; // APEPAD_MINI
+        if (minerType === 4) return '5000'; // GORILLA_GADGET
         return '0';
       };
     }, []);
 
     const getMinerPowerConsumption = useMemo(() => {
       return (minerType: number) => {
-        // Use the known miner types from the contract
+        // Use the correct power consumption values from miners.ts
         if (minerType === 1) return '1'; // BANANA_MINER
-        if (minerType === 2) return '2'; // MONKEY_TOASTER
-        if (minerType === 3) return '3'; // GORILLA_GADGET
-        if (minerType === 4) return '4'; // APEPAD_MINI
+        if (minerType === 2) return '6'; // MONKEY_TOASTER
+        if (minerType === 3) return '10'; // APEPAD_MINI
+        if (minerType === 4) return '30'; // GORILLA_GADGET
         return '0';
       };
     }, []);
 
     const getMinerCost = useMemo(() => {
       return (minerType: number) => {
-        // Use the known miner types from the contract
+        // Use the correct cost values from miners.ts
         if (minerType === 1) return 'FREE'; // BANANA_MINER
-        if (minerType === 2) return '10'; // MONKEY_TOASTER
-        if (minerType === 3) return '30'; // GORILLA_GADGET
-        if (minerType === 4) return '75'; // APEPAD_MINI
+        if (minerType === 2) return '20'; // MONKEY_TOASTER
+        if (minerType === 3) return '40'; // APEPAD_MINI
+        if (minerType === 4) return '100'; // GORILLA_GADGET
         return '0';
       };
     }, []);
 
     const getMinerTypeName = useMemo(() => {
       return (minerType: number) => {
-        // Use the known miner types from the contract
+        // Use the correct miner names from miners.ts
         if (minerType === 1) return 'BANANA MINER'; // BANANA_MINER
-        if (minerType === 2) return 'MONKEY TOASTER'; // MONKEY_TOASTERGORILLA_GADGET
-        if (minerType === 3) return 'GORILLA GADGET'; // GORILLA_GADGET
-        if (minerType === 4) return 'APEPAD MINI'; // APEPAD_MINI
+        if (minerType === 2) return 'MONKEY TOASTER'; // MONKEY_TOASTER
+        if (minerType === 3) return 'APEPAD MINI'; // APEPAD_MINI
+        if (minerType === 4) return 'GORILLA GADGET'; // GORILLA_GADGET
         return 'UNKNOWN MINER';
       };
     }, []);
@@ -1377,9 +1381,9 @@ export default function RoomPage() {
                     
     const MINERS = {
       1: { name: 'BANANA MINER', image: '/banana-miner.gif' },
-      2: { name: 'MONKEY TOASTER ', image: '/monkey-toaster.gif' },
-      3: { name: 'GORILLA GADGET', image: '/gorilla-gadget.gif' },
-      4: { name: 'APEPAD MINI', image: '/apepad.png' }
+      2: { name: 'MONKEY TOASTER', image: '/monkey-toaster.gif' },
+      3: { name: 'APEPAD MINI', image: '/apepad.png' },
+      4: { name: 'GORILLA GADGET', image: '/gorilla-gadget.gif' }
     };
     
     const minerConfig = MINERS[minerType as keyof typeof MINERS];

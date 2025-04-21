@@ -121,16 +121,17 @@ const MinerPurchaseModal: React.FC<MinerPurchaseModalProps> = ({
   const minerMapping = {
     [MinerType.BANANA_MINER]: { name: "BANANA MINER", index: MinerType.BANANA_MINER },
     [MinerType.MONKEY_TOASTER]: { name: "MONKEY TOASTER", index: MinerType.MONKEY_TOASTER },
-    [MinerType.GORILLA_GADGET]: { name: "GORILLA GADGET", index: MinerType.GORILLA_GADGET },
     [MinerType.APEPAD_MINI]: { name: "APEPAD MINI", index: MinerType.APEPAD_MINI },
+    [MinerType.GORILLA_GADGET]: { name: "GORILLA GADGET", index: MinerType.GORILLA_GADGET },
   };
   
-  // Define a specific display order for miners regardless of their index values
+  // Define a display order for miners from cheaper to more expensive
+  // Note: Order switched between APEPAD_MINI (now 3) and GORILLA_GADGET (now 4)
   const minerDisplayOrder = [
-    MinerType.BANANA_MINER,
-    MinerType.MONKEY_TOASTER,
-    MinerType.GORILLA_GADGET,
-    MinerType.APEPAD_MINI
+    MinerType.BANANA_MINER,    // Free starter miner (1)
+    MinerType.MONKEY_TOASTER,  // 20 BIT (2)
+    MinerType.APEPAD_MINI,     // 40 BIT (3)
+    MinerType.GORILLA_GADGET   // 100 BIT (4)
   ];
   
   // Get active miners in our preferred display order
@@ -440,6 +441,13 @@ const MinerPurchaseModal: React.FC<MinerPurchaseModalProps> = ({
                 <p className="text-white mb-1">- PRICE: {minerCostValue} BIT</p>
                 <p className="text-white mb-1">- ENERGY: {minerDetails.powerConsumption} WATT</p>
                 <p className="text-white mb-1">- MINER INDEX: {selectedMiner} ({minerDetails.name})</p>
+                {/* 
+                  Note on miner indices:
+                  BANANA_MINER = 1 (Starter)
+                  MONKEY_TOASTER = 2
+                  APEPAD_MINI = 3 (Previously was GORILLA_GADGET)
+                  GORILLA_GADGET = 4 (Previously was APEPAD_MINI)
+                */}
                 {minerDetails.description && (
                   <p className={`mt-3 text-center ${isFreeMiner ? 'text-green-400' : 'text-yellow-300'}`}>
                     {minerDetails.description}

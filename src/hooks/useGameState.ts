@@ -812,8 +812,10 @@ export function useGameState(): GameState {
         console.log('Purchasing a BANANA MINER (Type 1)');
       } else if (minerType === MinerType.MONKEY_TOASTER) {
         console.log('Purchasing a MONKEY TOASTER (Type 2)');
+      } else if (minerType === MinerType.APEPAD_MINI) {
+        console.log('Purchasing an APEPAD MINI (Type 3)');
       } else if (minerType === MinerType.GORILLA_GADGET) {
-        console.log('Purchasing a GORILLA GADGET (Type 3)');
+        console.log('Purchasing a GORILLA GADGET (Type 4)');
       }
       
       const minerPrice = minerConfig.price.toString();
