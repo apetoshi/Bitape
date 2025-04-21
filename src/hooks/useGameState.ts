@@ -1,5 +1,5 @@
 import { useAccount, useContractRead, useBalance, useWriteContract, usePublicClient } from 'wagmi';
-import { formatEther, parseEther, zeroAddress } from 'viem';
+import { formatEther, parseEther, zeroAddress, TransactionReceipt } from 'viem';
 import { CONTRACT_ADDRESSES, ERC20_ABI, APECHAIN_ID, MAIN_CONTRACT_ABI, BIT_TOKEN_ADDRESS, BIT_TOKEN_ABI } from '../config/contracts';
 import { MINERS, MinerType, MinerData } from '../config/miners';
 import { useEffect, useState } from 'react';
@@ -685,6 +685,7 @@ export function useGameState(): GameState {
   const handleGetStarterMiner = async (x: number, y: number) => {
     if (!address) {
       console.error('No wallet connected');
+      alert('Please connect your wallet to claim your starter miner');
       return;
     }
 
@@ -704,24 +705,72 @@ export function useGameState(): GameState {
           // Wait for confirmation before showing success
           if (publicClient) {
             try {
-              const receipt = await publicClient.waitForTransactionReceipt({
-                hash: txHash
-              });
+              // Set up a manual timeout
+              let receiptReceived = false;
+              let receipt;
               
-              console.log('Starter miner transaction confirmed:', receipt);
+              // Start a timeout that will check if we've received the receipt
+              const timeoutId = setTimeout(() => {
+                if (!receiptReceived) {
+                  console.log('Transaction receipt wait timed out after 60 seconds');
+                  
+                  // Still update the state since the transaction might still succeed
+                  refetchStarterMiner();
+                  refetchMinerIds();
+                  
+                  // Alert the user about the timeout but don't treat it as an error
+                  alert('Your transaction was submitted but is taking longer than expected to confirm. The game UI will update if your claim was successful.');
+                  
+                  setIsGettingStarterMiner(false);
+                }
+              }, 60000);
               
-              // Only now show success message
-              alert('Starter miner claimed successfully!');
-              
-              // Update data after success
-              await refetchStarterMiner();
-              await refetchMinerIds();
+              try {
+                receipt = await publicClient.waitForTransactionReceipt({
+                  hash: txHash
+                });
+                receiptReceived = true;
+                clearTimeout(timeoutId);
+                
+                console.log('Starter miner transaction confirmed:', receipt);
+                
+                // Only now show success message
+                alert('Starter miner claimed successfully!');
+                
+                // Update data after success
+                await refetchStarterMiner();
+                await refetchMinerIds();
+                
+                // Force a refresh to ensure UI is updated
+                setTimeout(() => {
+                  refetchAll();
+                }, 2000);
+              } catch (waitError) {
+                console.error('Error waiting for transaction receipt:', waitError);
+                if (!receiptReceived) {
+                  clearTimeout(timeoutId);
+                  throw waitError;
+                }
+              }
             } catch (error) {
               console.error('Error waiting for starter miner confirmation:', error);
-              alert('Error confirming starter miner. Please check your wallet for status.');
+              
+              // Still update the state
+              await refetchStarterMiner();
+              await refetchMinerIds();
+              
+              // Alert the user
+              alert('Error confirming your transaction. Please check your wallet for the status.');
             } finally {
               setIsGettingStarterMiner(false);
             }
+          } else {
+            // No public client available, wait a bit and update state
+            setTimeout(async () => {
+              await refetchStarterMiner();
+              await refetchMinerIds();
+              setIsGettingStarterMiner(false);
+            }, 5000);
           }
         },
         onError: (error) => {
@@ -732,6 +781,11 @@ export function useGameState(): GameState {
             alert('Transaction cancelled by user');
           } else if (error.message?.includes('insufficient funds')) {
             alert('Insufficient funds for gas. Please make sure you have enough APE for transaction fees.');
+          } else if (error.message?.includes('already claimed')) { 
+            alert('You have already claimed your free starter miner');
+            // Force refresh to update UI
+            refetchStarterMiner();
+            refetchMinerIds();
           } else {
             alert(`Failed to claim starter miner: ${error.message || 'Unknown error'}`);
           }
