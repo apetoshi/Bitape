@@ -1058,13 +1058,13 @@ export default function RoomPage() {
       ...MAIN_CONTRACT_ABI,
       {
         inputs: [{ name: 'player', type: 'address' }],
-        name: 'getCurrentRewards',
+        name: 'pendingRewards',
         outputs: [{ name: '', type: 'uint256' }],
         stateMutability: 'view',
         type: 'function'
       }
     ] as const,
-    functionName: 'getCurrentRewards',
+    functionName: 'pendingRewards',
     args: [address || zeroAddress],
     query: {
       enabled: Boolean(address),
@@ -1152,7 +1152,8 @@ export default function RoomPage() {
   const handleClaimRewards = async () => {
     try {
       console.log("Claiming rewards...");
-      // Use the gameState's claimRewardsmethod which is already set up correctly
+      // Use the gameState's claimRewards method which is already set up correctly
+      // This internally uses the claimRewards function (0x372500ab)
       await gameState.claimReward();
       
       // After claiming, refetch the rewards to update the UI
@@ -1784,7 +1785,7 @@ export default function RoomPage() {
                 </div>
                 <div className="border-b border-white/20 pb-2">
                   <span className="font-press-start text-white text-xs">- FOOD SOURCE</span>
-                  <span className="font-press-start text-banana text-xs block mt-1 ml-2">FREE FOOD FROM MOM</span>
+                  <span className="font-press-start text-banana text-xs block mt-1 ml-2">FREE BANANAS 🍌 FROM APETOSHI</span>
                 </div>
                 {parsedFacility && (
                   <div className="text-center mt-4">
@@ -1894,15 +1895,15 @@ export default function RoomPage() {
                     formatNumber(hashRateData as bigint, 0, '') : 
                     '2K'} GH/S</span></p>
                 <p className="text-white text-xs">- <span className="text-banana">
-                  {gameState.blocksUntilHalving || blocksUntilHalveningData ? 
+                  {blocksUntilHalveningData ? 
                     String(blocksUntilHalveningData) : 
                     '2,500,640'} BLOCKS</span> UNTIL NEXT HALVENING</p>
                 <p className="text-white text-xs">- YOU HAVE <span className="text-banana">
-                  {gameState.networkHashRatePercentage || networkShareData ? 
-                    (Number(networkShareData) / 100).toFixed(6) : 
+                  {networkSharePercentage ? 
+                    (Number(networkSharePercentage) / 100).toFixed(6) : 
                     '0.000472'}%</span> OF THE TOTAL NETWORK HASH RATE (<span className="text-banana">
-                  {gameState.totalNetworkHashRate || totalNetworkHashrateData ? 
-                    formatNumber(totalNetworkHashrateData as bigint, 0, '') : 
+                  {totalHashrateData ? 
+                    formatNumber(totalHashrateData as bigint, 0, '') : 
                     '483,155,475'} GH/S</span>)</p>
               </div>
             ) : (
@@ -1928,137 +1929,22 @@ export default function RoomPage() {
       case 'mining':
         return (
           <div className="p-4">
-            {/* Mining stats */}
-            <div className="bg-[#001420] border border-banana p-4 rounded-md mb-4">
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="font-press-start text-white text-xs">TOTAL SPACES</span>
-                  <span className="font-press-start text-banana text-xs">
-                    {gameState.facilityData ? gameState.facilityData.capacity : '0'} SPACES
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="font-press-start text-white text-xs">USED SPACES</span>
-                  <span className="font-press-start text-banana text-xs">
-                    {gameState.facilityData ? gameState.facilityData.miners : '0'} SPACES
-                  </span>
-                </div>
-                <div className="flex justify-between items-center border-b border-white/20 pb-3">
-                  <span className="font-press-start text-white text-xs">TOTAL GIGAWATTS</span>
-                  <span className="font-press-start text-banana text-xs">
-                    {gameState.facilityData ? gameState.facilityData.power : '0'} GW
-                  </span>
-                </div>
-              </div>
-              
-              {/* Mining rate info */}
-              <div className="space-y-2 mt-3">
-                <div className="flex items-start">
-                  <span className="font-press-start text-white text-xs w-1/3">- MINING</span>
-                  <span className="font-press-start text-banana text-xs">
-                    {gameState.miningRate || 'Loading...'} BIT/DAY
-                  </span>
-                </div>
-                <div className="flex items-start">
-                  <span className="font-press-start text-white text-xs w-1/3">- HASH RATE</span>
-                  <span className="font-press-start text-banana text-xs">
-                    {gameState.hashRate || '2K'} GH/S
-                  </span>
-                </div>
-                <div className="flex items-start">
-                  <span className="font-press-start text-white text-xs w-1/3">- NEXT HALVENING</span>
-                  <span className="font-press-start text-banana text-xs">
-                    {gameState.blocksUntilHalving || '4185328'} BLOCKS
-                  </span>
-                </div>
-                <div className="flex items-start border-b border-white/20 pb-3">
-                  <span className="font-press-start text-white text-xs w-1/3">- NETWORK %</span>
-                  <span className="font-press-start text-banana text-xs">
-                    {gameState.networkHashRatePercentage || '0.01'}%
-                  </span>
-                </div>
-              </div>
-              
-              {/* Network Stats */}
-              <div className="mt-3">
-                <h3 className="font-press-start text-white text-xs mb-3">NETWORK STATS</h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="font-press-start text-white text-xs">- BIT PER BLOCK</span>
-                    <span className="font-press-start text-banana text-xs">
-                      {gameState.rewardPerBlock || '2.5'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="font-press-start text-white text-xs">- TOTAL BIT MINED</span>
-                    <span className="font-press-start text-banana text-xs">
-                      {gameState.totalMinedBit || '18.72K'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center border-b border-white/20 pb-3">
-                    <span className="font-press-start text-white text-xs">- BIT BURNED</span>
-                    <span className="font-press-start text-banana text-xs">
-                      {gameState.burnedBit || '270.00'}
-                    </span>
-                  </div>
-                </div>
-              </div>
+            {/* CLAIM MINED $BIT Section - Replace the tabs from actions */}
+            <div className="bg-[#001420] border border-banana p-4 rounded-md mb-4 text-center">
+              <h3 className="font-press-start text-white text-sm mb-2">YOU HAVE MINED</h3>
+              <p className="font-press-start text-banana text-xl mb-3">
+                {isUnclaimedRewardsLoading ? 
+                 'Loading...' : 
+                 `${formatNumber(unclaimedRewardsData as bigint || BigInt(0), 5, '', 18)} $BIT`}
+              </p>
+              <button
+                onClick={handleClaimRewards}
+                disabled={gameState.isClaimingReward || (!unclaimedRewardsData || Number(unclaimedRewardsData) <= 0)}
+                className="w-full bg-banana text-royal font-press-start text-xs py-2 px-4 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                CLAIM MINED $BIT
+              </button>
             </div>
-            
-            {/* Your Miners */}
-            <div className="bg-[#001420] border border-banana p-4 rounded-md mb-4">
-              <h3 className="font-press-start text-white text-xs mb-3">YOUR MINERS</h3>
-              {gameState.miners && gameState.miners.length > 0 ? (
-                <div className="space-y-3">
-                  {gameState.miners.map((miner, index) => {
-                    const minerType = Number(miner.minerType || miner.type || 0);
-                    return (
-                      <div key={index} className="border-b border-white/20 pb-2 last:border-0">
-                        <div className="flex justify-between mb-1">
-                          <div>
-                            <p className="font-press-start text-white text-xs">Miner #{Number(miner.id)}</p>
-                            <p className="font-press-start text-banana text-xs mt-1">
-                              Type: {getMinerTypeName ? getMinerTypeName(minerType) : `Type ${minerType}`}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-press-start text-white text-xs">
-                              Mining rate: {getMinerMiningRate ? getMinerMiningRate(minerType) : '100'} BIT/day
-                            </p>
-                            <p className="font-press-start text-white text-xs mt-1">
-                              Position: X:{Number(miner.x)}, Y:{Number(miner.y)}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="text-center py-3">
-                  {gameState.hasClaimedStarterMiner ? 
-                    <p className="font-press-start text-white text-xs">Loading your miners...</p> : 
-                    <p className="font-press-start text-white text-xs">You don't have any miners yet. Claim your starter miner!</p>
-                  }
-                </div>
-              )}
-            </div>
-            
-            {/* Claim Section */}
-            {unclaimedRewardsData && Number(unclaimedRewardsData) > 0 && (
-              <div className="text-center bg-[#001420] border border-banana p-4 rounded-md">
-                <p className="font-press-start text-white text-xs mb-3">YOU HAVE MINED <span className="text-banana">
-                  {formatNumber(unclaimedRewardsData as bigint, 5, '', 18)} $BIT
-                </span></p>
-                <button
-                  onClick={handleClaimRewards}
-                  disabled={gameState.isClaimingReward}
-                  className="w-full bg-banana text-royal font-press-start text-xs py-3 rounded-md"
-                >
-                  {gameState.isClaimingReward ? "CLAIMING..." : "CLAIM MINED $BIT"}
-                </button>
-              </div>
-            )}
           </div>
         );
       default:
@@ -2348,8 +2234,8 @@ export default function RoomPage() {
             <Image
               src="/bitape.png"
               alt="BitApe Logo"
-              width={40}
-              height={40}
+              width={80}
+              height={80}
               className="hover:opacity-80 transition-opacity"
               priority
             />
@@ -2423,8 +2309,8 @@ export default function RoomPage() {
               <Image
                 src="/bitape.png"
                 alt="BitApe Logo"
-                width={64}
-                height={64}
+                width={100}
+                height={100}
                 className="hover:opacity-80 transition-opacity"
                 priority
               />

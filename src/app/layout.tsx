@@ -17,7 +17,7 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: 'BitApe - A Peer-to-Peer Electronic Ape Cash System',
-  description: 'Mine BitApe tokens with your virtual mining facility on ApeChain',
+  description: 'Mine BitApe with your virtual mining facility on ApeChain',
   manifest: '/manifest.json',
   themeColor: '#000000',
   appleWebApp: {
@@ -31,22 +31,25 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: 'BitApe - A Peer-to-Peer Electronic Ape Cash System',
-    description: 'Mine BitApe tokens with your virtual mining facility on ApeChain',
+    description: 'Mine BitApe with your virtual mining facility on ApeChain',
     images: [
       {
-        url: '/bitape.png',
-        width: 800,
-        height: 600,
+        url: 'https://bitape.org/opengraph-image.png',
+        width: 1200,
+        height: 630,
         alt: 'BitApe Logo',
       },
     ],
     type: 'website',
+    siteName: 'BitApe',
+    locale: 'en_US',
   },
   twitter: {
     card: 'summary_large_image',
     title: 'BitApe - A Peer-to-Peer Electronic Ape Cash System',
-    description: 'Mine BitApe tokens with your virtual mining facility on ApeChain',
-    images: ['/bitape.png'],
+    description: 'Mine BitApe with your virtual mining facility on ApeChain',
+    images: ['https://bitape.org/opengraph-image.png'],
+    creator: '@BitApeOrg',
   },
 };
 

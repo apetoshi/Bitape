@@ -13,8 +13,8 @@ export default function AboutPage() {
           <Image
             src="/bitape.png"
             alt="BitApe Logo"
-            width={64}
-            height={64}
+            width={100}
+            height={100}
             className="hover:opacity-80 transition-opacity"
             priority
           />

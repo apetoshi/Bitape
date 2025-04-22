@@ -59,8 +59,8 @@ const LandingPage = () => {
             <Image
               src="/bitape.png"
               alt="BitApe Logo"
-              width={70}
-              height={70}
+              width={120}
+              height={120}
               className="hover:opacity-80 transition-opacity"
               priority
             />

@@ -69,8 +69,8 @@ const Header: React.FC = () => {
           <Image
             src="/bitape.png"
             alt="BitApe Logo"
-            width={60}
-            height={60}
+            width={120}
+            height={120}
             className="hover:opacity-80 transition-opacity"
             priority
           />

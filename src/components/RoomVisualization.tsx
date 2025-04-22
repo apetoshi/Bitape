@@ -647,10 +647,10 @@ export const RoomVisualization = React.memo(function RoomVisualization({
       x: 0, y: 0, // TOP RIGHT
       style: { 
         position: 'absolute' as const,
-        top: isMobile ? '24%' : '40%',
-        left: isMobile ? '18%' : '35%',
-        width: isMobile ? '70px' : '150px',
-        height: isMobile ? '70px' : '150px',
+        top: isMobile ? '42%' : '40%',
+        left: isMobile ? '45%' : '35%',
+        width: isMobile ? '40px' : '150px',
+        height: isMobile ? '90px' : '150px',
         zIndex: 20
       }
     },
@@ -658,10 +658,10 @@ export const RoomVisualization = React.memo(function RoomVisualization({
       x: 1, y: 0, // TOP LEFT
       style: { 
         position: 'absolute' as const,
-        top: isMobile ? '30%' : '47%',
-        left: isMobile ? '4%' : '20%',
-        width: isMobile ? '70px' : '150px',
-        height: isMobile ? '70px' : '150px',
+        top: isMobile ? '50%' : '47%',
+        left: isMobile ? '30%' : '20%',
+        width: isMobile ? '40px' : '150px',
+        height: isMobile ? '90px' : '150px',
         zIndex: 20
       }
     },
@@ -669,10 +669,10 @@ export const RoomVisualization = React.memo(function RoomVisualization({
       x: 0, y: 1, // BOTTOM RIGHT
       style: { 
         position: 'absolute' as const,
-        top: isMobile ? '26%' : '46%',
-        left: isMobile ? '70%' : '50%',
-        width: isMobile ? '70px' : '150px',
-        height: isMobile ? '70px' : '150px',
+        top: isMobile ? '50%' : '46%',
+        left: isMobile ? '60%' : '50%',
+        width: isMobile ? '40px' : '150px',
+        height: isMobile ? '90px' : '150px',
         zIndex: 20
       }
     },
@@ -680,10 +680,10 @@ export const RoomVisualization = React.memo(function RoomVisualization({
       x: 1, y: 1, // BOTTOM LEFT
       style: { 
         position: 'absolute' as const,
-        top: isMobile ? '36%' : '55%',
-        left: isMobile ? '50%' : '35%',
-        width: isMobile ? '70px' : '150px',
-        height: isMobile ? '70px' : '150px',
+        top: isMobile ? '56%' : '55%',
+        left: isMobile ? '45%' : '35%',
+        width: isMobile ? '40px' : '150px',
+        height: isMobile ? '90px' : '150px',
         zIndex: 20
       }
     }
