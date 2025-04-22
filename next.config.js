@@ -15,9 +15,5 @@ module.exports = withPWA({
     ignoreDuringBuilds: true,
   },
   // Force all pages to be server-side rendered to avoid issues with client components during static build
-  experimental: {
-    // This ensures all pages are server components by default
-    serverComponentsExternalPackages: [],
-  },
-  swcMinify: false,
+  serverExternalPackages: [],
 }) 
