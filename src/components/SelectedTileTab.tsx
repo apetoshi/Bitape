@@ -113,18 +113,18 @@ export const SelectedTileTab: React.FC<SelectedTileTabProps> = ({
       
       // Fallback to hardcoded starter miner if not in array but claimed
       console.log('SelectedTileTab - Using hardcoded starter miner data for (0,0)');
-      return {
-        id: '1',
-        minerType: 1, // BANANA_MINER
-        x: 0,
-        y: 0,
-        hashrate: 100,
-        powerConsumption: 1,
-        cost: 0,
-        inProduction: true,
-        image: '/banana-miner.gif'
-      };
-    }
+        return {
+          id: '1',
+          minerType: 1, // BANANA_MINER
+          x: 0,
+          y: 0,
+          hashrate: 100,
+          powerConsumption: 1,
+          cost: 0,
+          inProduction: true,
+          image: '/banana-miner.gif'
+        };
+      }
     
     if (!gameState.miners || gameState.miners.length === 0) {
       console.log(`SelectedTileTab - No miners array available for position (${x}, ${y})`);

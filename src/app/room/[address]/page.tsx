@@ -163,6 +163,10 @@ export default function RoomPage() {
     };
   }, []); // Empty dependency array means it only runs once on mount
   
+  // We had a fix here that was causing invalid hook calls, so it has been removed.
+  // The proper way to fix hook ordering issues is to ensure hooks are always called
+  // in the same order in the component body, not conditionally.
+  
   // Get player facility data directly from contract
   const { data: facilityData } = useContractRead({
     address: CONTRACT_ADDRESSES.MAIN,
@@ -852,15 +856,25 @@ export default function RoomPage() {
   // Simplify the useEffect that forces a UI re-render to prevent infinite loops
   useEffect(() => {
     if (selectedTile) {
-      // Limit the frequency of this check to avoid excessive re-renders
-      const hasMiner = selectedTileHasMiner(selectedTile.x, selectedTile.y);
+      // Debounce selection checks to prevent excessive processing
+      const now = Date.now();
+      if (now - lastSelectionTimeRef.current < 300) {
+        return; // Skip if another selection was made recently
+      }
+      lastSelectionTimeRef.current = now;
       
-      // Use a boolean flag in a ref to prevent repeatedly entering this logic 
-      // when nothing has changed
-      const hasChanged = hasMinerRef.current !== hasMiner;
-      if (hasChanged) {
-        hasMinerRef.current = hasMiner;
-        console.log(`Selected tile has miner: ${hasMiner}`);
+      // Instead of calling the function directly which may cause re-renders,
+      // make a local variable for the result
+      const selectedTileHasAMiner = selectedTileHasMiner ? 
+        selectedTileHasMiner(selectedTile.x, selectedTile.y) : false;
+      
+      // Only update the ref if the value actually changed - don't trigger re-renders
+      if (hasMinerRef.current !== selectedTileHasAMiner) {
+        hasMinerRef.current = selectedTileHasAMiner;
+        console.log(`Selected tile has miner: ${selectedTileHasAMiner}`);
+        
+        // The page component will now naturally use hasMinerRef.current 
+        // in its rendering logic without causing loops
       }
     }
   }, [selectedTile, selectedTileHasMiner]);
@@ -1690,221 +1704,7 @@ export default function RoomPage() {
 
   // Direct contract read for totalSupply for mobile tab (moved to component level)
 
-  // Render content based on the active mobile tab
-  const renderMobileTabContent = () => {
-    switch (activeMobileTab) {
-      case 'actions':
-        return (
-          <div className="p-4">
-            <div className="grid grid-cols-1 gap-4">
-              <button
-                className="bigcoin-button"
-                onClick={() => setIsUpgradeModalOpen(true)}
-              >
-                UPGRADE FACILITY
-              </button>
-              {!acquiredStarterMinerData && (
-                <button
-                  className="bigcoin-button"
-                  onClick={() => setIsStarterMinerModalOpen(true)}
-                  disabled={gameState.isGettingStarterMiner}
-                >
-                  {gameState.isGettingStarterMiner ? "PROCESSING..." : "CLAIM STARTER MINER"}
-                </button>
-              )}
-              {hasFacility && (
-                <DirectMinerPurchaseButton 
-                  text="BUY MINER"
-                  buttonClass="bigcoin-button"
-                  autoSelectTile={true}
-                />
-              )}
-            </div>
-          </div>
-        );
-      case 'stats':
-        return (
-          <div className="p-4">
-            <div className="flex justify-between items-center mb-2">
-              <span className="bigcoin-text">APE BALANCE</span>
-              <span className="bigcoin-value font-press-start">{apeBalance || '0'} APE</span>
-            </div>
-            <div className="flex justify-between items-center mb-2">
-              <span className="bigcoin-text">BIT BALANCE</span>
-              <span className="bigcoin-value font-press-start">{bitBalance || '0'} BIT</span>
-            </div>
-            <div className="flex justify-between items-center mb-2">
-              <span className="bigcoin-text">SPACES LEFT</span>
-              <span className="bigcoin-value font-press-start">
-                {parsedFacility ? `${parsedFacility.capacity - parsedFacility.miners} SPACES` : '0 SPACES'}
-              </span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="bigcoin-text">GIGAWATTS AVAILABLE</span>
-              <span className="bigcoin-value font-press-start">
-                {parsedFacility ? `${parsedFacility.power - parsedFacility.used} GW` : '0 GW'}
-              </span>
-            </div>
-            
-            {/* Also display mining stats in mobile view */}
-            <div className="border-t border-white/20 pt-4 mt-4">
-              <h3 className="bigcoin-text mb-2">MINING STATS</h3>
-              <p className="font-press-start text-white text-xs mb-1">- MINING <span className="text-banana">
-                {miningRateData !== undefined 
-                  ? formatNumber(miningRateData, 2, '', 18) 
-                  : 'Loading...'}
-              </span> BIT/DAY</p>
-              <p className="font-press-start text-white text-xs mb-1">- HASH RATE: <span className="text-banana">
-                {hashRateData !== undefined 
-                  ? formatNumber(hashRateData, 0, '') 
-                  : 'Loading...'}
-              </span> GH/S</p>
-              <p className="font-press-start text-white text-xs mb-1">- <span className="text-banana">
-                {blocksUntilHalveningData !== undefined 
-                  ? String(blocksUntilHalveningData) 
-                  : 'Loading...'}
-              </span> BLOCKS UNTIL HALVENING</p>
-              <p className="font-press-start text-white text-xs">- <span className="text-banana">
-                {networkShareData !== undefined 
-                  ? (Number(networkShareData) / 100).toFixed(2) 
-                  : 'Loading...'}%
-              </span> OF NETWORK (<span className="text-banana">
-                {totalNetworkHashrateData !== undefined 
-                  ? formatNumber(totalNetworkHashrateData, 0, '') 
-                  : 'Loading...'}
-              </span> GH/S)</p>
-            </div>
-            
-            {/* Add PRO stats in mobile view as well */}
-            <div className="border-t border-white/20 pt-4 mt-4">
-              <h3 className="bigcoin-text mb-2">NETWORK STATS</h3>
-              <p className="font-press-start text-white text-xs mb-1">- <span className="text-banana">
-                {currentBitApePerBlockData !== undefined 
-                  ? formatNumber(currentBitApePerBlockData, 2, '', 18) 
-                  : 'Loading...'}
-              </span> BIT PER BLOCK</p>
-              <p className="font-press-start text-white text-xs mb-1">- <span className="text-banana">
-                {useSafeHookValues(statsTotalSupplyData, undefined) !== undefined 
-                  ? formatNumber(statsTotalSupplyData, 2, '', 18) 
-                  : 'Loading...'}
-              </span> TOTAL BIT MINED</p>
-              <p className="font-press-start text-white text-xs mb-1">- <span className="text-banana">
-                {burnedBitData !== undefined 
-                  ? formatNumber(burnedBitData, 2, '', 18) 
-                  : 'Loading...'}
-              </span> BIT BURNED</p>
-            </div>
-          </div>
-        );
-      case 'mining':
-        // Get all miners including any from localStorage if needed
-        let displayedMiners = [...(gameState.miners || [])];
-        
-        // If no miners in gameState but user has claimed starter miner, check localStorage
-        if (displayedMiners.length === 0 && gameState.hasClaimedStarterMiner && typeof window !== 'undefined') {
-          try {
-            // Check localStorage for any saved miners
-            const minerData = getMinerAtPosition(address as string, 0, 0);
-            if (minerData) {
-              console.log('Found Banana Miner at position (0,0) from localStorage!');
-              displayedMiners.push({
-                id: '0',
-                minerType: MinerType.BANANA_MINER,
-                x: 0,
-                y: 0,
-                image: MINERS[MinerType.BANANA_MINER].image,
-                hashrate: 1,
-                powerConsumption: 1,
-                cost: 0,
-                inProduction: true
-              });
-            }
-          } catch (e) {
-            console.error('Error retrieving miner from localStorage:', e);
-          }
-        }
-        
-        // If still no miners but we know starter miner is claimed, add default at 0,0
-        if (displayedMiners.length === 0 && gameState.hasClaimedStarterMiner) {
-          console.log('No miners found, but starter miner claimed. Adding default at (0,0)');
-          displayedMiners.push({
-            id: '0',
-            minerType: MinerType.BANANA_MINER,
-            x: 0,
-            y: 0,
-            image: MINERS[MinerType.BANANA_MINER].image,
-            hashrate: 1,
-            powerConsumption: 1,
-            cost: 0,
-            inProduction: true
-          });
-        }
-
-        return (
-          <div className="p-4">
-            <div className="flex justify-between items-center mb-2">
-              <span className="bigcoin-text">TOTAL SPACES</span>
-              <span className="bigcoin-value font-press-start">
-                {parsedFacility ? `${parsedFacility.capacity} SPACES` : '0 SPACES'}
-              </span>
-            </div>
-            <div className="flex justify-between items-center mb-2">
-              <span className="bigcoin-text">USED SPACES</span>
-              <span className="bigcoin-value font-press-start">
-                {parsedFacility ? `${parsedFacility.miners} SPACES` : '0 SPACES'}
-              </span>
-            </div>
-            <div className="flex justify-between items-center mb-3">
-              <span className="bigcoin-text">TOTAL GIGAWATTS</span>
-              <span className="bigcoin-value font-press-start">
-                {parsedFacility ? `${parsedFacility.power} GW` : '0 GW'}
-              </span>
-            </div>
-            
-            {/* Mining stats with improved mobile styling */}
-            <div className="border-t border-white/20 pt-3 mb-3">
-              <p className="font-press-start text-white text-xs mb-1">- MINING <span className="text-banana">
-                {miningRateData !== undefined 
-                  ? formatNumber(miningRateData, 2, '', 18) 
-                  : 'Loading...'}
-              </span> BIT/DAY</p>
-              <p className="font-press-start text-white text-xs mb-1">- HASH RATE: <span className="text-banana">
-                {hashRateData !== undefined 
-                  ? formatNumber(hashRateData, 0, '') 
-                  : 'Loading...'}
-              </span> GH/S</p>
-            </div>
-            
-            <div className="mt-4">
-              <h3 className="text-lg font-bold mb-2">Your Miners</h3>
-              {displayedMiners.length > 0 ? (
-                <div className="grid grid-cols-1 gap-4">
-                  {displayedMiners.map((miner, index) => (
-                    <div key={index} className="border border-white/20 p-3 rounded">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs">Miner #{miner.id}</span>
-                        <span className="text-xs">Type: {getMinerTypeName(miner.minerType)}</span>
-                      </div>
-                      <div className="mt-2">
-                        <span className="text-xs">Mining rate: {getMinerMiningRate(miner.minerType)} BIT/day</span>
-                      </div>
-                      <div className="mt-2">
-                        <span className="text-xs">Position: X:{miner.x}, Y:{miner.y}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-4 text-sm">No miners yet</div>
-              )}
-            </div>
-          </div>
-        );
-      default:
-        return null;
-    }
-  };
-
+  // Define getLocationDescription function to fix the reference error
   const getLocationDescription = (tile: SelectedTile) => {
     if (tile.x === 0 && tile.y === 0) return "NEAR BED";
     if (tile.x === 1 && tile.y === 0) return "NEAR BANANA BOXES";
@@ -1913,7 +1713,359 @@ export default function RoomPage() {
     return "UNKNOWN LOCATION";
   };
 
-  // Handle selecting a tile in the room visualization
+  // Render content based on the active mobile tab
+  const renderMobileTabContent = () => {
+    switch (activeMobileTab) {
+      case 'actions':
+        return (
+          <div className="p-4">
+            <div className="flex border-b-2 border-banana mb-4">
+              <button 
+                onClick={() => setActiveTab("resources")}
+                className={`font-press-start text-xs mr-2 p-2 ${activeTab === "resources" ? "bg-banana text-royal" : "text-white"}`}
+              >
+                RESOURCES
+              </button>
+              <button 
+                onClick={() => setActiveTab("space")}
+                className={`font-press-start text-xs mx-2 p-2 ${activeTab === "space" ? "bg-banana text-royal" : "text-white"}`}
+              >
+                SPACE
+              </button>
+              <button 
+                onClick={() => setActiveTab("selectedTile")}
+                className={`font-press-start text-xs ml-2 p-2 ${activeTab === "selectedTile" ? "bg-banana text-royal" : "text-white"}`}
+              >
+                SELECTED TILE
+              </button>
+            </div>
+            
+            {activeTab === 'resources' && (
+              <div className="bg-[#001420] border border-banana p-4 rounded-md space-y-3">
+                <div className="flex justify-between items-center border-b border-white/20 pb-2">
+                  <span className="font-press-start text-white text-xs">APE:</span> 
+                  <span className="font-press-start text-banana text-xs">{gameState.apeBalance || '0.54746334447510442'} APE</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-white/20 pb-2">
+                  <span className="font-press-start text-white text-xs">BIT:</span> 
+                  <span className="font-press-start text-banana text-xs">{gameState.bitBalance || '7857.5379464285714285'} BIT</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-white/20 pb-2">
+                  <span className="font-press-start text-white text-xs">SPACES LEFT:</span>
+                  <span className="font-press-start text-banana text-xs">
+                    {gameState.spacesLeft || '0'} SPACES
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="font-press-start text-white text-xs">GIGAWATTS AVAILABLE:</span>
+                  <span className="font-press-start text-banana text-xs">
+                    {gameState.gigawattsAvailable || '0'} GIGAWATTS
+                  </span>
+                </div>
+              </div>
+            )}
+            
+            {activeTab === 'space' && (
+              <div className="bg-[#001420] border border-banana p-4 rounded-md space-y-3">
+                <div className="border-b border-white/20 pb-2">
+                  <span className="font-press-start text-white text-xs">- YOUR BEDROOM</span>
+                </div>
+                <div className="border-b border-white/20 pb-2">
+                  <span className="font-press-start text-white text-xs">- TOTAL SPACES</span>
+                  <span className="font-press-start text-banana text-xs block mt-1 ml-2">
+                    {parsedFacility ? parsedFacility.capacity : 4} SPACES
+                  </span>
+                </div>
+                <div className="border-b border-white/20 pb-2">
+                  <span className="font-press-start text-white text-xs">- TOTAL GIGAWATTS</span>
+                  <span className="font-press-start text-banana text-xs block mt-1 ml-2">
+                    {parsedFacility ? parsedFacility.power : 28} GIGAWATTS
+                  </span>
+                </div>
+                <div className="border-b border-white/20 pb-2">
+                  <span className="font-press-start text-white text-xs">- FOOD SOURCE</span>
+                  <span className="font-press-start text-banana text-xs block mt-1 ml-2">FREE FOOD FROM MOM</span>
+                </div>
+                {parsedFacility && (
+                  <div className="text-center mt-4">
+                    <button
+                      onClick={() => gameState.upgradeFacility()}
+                      disabled={gameState.isUpgradingFacility}
+                      className="bg-banana text-royal font-press-start text-xs py-2 px-4 rounded-md w-full"
+                    >
+                      {gameState.isUpgradingFacility ? "UPGRADING..." : "UPGRADE"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {activeTab === 'selectedTile' && selectedTile && (
+              <div className="bg-[#001420] border border-banana p-4 rounded-md space-y-3">
+                <div className="border-b border-white/20 pb-3 mb-1">
+                  <span className="font-press-start text-white text-xs">LOCATION:</span>
+                  <span className="font-press-start text-banana text-xs block mt-2">
+                    {getLocationDescription(selectedTile)}
+                  </span>
+                  <span className="font-press-start text-white text-xs mt-2 block">
+                    POSITION: X: {selectedTile.x}, Y: {selectedTile.y}
+                  </span>
+                </div>
+                
+                {selectedTileHasMiner && selectedTileHasMiner(selectedTile.x, selectedTile.y) ? (
+                  <div className="space-y-3">
+                    <p className="font-press-start text-white text-xs">ACTIVE MINER:</p>
+                    {getMinerAtTile && (() => {
+                      const miner = getMinerAtTile(selectedTile.x, selectedTile.y);
+                      if (!miner) return null;
+                      
+                      const minerType = Number(miner.minerType || miner.type || 0);
+                      return (
+                        <>
+                          <div className="flex items-start justify-end mt-3">
+                            <div className="text-right">
+                              <p className="font-press-start text-banana text-xs">{getMinerTypeName ? getMinerTypeName(minerType) : `Type ${minerType}`}</p>
+                              <p className="font-press-start text-white text-xs mt-1">
+                                {getMinerHashRate ? getMinerHashRate(minerType) : "100"} GH/s · 
+                                {getMinerPowerConsumption ? getMinerPowerConsumption(minerType) : "1"} WATTS
+                              </p>
+                            </div>
+                          </div>
+                          <div className="mt-4">
+                            <button
+                              onClick={() => handleRemoveMiner(selectedTile.x, selectedTile.y)}
+                              className="w-full bg-red-500 text-white font-press-start text-xs py-2 rounded-md"
+                            >
+                              REMOVE MINER
+                            </button>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                ) : (
+                  <div>
+                    <p className="font-press-start text-white text-xs mb-3">NO MINER INSTALLED</p>
+                    {hasFacility && (
+                      <div className="mt-4">
+                        <button
+                          onClick={() => setShowMinerModal(true)}
+                          className="w-full bg-banana text-royal font-press-start text-xs py-2 rounded-md"
+                        >
+                          BUY MINER
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      case 'stats':
+        return (
+          <div className="p-4">
+            {/* Toggle between Simple and Pro views */}
+            <div className="flex border-b-2 border-banana p-2 mb-4">
+              <button 
+                onClick={() => setStatsView("simple")}
+                className={`font-press-start text-xs mr-4 ${statsView === "simple" ? "text-banana font-bold" : "text-white opacity-50"}`}
+              >
+                SIMPLE
+              </button>
+              <span className="font-press-start text-white opacity-50">/</span>
+              <button 
+                onClick={() => setStatsView("pro")}
+                className={`font-press-start text-xs ml-4 ${statsView === "pro" ? "text-banana font-bold" : "text-white opacity-50"}`}
+              >
+                PRO
+              </button>
+            </div>
+            
+            {/* Simple Stats View */}
+            {statsView === "simple" ? (
+              <div className="bg-[#001420] border border-banana p-4 rounded-md space-y-3 font-press-start">
+                <p className="text-white text-xs">- YOU ARE MINING <span className="text-banana">
+                  {gameState.miningRate || miningRateData ? 
+                    formatNumber(miningRateData as bigint, 2, '', 18) : 
+                    '0.973'} BIT</span> A DAY</p>
+                <p className="text-white text-xs">- YOUR HASH RATE IS <span className="text-banana">
+                  {gameState.hashRate || hashRateData ? 
+                    formatNumber(hashRateData as bigint, 0, '') : 
+                    '2K'} GH/S</span></p>
+                <p className="text-white text-xs">- <span className="text-banana">
+                  {gameState.blocksUntilHalving || blocksUntilHalveningData ? 
+                    String(blocksUntilHalveningData) : 
+                    '2,500,640'} BLOCKS</span> UNTIL NEXT HALVENING</p>
+                <p className="text-white text-xs">- YOU HAVE <span className="text-banana">
+                  {gameState.networkHashRatePercentage || networkShareData ? 
+                    (Number(networkShareData) / 100).toFixed(6) : 
+                    '0.000472'}%</span> OF THE TOTAL NETWORK HASH RATE (<span className="text-banana">
+                  {gameState.totalNetworkHashRate || totalNetworkHashrateData ? 
+                    formatNumber(totalNetworkHashrateData as bigint, 0, '') : 
+                    '483,155,475'} GH/S</span>)</p>
+              </div>
+            ) : (
+              /* Pro Stats View */
+              <div className="bg-[#001420] border border-banana p-4 rounded-md space-y-3 font-press-start">
+                <p className="text-white text-xs">- <span className="text-banana">
+                  {currentBitApePerBlockData !== undefined 
+                    ? formatNumber(currentBitApePerBlockData, 2, '', 18) 
+                    : '2.5'}</span> TOTAL BIT MINED PER BLOCK</p>
+                <p className="text-white text-xs">- <span className="text-banana">
+                  {statsTotalSupplyData !== undefined 
+                    ? formatNumber(statsTotalSupplyData, 2, '', 18) 
+                    : '4,058,118.214'}</span> $BIT HAS EVER BEEN MINED</p>
+                <p className="text-white text-xs">- <span className="text-banana">
+                  {burnedBitData !== undefined 
+                    ? formatNumber(burnedBitData, 2, '', 18) 
+                    : '2,402,685.75'}</span> $BIT HAS BEEN BURNED</p>
+                <p className="text-white text-xs">- <span className="text-banana">2,102,400 BLOCKS</span> HALVENING PERIOD</p>
+              </div>
+            )}
+          </div>
+        );
+      case 'mining':
+        return (
+          <div className="p-4">
+            {/* Mining stats */}
+            <div className="bg-[#001420] border border-banana p-4 rounded-md mb-4">
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="font-press-start text-white text-xs">TOTAL SPACES</span>
+                  <span className="font-press-start text-banana text-xs">
+                    {gameState.facilityData ? gameState.facilityData.capacity : '0'} SPACES
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="font-press-start text-white text-xs">USED SPACES</span>
+                  <span className="font-press-start text-banana text-xs">
+                    {gameState.facilityData ? gameState.facilityData.miners : '0'} SPACES
+                  </span>
+                </div>
+                <div className="flex justify-between items-center border-b border-white/20 pb-3">
+                  <span className="font-press-start text-white text-xs">TOTAL GIGAWATTS</span>
+                  <span className="font-press-start text-banana text-xs">
+                    {gameState.facilityData ? gameState.facilityData.power : '0'} GW
+                  </span>
+                </div>
+              </div>
+              
+              {/* Mining rate info */}
+              <div className="space-y-2 mt-3">
+                <div className="flex items-start">
+                  <span className="font-press-start text-white text-xs w-1/3">- MINING</span>
+                  <span className="font-press-start text-banana text-xs">
+                    {gameState.miningRate || 'Loading...'} BIT/DAY
+                  </span>
+                </div>
+                <div className="flex items-start">
+                  <span className="font-press-start text-white text-xs w-1/3">- HASH RATE</span>
+                  <span className="font-press-start text-banana text-xs">
+                    {gameState.hashRate || '2K'} GH/S
+                  </span>
+                </div>
+                <div className="flex items-start">
+                  <span className="font-press-start text-white text-xs w-1/3">- NEXT HALVENING</span>
+                  <span className="font-press-start text-banana text-xs">
+                    {gameState.blocksUntilHalving || '4185328'} BLOCKS
+                  </span>
+                </div>
+                <div className="flex items-start border-b border-white/20 pb-3">
+                  <span className="font-press-start text-white text-xs w-1/3">- NETWORK %</span>
+                  <span className="font-press-start text-banana text-xs">
+                    {gameState.networkHashRatePercentage || '0.01'}%
+                  </span>
+                </div>
+              </div>
+              
+              {/* Network Stats */}
+              <div className="mt-3">
+                <h3 className="font-press-start text-white text-xs mb-3">NETWORK STATS</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="font-press-start text-white text-xs">- BIT PER BLOCK</span>
+                    <span className="font-press-start text-banana text-xs">
+                      {gameState.rewardPerBlock || '2.5'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="font-press-start text-white text-xs">- TOTAL BIT MINED</span>
+                    <span className="font-press-start text-banana text-xs">
+                      {gameState.totalMinedBit || '18.72K'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center border-b border-white/20 pb-3">
+                    <span className="font-press-start text-white text-xs">- BIT BURNED</span>
+                    <span className="font-press-start text-banana text-xs">
+                      {gameState.burnedBit || '270.00'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Your Miners */}
+            <div className="bg-[#001420] border border-banana p-4 rounded-md mb-4">
+              <h3 className="font-press-start text-white text-xs mb-3">YOUR MINERS</h3>
+              {gameState.miners && gameState.miners.length > 0 ? (
+                <div className="space-y-3">
+                  {gameState.miners.map((miner, index) => {
+                    const minerType = Number(miner.minerType || miner.type || 0);
+                    return (
+                      <div key={index} className="border-b border-white/20 pb-2 last:border-0">
+                        <div className="flex justify-between mb-1">
+                          <div>
+                            <p className="font-press-start text-white text-xs">Miner #{Number(miner.id)}</p>
+                            <p className="font-press-start text-banana text-xs mt-1">
+                              Type: {getMinerTypeName ? getMinerTypeName(minerType) : `Type ${minerType}`}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-press-start text-white text-xs">
+                              Mining rate: {getMinerMiningRate ? getMinerMiningRate(minerType) : '100'} BIT/day
+                            </p>
+                            <p className="font-press-start text-white text-xs mt-1">
+                              Position: X:{Number(miner.x)}, Y:{Number(miner.y)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-3">
+                  {gameState.hasClaimedStarterMiner ? 
+                    <p className="font-press-start text-white text-xs">Loading your miners...</p> : 
+                    <p className="font-press-start text-white text-xs">You don't have any miners yet. Claim your starter miner!</p>
+                  }
+                </div>
+              )}
+            </div>
+            
+            {/* Claim Section */}
+            {unclaimedRewardsData && Number(unclaimedRewardsData) > 0 && (
+              <div className="text-center bg-[#001420] border border-banana p-4 rounded-md">
+                <p className="font-press-start text-white text-xs mb-3">YOU HAVE MINED <span className="text-banana">
+                  {formatNumber(unclaimedRewardsData as bigint, 5, '', 18)} $BIT
+                </span></p>
+                <button
+                  onClick={handleClaimRewards}
+                  disabled={gameState.isClaimingReward}
+                  className="w-full bg-banana text-royal font-press-start text-xs py-3 rounded-md"
+                >
+                  {gameState.isClaimingReward ? "CLAIMING..." : "CLAIM MINED $BIT"}
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
   const handleTileSelect = useCallback((x: number, y: number) => {
     // Add a debounce to prevent rapid state updates
     if (Date.now() - lastSelectionTimeRef.current < 300) {
@@ -1987,6 +2139,10 @@ export default function RoomPage() {
   
   // Add functionality to remove a miner from a tile
   const handleRemoveMiner = async (x: number, y: number) => {
+    if (!confirm(`Are you sure you want to remove the miner at position (${x}, ${y})? This action cannot be undone.`)) {
+      return;
+    }
+    
     try {
       console.log(`Removing miner at position (${x}, ${y})`);
       
@@ -2169,7 +2325,7 @@ export default function RoomPage() {
         networkShareData={networkSharePercentage}
         totalNetworkHashrateData={totalHashrateData as bigint}
         totalSupplyData={statsTotalSupplyData as bigint} // Use the data from the top-level hook
-        burnedBitData={undefined} // Optional
+        burnedBitData={burnedBitData as bigint} // Optional
         currentBitApePerBlockData={bitPerBlockData as bigint}
         isMiningRateLoading={!miningRatePerDay}
         isHashRateLoading={!playerHashrateData}

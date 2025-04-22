@@ -42,27 +42,27 @@ export default function SpaceTab() {
     if (!rawFacilityData || !Array.isArray(rawFacilityData) || rawFacilityData.length < 5) {
       return null;
     }
-    
-    try {
-      // [facilityIndex, maxMiners, currMiners, totalPowerOutput, currPowerOutput, x, y]
-      const facilityIndex = Number(rawFacilityData[0] || 0);
-      const maxMiners = Number(rawFacilityData[1] || 0);
-      const currMiners = Number(rawFacilityData[2] || 0);
-      const totalPowerOutput = Number(rawFacilityData[3] || 0);
-      const currPowerOutput = Number(rawFacilityData[4] || 0);
       
+      try {
+        // [facilityIndex, maxMiners, currMiners, totalPowerOutput, currPowerOutput, x, y]
+        const facilityIndex = Number(rawFacilityData[0] || 0);
+        const maxMiners = Number(rawFacilityData[1] || 0);
+        const currMiners = Number(rawFacilityData[2] || 0);
+        const totalPowerOutput = Number(rawFacilityData[3] || 0);
+        const currPowerOutput = Number(rawFacilityData[4] || 0);
+        
       // Only return valid facility data if facilityIndex > 0
-      if (facilityIndex > 0) {
+        if (facilityIndex > 0) {
         return {
-          level: facilityIndex,
-          maxMiners,
-          currMiners,
-          totalPower: totalPowerOutput,
-          usedPower: currPowerOutput
-        };
-      }
-    } catch (error) {
-      console.error('Error processing facility data in SpaceTab:', error);
+            level: facilityIndex,
+            maxMiners,
+            currMiners,
+            totalPower: totalPowerOutput,
+            usedPower: currPowerOutput
+          };
+        }
+      } catch (error) {
+        console.error('Error processing facility data in SpaceTab:', error);
     }
     
     return null;

@@ -47,7 +47,7 @@ const ConnectWalletButton: React.FC<ConnectWalletButtonProps> = ({ className }) 
     if (isConnected && address && mounted) {
       // Set a small delay to ensure connection is stable
       const timeout = setTimeout(() => {
-        router.push(`/room/${address}`);
+      router.push(`/room/${address}`);
       }, 500);
       
       return () => clearTimeout(timeout);
@@ -58,14 +58,14 @@ const ConnectWalletButton: React.FC<ConnectWalletButtonProps> = ({ className }) 
   const handleClick = useCallback(async () => {
     if (isConnected) {
       setIsModalOpen(true);
-      return;
-    }
-    
+          return;
+        }
+        
     try {
       setIsConnecting(true);
       
       // Open wallet modal
-      await web3Modal.open();
+        await web3Modal.open();
       
       // Set a connection timeout to reset UI if connection stalls
       const connectionTimeout = setTimeout(() => {
@@ -77,8 +77,8 @@ const ConnectWalletButton: React.FC<ConnectWalletButtonProps> = ({ className }) 
       
       // Clean up the timeout
       return () => clearTimeout(connectionTimeout);
-    } catch (error) {
-      console.error('Failed to connect wallet:', error);
+      } catch (error) {
+        console.error('Failed to connect wallet:', error);
       setIsConnecting(false);
     }
   }, [isConnected, web3Modal]);

@@ -31,7 +31,7 @@ const FacilityStats: React.FC<FacilityStatsProps> = ({
         <p>- YOUR APEROOM</p>
         <p>- {facilityData.spaces} TOTAL SPACES</p>
         <p>- {facilityData.capacity} TOTAL GIGAWATTS</p>
-        <p>- FREE FOOD FROM APETOSHI</p>
+        <p>- FREE BANANAS🍌 FROM APETOSHI</p>
         {onUpgrade && (
           <div className="mt-6">
             <button 

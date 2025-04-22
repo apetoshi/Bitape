@@ -103,7 +103,8 @@ export interface RoomVisualizationProps {
   getMinerAtTile?: (x: number, y: number) => PlayerMiner | null;
 }
 
-export function RoomVisualization({
+// Wrap the component with React.memo for better performance
+export const RoomVisualization = React.memo(function RoomVisualization({
   hasFacility,
   facilityData,
   onPurchaseFacility,
@@ -205,54 +206,54 @@ export function RoomVisualization({
       return;
     }
     
-    try {
-      const processedMiners = directMinerReads
-        .map((minerData, index) => {
-          if (!minerData || !minerData.result) return null;
-          
-          // Get the ID from the playerMinerIds array
-          const id = playerMinerIds[index];
-          const result = minerData.result as any;
-          
-          if (Array.isArray(result)) {
-            const minerType = Number(result[0] || 0);
-            const x = Number(result[1] || 0);
-            const y = Number(result[2] || 0);
+      try {
+        const processedMiners = directMinerReads
+          .map((minerData, index) => {
+            if (!minerData || !minerData.result) return null;
             
-            if (DEBUG_MINERS) {
-              console.log(`Direct contract read for miner ${id}: Type=${minerType}, Position=(${x},${y})`);
+            // Get the ID from the playerMinerIds array
+            const id = playerMinerIds[index];
+            const result = minerData.result as any;
+            
+            if (Array.isArray(result)) {
+              const minerType = Number(result[0] || 0);
+              const x = Number(result[1] || 0);
+              const y = Number(result[2] || 0);
               
-              // Log miner type information
-              if (minerType === MinerType.BANANA_MINER) {
-                console.log(`🍌 Found Banana Miner (Starter) via direct contract read at (${x},${y})`);
-              } else if (minerType === MinerType.MONKEY_TOASTER) {
-                console.log(`🐵 Found Monkey Toaster via direct contract read at (${x},${y})`);
-              } else if (minerType === MinerType.GORILLA_GADGET) {
-                console.log(`🦍 Found Gorilla Gadget via direct contract read at (${x},${y})`);
+              if (DEBUG_MINERS) {
+                console.log(`Direct contract read for miner ${id}: Type=${minerType}, Position=(${x},${y})`);
+                
+                // Log miner type information
+                if (minerType === MinerType.BANANA_MINER) {
+                  console.log(`🍌 Found Banana Miner (Starter) via direct contract read at (${x},${y})`);
+                } else if (minerType === MinerType.MONKEY_TOASTER) {
+                  console.log(`🐵 Found Monkey Toaster via direct contract read at (${x},${y})`);
+                } else if (minerType === MinerType.GORILLA_GADGET) {
+                  console.log(`🦍 Found Gorilla Gadget via direct contract read at (${x},${y})`);
+                }
               }
+              
+              // Import getMinerById to safely get miner data
+              const minerData = getMinerById(minerType);
+              const minerImage = minerData?.image || '/banana-miner.gif';
+              
+              return {
+                id: String(id),
+                minerType,
+                x,
+                y,
+                image: minerImage,
+                hashrate: Number(result[3] || 0),
+                powerConsumption: Number(result[4] || 0),
+                inProduction: Boolean(result[7] || false)
+              };
             }
-            
-            // Import getMinerById to safely get miner data
-            const minerData = getMinerById(minerType);
-            const minerImage = minerData?.image || '/banana-miner.gif';
-            
-            return {
-              id: String(id),
-              minerType,
-              x,
-              y,
-              image: minerImage,
-              hashrate: Number(result[3] || 0),
-              powerConsumption: Number(result[4] || 0),
-              inProduction: Boolean(result[7] || false)
-            };
-          }
-          return null;
-        })
-        .filter(Boolean);
-      
+            return null;
+          })
+          .filter(Boolean);
+        
       // Only update the state if the data has actually changed
-      if (processedMiners.length > 0) {
+        if (processedMiners.length > 0) {
         // Use a stable comparison to avoid unnecessary updates
         const minersJSON = JSON.stringify(processedMiners);
         const currentMinersJSON = JSON.stringify(contractMiners);
@@ -264,9 +265,9 @@ export function RoomVisualization({
           }
           setContractMiners(processedMiners as PlayerMiner[]);
         }
-      }
-    } catch (error) {
-      console.error("Error processing direct miner reads:", error);
+        }
+      } catch (error) {
+        console.error("Error processing direct miner reads:", error);
     }
   }, [directMinerReads, playerMinerIds]);
 
@@ -322,7 +323,7 @@ export function RoomVisualization({
   const prevMinersDataRef = useRef(null);
 
   // Process the miners data outside of render to ensure consistent hook calls
-  // Use stable object references with useMemo
+  // Use stable object references with useMemo and implement deeper comparison
   const allMinersData = useMemo(() => {
     // Skip reprocessing if miners and contractMiners haven't changed
     if (prevMinersDataRef.current && 
@@ -331,6 +332,17 @@ export function RoomVisualization({
       return prevMinersDataRef.current.result;
     }
 
+    // Create a string representation of current miners for comparison
+    const currentMinersString = JSON.stringify(miners);
+    const currentContractMinersString = JSON.stringify(contractMiners);
+    
+    // Compare with previous strings
+    if (prevMinersDataRef.current && 
+        prevMinersDataRef.current.minersString === currentMinersString && 
+        prevMinersDataRef.current.contractMinersString === currentContractMinersString) {
+      return prevMinersDataRef.current.result;
+    }
+    
     // Create a combined array of all miners
     let allMiners = [...contractMiners];
     
@@ -388,11 +400,13 @@ export function RoomVisualization({
     prevMinersDataRef.current = {
       miners,
       contractMiners,
+      minersString: currentMinersString,
+      contractMinersString: currentContractMinersString,
       result
     };
     
     return result;
-  }, [miners, contractMiners]);
+  }, [miners, contractMiners, DEBUG_MINERS]);
   
   // Filter out miners with non-zero rewardDebt
   const processedMiners = useMemo(() => {
@@ -519,10 +533,10 @@ export function RoomVisualization({
   // Grid coordinates for the four mining spaces
   // Adjusted grid positions for better visual positioning
   const gridPositions = useMemo(() => [
-    { x: 0, y: 0, top: '40%', left: '40%', width: '15%', height: '15%' }, // near bed
-    { x: 1, y: 0, top: '46%', left: '29%', width: '15%', height: '15%' }, // near banana boxes - adjusted left position
-    { x: 0, y: 1, top: '50%', left: '55%', width: '15%', height: '15%' }, // near jukebox
-    { x: 1, y: 1, top: '60%', left: '35%', width: '15%', height: '15%' }  // near control panel
+      { x: 0, y: 0, top: '40%', left: '40%', width: '15%', height: '15%' }, // near bed
+      { x: 1, y: 0, top: '46%', left: '29%', width: '15%', height: '15%' }, // near banana boxes - adjusted left position
+      { x: 0, y: 1, top: '50%', left: '55%', width: '15%', height: '15%' }, // near jukebox
+      { x: 1, y: 1, top: '60%', left: '35%', width: '15%', height: '15%' }  // near control panel
   ], []);
 
   // Function to check if a selected tile has a miner - use our local implementation consistently
@@ -534,45 +548,158 @@ export function RoomVisualization({
 
   // Handle tile selection
   const handleTileClick = useCallback((x: number, y: number) => {
-    // Prevent selection if disabled
     if (disableSelection) return;
     
-    // Rate limit clicks to prevent double-clicking issues
+    // Prevent interaction on tiles that already have miners
+    if (isTileOccupied(x, y) && !selectedTileHasMiner) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`Tile (${x}, ${y}) already has a miner. Ignoring click.`);
+      }
+      return;
+    }
+    
+    // Add debounce to prevent duplicate calls in a short time span
     const now = Date.now();
-    if (now - lastTileSelectTime.current < 300) {
-      return; // Ignore clicks that are too close together
+    if (now - lastTileSelectTime.current < 300) { // 300ms debounce
+      return;
     }
     lastTileSelectTime.current = now;
     
     if (isGridMode) {
-      // If already selected, unselect it
-      if (selectedTile && selectedTile.x === x && selectedTile.y === y) {
-        setSelectedTile(null);
-        selectedTileRef.current = null;
-      } else {
-        // Otherwise, select the new tile
-        setSelectedTile({ x, y });
+      // Only update state if it actually changes to avoid re-renders
+      if (!selectedTile || selectedTile.x !== x || selectedTile.y !== y) {
+        // Update refs first (doesn't trigger re-render)
         selectedTileRef.current = { x, y };
-      }
-      
-      // Only call onTileSelect if the function exists and the coordinates are valid
-      if (onTileSelect && Number.isFinite(x) && Number.isFinite(y)) {
-        // Avoid multiple calls to onTileSelect in the same render cycle
-        if (!tileSelectCallbackMade.current) {
+        
+        // Then update state
+        setSelectedTile({ x, y });
+        
+        // Call the parent callback only once when selection changes
+        if (onTileSelect && !tileSelectCallbackMade.current) {
           tileSelectCallbackMade.current = true;
-          // Reset the callback flag on the next tick
-          setTimeout(() => {
-            tileSelectCallbackMade.current = false;
-          }, 0);
           
-          onTileSelect(x, y);
+          // Use setTimeout to break the potential render cycle
+          setTimeout(() => {
+            if (onTileSelect) {
+              onTileSelect(x, y);
+            }
+            // Reset the flag after a safe delay
+            setTimeout(() => {
+              tileSelectCallbackMade.current = false;
+            }, 0);
+          }, 0);
         }
       }
     } else if (onTileSelect) {
-      // Non-grid mode behavior
+      // Non-grid mode - call handler directly
       onTileSelect(x, y);
     }
-  }, [isGridMode, onTileSelect, selectedTile, disableSelection]);
+  }, [isGridMode, onTileSelect, selectedTile, disableSelection, isTileOccupied, selectedTileHasMiner]);
+
+  // Add memoized values at the component top level - before useCallback functions
+  // Define custom positions for the grid spaces to match the blue tiles
+  const customPositions = useMemo(() => [
+    { 
+      x: 0, y: 0, // TOP RIGHT
+      style: { 
+        gridColumn: 2, 
+        gridRow: 1,
+        ...(isMobile && {
+          margin: '0 0 0 10px' // Add some spacing for mobile
+        })
+      }
+    },
+    { 
+      x: 1, y: 0, // TOP LEFT
+      style: { 
+        gridColumn: 1, 
+        gridRow: 1,
+        ...(isMobile && {
+          margin: '0 10px 0 0' // Add some spacing for mobile
+        })
+      }
+    },
+    { 
+      x: 0, y: 1, // BOTTOM RIGHT
+      style: { 
+        gridColumn: 2, 
+        gridRow: 2,
+        ...(isMobile && {
+          margin: '10px 0 0 10px' // Add some spacing for mobile
+        })
+      }
+    },
+    { 
+      x: 1, y: 1, // BOTTOM LEFT
+      style: { 
+        gridColumn: 1, 
+        gridRow: 2,
+        ...(isMobile && {
+          margin: '10px 10px 0 0' // Add some spacing for mobile
+        })
+      }
+    }
+  ], [isMobile]);
+
+  // Define custom positions for the active miners on blue tiles
+  const minerPositions = useMemo(() => [
+    { 
+      x: 0, y: 0, // TOP RIGHT
+      style: { 
+        position: 'absolute' as const,
+        top: isMobile ? '24%' : '40%',
+        left: isMobile ? '18%' : '35%',
+        width: isMobile ? '70px' : '150px',
+        height: isMobile ? '70px' : '150px',
+        zIndex: 20
+      }
+    },
+    { 
+      x: 1, y: 0, // TOP LEFT
+      style: { 
+        position: 'absolute' as const,
+        top: isMobile ? '30%' : '47%',
+        left: isMobile ? '4%' : '20%',
+        width: isMobile ? '70px' : '150px',
+        height: isMobile ? '70px' : '150px',
+        zIndex: 20
+      }
+    },
+    { 
+      x: 0, y: 1, // BOTTOM RIGHT
+      style: { 
+        position: 'absolute' as const,
+        top: isMobile ? '26%' : '46%',
+        left: isMobile ? '70%' : '50%',
+        width: isMobile ? '70px' : '150px',
+        height: isMobile ? '70px' : '150px',
+        zIndex: 20
+      }
+    },
+    { 
+      x: 1, y: 1, // BOTTOM LEFT
+      style: { 
+        position: 'absolute' as const,
+        top: isMobile ? '36%' : '55%',
+        left: isMobile ? '50%' : '35%',
+        width: isMobile ? '70px' : '150px',
+        height: isMobile ? '70px' : '150px',
+        zIndex: 20
+      }
+    }
+  ], [isMobile]);
+
+  // Create a position map from combinedMinersData
+  const minersByPosition = useMemo(() => {
+    if (!combinedMinersData) return new Map();
+    
+    const posMap = new Map();
+    combinedMinersData.forEach(miner => {
+      const key = `${Number(miner.x)}-${Number(miner.y)}`;
+      posMap.set(key, miner);
+    });
+    return posMap;
+  }, [combinedMinersData]);
 
   // Function to render the mining grid spaces - for selection and interaction only
   const renderMiningSpaces = useCallback(() => {
@@ -582,54 +709,29 @@ export function RoomVisualization({
       console.log(`renderMiningSpaces called (${renderCount.current} times)`);
     }
 
-    // Define custom positions for the grid spaces to match the blue tiles
-    // Coordinates based on the provided reference image
-    const customPositions = [
-      { 
-        x: 0, y: 0, // TOP RIGHT
-        style: { 
-          gridColumn: 2, gridRow: 1
-        }
-      },
-      { 
-        x: 1, y: 0, // TOP LEFT
-        style: { 
-          gridColumn: 1, gridRow: 1
-        }
-      },
-      { 
-        x: 0, y: 1, // BOTTOM RIGHT
-        style: { 
-          gridColumn: 2, gridRow: 2
-        }
-      },
-      { 
-        x: 1, y: 1, // BOTTOM LEFT
-        style: { 
-          gridColumn: 1, gridRow: 2
-        }
-      }
-    ];
-
     return customPositions.map(pos => {
       const { x, y, style } = pos;
       
-      // Check if this tile is selected - use object comparison
-      const isSelected = selectedTile && selectedTile.x === x && selectedTile.y === y;
+      // Check if this tile is selected - use the ref for comparison
+      // This prevents unnecessary re-renders when selection changes
+      const isSelected = selectedTileRef.current && 
+                         selectedTileRef.current.x === x && 
+                         selectedTileRef.current.y === y;
       
       // Create a unique key for this tile
       const key = `tile-${x}-${y}`;
       
-      // Get the miner at this position
+      // Use a local cached variable to avoid calling functions during render
+      // This breaks potential render loops by not triggering re-renders
       const miner = getMinerAtTileLocal(x, y);
       const hasMiner = miner !== null;
-
-      return (
-        <div
+          
+          return (
+            <div 
           key={key}
           className={`mining-space ${isSelected ? 'selected' : ''} ${hasMiner ? 'has-miner' : ''}`}
           onClick={() => handleTileClick(x, y)}
-          style={{
+              style={{
             ...style,
             position: 'relative',
             width: '100%',
@@ -663,7 +765,7 @@ export function RoomVisualization({
           {hasMiner && isGridMode && (
             <div 
               className="grid-miner-container" 
-              style={{
+                  style={{ 
                 position: 'relative',
                 width: '80%',
                 height: '80%',
@@ -680,70 +782,24 @@ export function RoomVisualization({
                 className="object-contain"
                 priority
               />
+                  </div>
+                )}
             </div>
-          )}
-        </div>
-      );
+          );
     });
-  }, [selectedTile, getMinerAtTileLocal, handleTileClick, isGridMode, DEBUG_MINERS]);
+  }, [isGridMode, DEBUG_MINERS, DEBUG_RENDERS, getMinerAtTileLocal, handleTileClick, customPositions]);
 
   // Separate function to render active miners on the blue floor tiles
   const renderActiveMiners = useCallback(() => {
     if (!hasFacility || !combinedMinersData) return null;
-    
-    // Define custom positions for the active miners on blue tiles
-    const minerPositions = [
-      { 
-        x: 0, y: 0, // TOP RIGHT
-        style: { 
-          position: 'absolute' as const,
-          top: '40%',
-          left: '35%',
-          width: '150px',
-          height: '150px',
-          zIndex: 20
-        }
-      },
-      { 
-        x: 1, y: 0, // TOP LEFT
-        style: { 
-          position: 'absolute' as const,
-          top: '47%',
-          left: '20%',
-          width: '150px',
-          height: '150px',
-          zIndex: 20
-        }
-      },
-      { 
-        x: 0, y: 1, // BOTTOM RIGHT
-        style: { 
-          position: 'absolute' as const,
-          top: '46%',
-          left: '50%',
-          width: '150px',
-          height: '150px',
-          zIndex: 20
-        }
-      },
-      { 
-        x: 1, y: 1, // BOTTOM LEFT
-        style: { 
-          position: 'absolute' as const,
-          top: '55%',
-          left: '35%',
-          width: '150px',
-          height: '150px',
-          zIndex: 20
-        }
-      }
-    ];
 
     return minerPositions.map(pos => {
       const { x, y, style } = pos;
       
-      // Check if there's a miner at this position
-      const miner = getMinerAtTileLocal(x, y);
+      // Check if there's a miner at this position using the position map
+      // This avoids calling functions during render that might trigger state updates
+      const posKey = `${x}-${y}`;
+      const miner = minersByPosition.get(posKey);
       
       // Skip rendering if no miner at this position
       if (!miner) return null;
@@ -759,12 +815,12 @@ export function RoomVisualization({
           default: return { width: '130%', height: '130%' };
         }
       };
-      
-      return (
-        <div 
+
+          return (
+            <div
           key={`active-miner-${x}-${y}`}
           className="active-miner-container" 
-          style={{
+              style={{
             ...style,
             opacity: isGridMode ? 0 : 1,
             transition: 'opacity 0.3s ease'
@@ -800,10 +856,10 @@ export function RoomVisualization({
               </div>
             )}
           </div>
-        </div>
-      );
+      </div>
+    );
     }).filter(Boolean); // Filter out null entries (positions without miners)
-  }, [hasFacility, combinedMinersData, getMinerAtTileLocal, getMinerLabel, DEBUG_MINERS, isGridMode]);
+  }, [hasFacility, combinedMinersData, isGridMode, DEBUG_MINERS, getMinerLabel, minerPositions, minersByPosition]);
 
   // Add debugging to monitor excessive re-renders in development
   useEffect(() => {
@@ -885,6 +941,14 @@ export function RoomVisualization({
     return Boolean(isGridMode);
   }, [isGridMode]);
 
+  // Cleanup any pending timers on unmount
+  useEffect(() => {
+    return () => {
+      // Clear any pending timeouts to prevent memory leaks
+      tileSelectCallbackMade.current = false;
+    };
+  }, []);
+
   return (
     <>
       <style jsx global>{`
@@ -894,10 +958,10 @@ export function RoomVisualization({
           grid-template-columns: repeat(2, 1fr);
           grid-template-rows: repeat(2, 1fr);
           gap: 4px;
-          width: 300px;
-          height: 170px;
+          width: ${isMobile ? '250px' : '300px'};
+          height: ${isMobile ? '140px' : '170px'};
           position: absolute;
-          top: 57%;
+          top: ${isMobile ? '47%' : '57%'};
           left: 50%;
           transform: translate(-50%, -50%);
           z-index: 20;
@@ -1056,4 +1120,17 @@ export function RoomVisualization({
       )}
     </>
   );
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison function to prevent unnecessary re-renders
+  // Only re-render when these specific props change
+  return (
+    prevProps.hasFacility === nextProps.hasFacility &&
+    prevProps.isGridMode === nextProps.isGridMode &&
+    prevProps.hasClaimedStarterMiner === nextProps.hasClaimedStarterMiner &&
+    prevProps.isPurchasingFacility === nextProps.isPurchasingFacility &&
+    prevProps.isGettingStarterMiner === nextProps.isGettingStarterMiner &&
+    prevProps.isUpgradingFacility === nextProps.isUpgradingFacility &&
+    // Compare miners arrays by length rather than identity to reduce re-renders
+    (!prevProps.miners || !nextProps.miners || prevProps.miners.length === nextProps.miners.length)
+  );
+});

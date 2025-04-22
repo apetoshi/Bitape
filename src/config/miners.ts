@@ -43,7 +43,7 @@ export const MINERS: Record<number, MinerData> = {
   [MinerType.APEPAD_MINI]: {
     id: MinerType.APEPAD_MINI,
     name: "APEPAD MINI",
-    image: "/apepad.png",
+    image: "/apepad.gif",
     hashrate: 1000,
     energyConsumption: 10,
     price: 40, // 40 BIT

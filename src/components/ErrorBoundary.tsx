@@ -34,8 +34,8 @@ export class ErrorBoundary extends Component<Props, State> {
     // Log the error to an error reporting service
     if (this.props.onError) {
       this.props.onError(error, errorInfo);
+      }
     }
-  }
 
   private resetError = () => {
     // Reset wallet connection data
@@ -61,16 +61,16 @@ export class ErrorBoundary extends Component<Props, State> {
             <h2 className="text-[#ffc107] text-xl font-bold mb-4">Something went wrong</h2>
             <p className="text-white mb-4">
               The application encountered an unexpected error. This may be related to your wallet connection.
-            </p>
+              </p>
             <div className="text-white text-sm bg-black bg-opacity-40 p-3 rounded mb-4 max-h-32 overflow-auto">
               <p>{this.state.error?.name}: {this.state.error?.message}</p>
             </div>
-            <button 
+              <button
               onClick={this.resetError}
               className="bg-[#ffc107] text-[#041e3a] font-bold py-2 px-4 rounded hover:bg-opacity-90 w-full"
-            >
+              >
               Reset & Reload
-            </button>
+              </button>
           </div>
         </div>
       );
