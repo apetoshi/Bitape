@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useGameState } from '@/hooks/useGameState';
 import { Button } from './ui/button';
 import { useAccount, useContractRead } from 'wagmi';
 import { CONTRACT_ADDRESSES, MAIN_CONTRACT_ABI } from '@/config/contracts';
 import { zeroAddress } from 'viem';
+import { useIsMounted } from '@/hooks/useIsMounted';
 
 // Default facility data with zeros
 const DEFAULT_FACILITY_DATA = {
@@ -19,7 +20,10 @@ const DEFAULT_FACILITY_DATA = {
 export default function SpaceTab() {
   const { isConnected, address } = useAccount();
   const gameState = useGameState();
+  const isMounted = useIsMounted();
   const [facilityData, setFacilityData] = useState(DEFAULT_FACILITY_DATA);
+  
+  // Single source of truth for tracking which data source to use
   const [dataSource, setDataSource] = useState<'none' | 'contract' | 'gameState'>('none');
 
   // Direct contract read to get facility data using ownerToFacility
@@ -29,7 +33,7 @@ export default function SpaceTab() {
     functionName: 'ownerToFacility',
     args: [address || zeroAddress],
     query: {
-      enabled: Boolean(address),
+      enabled: Boolean(address) && isMounted,
     }
   });
 
@@ -115,6 +119,7 @@ export default function SpaceTab() {
     userHasFacility: facilityData.level > 0
   }), [facilityData]);
 
+  // Check if user is not connected
   if (!isConnected) {
     return (
       <div className="flex h-full flex-col items-center justify-center">
@@ -123,71 +128,105 @@ export default function SpaceTab() {
     );
   }
 
-  if (!userHasFacility && !gameState.hasFacility) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center">
-        <div className="pixel-text text-white">You don't have a facility yet</div>
-        <Button className="mt-4 pixel-text bg-banana text-black hover:bg-banana/90" onClick={gameState.purchaseFacility}>
-          Buy a Facility
-        </Button>
-      </div>
-    );
-  }
+  // Check if facility is fully initialized (has facility AND has claimed starter miner)
+  const isFullyInitialized = userHasFacility && gameState.hasClaimedStarterMiner;
 
+  // Only render facility UI if user actually has a facility
   return (
-    <div className="bg-[#001420] p-3 rounded-md border-2 border-banana">
-      <h3 className="font-press-start text-white text-xs mb-4">FACILITY STATUS</h3>
-
-      {isConnected ? (
-        userHasFacility || gameState.hasFacility ? (
-          <div className="space-y-6">
-            {/* Slots/Spaces */}
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="font-press-start text-white text-xs">SPACES LEFT:</span>
-                <span className="font-press-start text-banana text-xs">{spacesLeft} SPACES</span>
-              </div>
-              <div className="w-full bg-blue-900 h-3 rounded-full overflow-hidden">
-                <div 
-                  className="bg-yellow-400 h-full" 
-                  style={{ width: `${facilityData.maxMiners ? (facilityData.currMiners / facilityData.maxMiners) * 100 : 0}%` }}
-                />
-              </div>
-              <div className="flex justify-between">
-                <span className="font-press-start text-white text-[9px]">USED: {facilityData.currMiners}</span>
-                <span className="font-press-start text-white text-[9px]">MAX: {facilityData.maxMiners}</span>
-              </div>
-            </div>
-
-            {/* Power */}
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="font-press-start text-white text-xs">GIGAWATTS AVAILABLE:</span>
-                <span className="font-press-start text-banana text-xs">{gigawattsAvailable} GW</span>
-              </div>
-              <div className="w-full bg-blue-900 h-3 rounded-full overflow-hidden">
-                <div 
-                  className="bg-yellow-400 h-full" 
-                  style={{ width: `${facilityData.totalPower ? (facilityData.usedPower / facilityData.totalPower) * 100 : 0}%` }}
-                />
-              </div>
-              <div className="flex justify-between">
-                <span className="font-press-start text-white text-[9px]">USED: {facilityData.usedPower} GW</span>
-                <span className="font-press-start text-white text-[9px]">MAX: {facilityData.totalPower} GW</span>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="text-center py-4">
-            <p className="font-press-start text-white text-xs">NO FACILITY DETECTED</p>
-            <p className="font-press-start text-white text-[9px] mt-2">PURCHASE A FACILITY TO BEGIN MINING</p>
-          </div>
-        )
-      ) : (
-        <div className="text-center py-4">
-          <p className="font-press-start text-white text-xs">CONNECT WALLET TO VIEW FACILITY</p>
+    <div className="bg-[#001420]/70 border border-banana p-4 rounded-md">
+      <div className="space-y-3">
+        <div className="border-b border-white/20 pb-2">
+          <span className="font-press-start text-white text-xs">- YOUR APEROOM</span>
         </div>
-      )}
+        {userHasFacility ? (
+          isFullyInitialized ? (
+            <>
+              <div className="border-b border-white/20 pb-2">
+                <span className="font-press-start text-white text-xs">- TOTAL SPACES</span>
+                <span className="font-press-start text-banana text-xs block mt-1 ml-2">
+                  {facilityData.maxMiners} SPACES
+                </span>
+              </div>
+              <div className="border-b border-white/20 pb-2">
+                <span className="font-press-start text-white text-xs">- TOTAL GIGAWATTS</span>
+                <span className="font-press-start text-banana text-xs block mt-1 ml-2">
+                  {facilityData.totalPower} GIGAWATTS
+                </span>
+              </div>
+              <div className="border-b border-white/20 pb-2">
+                <span className="font-press-start text-white text-xs">- FOOD SOURCE</span>
+                <span className="font-press-start text-banana text-xs block mt-1 ml-2">FREE BANANAS 🍌 FROM APETOSHI</span>
+              </div>
+
+              {/* Space usage visualization */}
+              <div className="space-y-2 pt-2">
+                <div className="flex justify-between items-center">
+                  <span className="font-press-start text-white text-xs">SPACES LEFT:</span>
+                  <span className="font-press-start text-banana text-xs">{spacesLeft} SPACES</span>
+                </div>
+                <div className="w-full bg-blue-900 h-3 rounded-full overflow-hidden">
+                  <div 
+                    className="bg-yellow-400 h-full" 
+                    style={{ width: `${facilityData.maxMiners ? (facilityData.currMiners / facilityData.maxMiners) * 100 : 0}%` }}
+                  />
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-press-start text-white text-[9px]">USED: {facilityData.currMiners}</span>
+                  <span className="font-press-start text-white text-[9px]">MAX: {facilityData.maxMiners}</span>
+                </div>
+              </div>
+
+              {/* Power usage visualization */}
+              <div className="space-y-2 pt-2">
+                <div className="flex justify-between items-center">
+                  <span className="font-press-start text-white text-xs">GIGAWATTS AVAILABLE:</span>
+                  <span className="font-press-start text-banana text-xs">{gigawattsAvailable} GW</span>
+                </div>
+                <div className="w-full bg-blue-900 h-3 rounded-full overflow-hidden">
+                  <div 
+                    className="bg-yellow-400 h-full" 
+                    style={{ width: `${facilityData.totalPower ? (facilityData.usedPower / facilityData.totalPower) * 100 : 0}%` }}
+                  />
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-press-start text-white text-[9px]">USED: {facilityData.usedPower} GW</span>
+                  <span className="font-press-start text-white text-[9px]">MAX: {facilityData.totalPower} GW</span>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center py-4">
+              <div className="pixel-text text-white text-sm mb-1">NO MINING SPACE</div>
+              <div className="font-press-start text-banana text-xs block mb-0.5">0 TOTAL SPACES</div>
+              <div className="font-press-start text-banana text-xs block mb-1">0 TOTAL GIGAWATTS</div>
+              <div className="pixel-text text-white text-sm mb-2">CANT MINE WITHOUT SPACE, BUDDY</div>
+              <Button className="pixel-text bg-banana text-black hover:bg-banana/90 py-1 px-2 text-xs" onClick={() => gameState.getStarterMiner(0, 0)}>
+                Get Starter Miner
+              </Button>
+            </div>
+          )
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center py-4">
+            <div className="pixel-text text-white text-sm mb-2">You don't have a facility yet</div>
+            <Button className="pixel-text bg-banana text-black hover:bg-banana/90 py-1 px-2 text-xs" onClick={gameState.purchaseFacility}>
+              Buy a Facility
+            </Button>
+          </div>
+        )}
+
+        {/* Upgrade button - only show if user can upgrade */}
+        {isFullyInitialized && gameState.hasFacility && (
+          <div className="mt-4">
+            <Button 
+              className="w-full font-press-start text-xs bg-banana text-royal hover:bg-banana/90"
+              onClick={gameState.upgradeFacility}
+              disabled={gameState.isUpgradingFacility}
+            >
+              {gameState.isUpgradingFacility ? 'UPGRADING...' : 'UPGRADE FACILITY'}
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   );
 } 

@@ -3,8 +3,7 @@ import { formatEther, parseEther, zeroAddress, TransactionReceipt } from 'viem';
 import { CONTRACT_ADDRESSES, ERC20_ABI, APECHAIN_ID, MAIN_CONTRACT_ABI, BIT_TOKEN_ADDRESS, BIT_TOKEN_ABI } from '../config/contracts';
 import { MINERS, MinerType, MinerData } from '../config/miners';
 import { useEffect, useState } from 'react';
-// Import from the index file instead
-import { useReferral } from './';
+import { useReferral } from '@/hooks/useReferral';
 import { formatUnits } from 'viem';
 
 interface PlayerFacility {
@@ -79,11 +78,11 @@ export interface GameState {
   stats: PlayerStats;
   
   // Actions
-  purchaseFacility: () => Promise<boolean | void>;
-  getStarterMiner: (x: number, y: number) => Promise<boolean | void>;
-  purchaseMiner: (minerType: MinerType, x: number, y: number) => Promise<boolean | void>;
-  claimReward: () => Promise<boolean | void>;
-  upgradeFacility: () => Promise<boolean | void>;
+  purchaseFacility: () => Promise<boolean>;
+  getStarterMiner: (x: number, y: number) => Promise<boolean>;
+  purchaseMiner: (minerType: MinerType, x: number, y: number) => Promise<boolean>;
+  claimReward: () => Promise<boolean>;
+  upgradeFacility: () => Promise<boolean>;
   
   // Loading states
   isPurchasingFacility: boolean;
@@ -613,105 +612,86 @@ export function useGameState(): GameState {
         throw new Error('Address not found');
       }
       
-      // First simulate transaction with 10 APE value to match 0x3e89bb13 signature
-      await publicClient?.simulateContract({
-        address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
-        abi: MAIN_CONTRACT_ABI,
-        functionName: 'purchaseInitialFacility',
-        account: address,
-        args: [referralAddress as `0x${string}`],
-        value: parseEther('10') // Send 10 APE to match signature 0x3e89bb13
-      });
-      
       console.log('Purchasing facility with referrer:', referralAddress);
-      console.log('Requesting wallet confirmation to spend 10 APE...');
       
-      // Attempt to get the transaction hash without retry logic
-      let hash: `0x${string}` | undefined;
-      
+      // First simulate transaction to check if it would succeed
       try {
-        // Send transaction with 10 APE to match signature 0x3e89bb13
-        const writeResult = await writeContract({
+        await publicClient?.simulateContract({
           address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
           abi: MAIN_CONTRACT_ABI,
           functionName: 'purchaseInitialFacility',
+          account: address,
           args: [referralAddress as `0x${string}`],
-          account: address as `0x${string}`,
-          value: parseEther('10'), // Send 10 APE to match signature 0x3e89bb13
-          chain: publicClient?.chain
+          value: parseEther('10')
         });
-        
-        hash = writeResult;
-        console.log('Purchase transaction hash:', hash);
-        
-        // Only proceed with waiting for receipt if we have a valid hash
-        if (hash) {
-          try {
-            const receipt = await publicClient.waitForTransactionReceipt({
-              hash,
-            });
-            console.log('Purchase confirmed:', receipt);
-            
-            // Update game state after successful purchase
-            setTimeout(async () => {
-              try {
-                console.log("Refreshing game state after facility purchase");
-                await refetchUserInfo();
-                alert('Facility purchased successfully!');
-              } catch (refreshError) {
-                console.error("Error refreshing game state:", refreshError);
-              }
-            }, 2000);
-            
-            return true;
-          } catch (receiptError) {
-            console.error('Error waiting for purchase confirmation:', receiptError);
-            throw new Error('Purchase transaction failed');
-          }
-        } else {
-          // Don't show an error here - the wallet interaction might still be processing
-          console.log('Waiting for transaction confirmation...');
+        console.log('Simulation successful, proceeding with transaction');
+      } catch (simError: any) {
+        console.error('Simulation failed:', simError);
+        // If simulation fails with a non-user rejection, show error and exit
+        if (!simError.message?.includes('User rejected') && 
+            !simError.message?.includes('user rejected') && 
+            !simError.code === 4001) {
+          alert(`Cannot purchase facility: ${simError.message}`);
           return false;
         }
-      } catch (writeError: any) {
-        // Check if user rejected the transaction
-        if (writeError.message?.includes('User rejected') || 
-            writeError.message?.includes('user rejected') || 
-            writeError.message?.includes('rejected') || 
-            writeError.message?.includes('denied') || 
-            writeError.message?.includes('cancelled') || 
-            writeError.message?.includes('canceled') || 
-            writeError.code === 4001) {
-          console.log('User rejected purchase transaction');
-          alert('You canceled the facility purchase.');
-          return false;
-        }
-        
-        // For other errors, rethrow
-        throw writeError;
+        throw simError; // Rethrow to be caught by outer try-catch
       }
+      
+      // Send the transaction - this will open the wallet for user confirmation
+      const hash = await writeContract({
+        address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
+        abi: MAIN_CONTRACT_ABI,
+        functionName: 'purchaseInitialFacility',
+        args: [referralAddress as `0x${string}`],
+        account: address as `0x${string}`,
+        value: parseEther('10'),
+        chain: publicClient?.chain
+      });
+      
+      console.log('Purchase transaction hash:', hash);
+      
+      // Once we have a hash, user has confirmed the transaction
+      if (hash) {
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        console.log('Purchase confirmed:', receipt);
+        
+        // Update game state after successful purchase
+        setTimeout(async () => {
+          try {
+            console.log("Refreshing game state after facility purchase");
+            await refetchUserInfo();
+            alert('Facility purchased successfully!');
+          } catch (refreshError) {
+            console.error("Error refreshing game state:", refreshError);
+          }
+        }, 2000);
+        
+        return true;
+      }
+      
+      return false;
+      
     } catch (error: any) {
       console.error('Error purchasing facility:', error);
       
-      // Double-check for user rejection
-      if (error.message?.includes('User rejected') || 
-          error.message?.includes('user rejected') || 
-          error.message?.includes('rejected') || 
-          error.message?.includes('denied') || 
-          error.message?.includes('cancelled') || 
-          error.message?.includes('canceled') || 
-          error.code === 4001) {
-        console.log('User rejected purchase transaction');
-        alert('You canceled the facility purchase.');
-        return false;
-      }
+      // Check for user rejection patterns
+      const isUserRejection = 
+        error.code === 4001 || 
+        error.message?.includes('User rejected') || 
+        error.message?.includes('user rejected') || 
+        error.message?.includes('rejected') || 
+        error.message?.includes('denied') || 
+        error.message?.includes('cancelled') || 
+        error.message?.includes('canceled');
       
-      // More friendly error message
-      if (error.message?.includes('Failed to get transaction hash')) {
-        alert('Transaction was not processed. Please try again.');
+      if (isUserRejection) {
+        console.log('User canceled the transaction');
+        alert('You canceled the facility purchase.');
       } else {
+        // Only show error for non-rejection cases
         alert(`Error purchasing facility: ${error.message}`);
       }
+      
       return false;
     } finally {
       setIsPurchasingFacility(false);
@@ -861,7 +841,7 @@ export function useGameState(): GameState {
           address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
           abi: MAIN_CONTRACT_ABI,
           functionName: 'getFreeStarterMiner',
-          args: [BigInt(0), BigInt(0)], // Pass coordinates for the miner placement
+          args: [], // No arguments needed for getFreeStarterMiner
           account: address as `0x${string}`,
           chain: publicClient?.chain
         });
@@ -938,7 +918,7 @@ export function useGameState(): GameState {
     setIsPurchasingMiner(true);
     
     try {
-      console.log("User has BIT balance:", bitBalance);
+      console.log("User has BIT balance:", formatEther(bitBalance));
       console.log(`Attempting to purchase miner of type ${minerType} at position (${x}, ${y})`);
       
       // Create a localStorage cache for allowances to avoid unnecessary approval requests

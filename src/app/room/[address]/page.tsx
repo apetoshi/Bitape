@@ -16,6 +16,8 @@ import { MinerData as MinerDataConfig } from '@/config/miners';
 import BuyFacilityModal from '@/components/BuyFacilityModal';
 import AccountModal from '@/components/AccountModal';
 import ReferralModal from '@/components/ReferralModal';
+import { AnnouncementsModal } from '@/components/AnnouncementsModal';
+import { TradeModal } from '@/components/TradeModal';
 import { RoomVisualization } from '@/components/RoomVisualization';
 import { ResourcesPanel } from '@/components/ResourcesPanel';
 import { SpaceTab } from '@/components';
@@ -111,12 +113,15 @@ export default function RoomPage() {
   const [isBuyModalOpen, setIsBuyModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
+  const [isTradeModalOpen, setIsTradeModalOpen] = useState(false);
+  const [isAnnouncementsModalOpen, setIsAnnouncementsModalOpen] = useState(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState<boolean>(false);
   const [isStarterMinerModalOpen, setIsStarterMinerModalOpen] = useState<boolean>(false);
   const [isPurchaseMinerModalOpen, setIsPurchaseMinerModalOpen] = useState<boolean>(false);
   const [selectedTile, setSelectedTile] = useState<SelectedTile | null>(null);
   const [showMinerModal, setShowMinerModal] = useState(false);
   const [isGridModeActive, setIsGridModeActive] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   const isMounted = useIsMounted();
   const [statsView, setStatsView] = useState<'simple' | 'pro'>('simple');
   const { writeContract } = useWriteContract();
@@ -1153,7 +1158,6 @@ export default function RoomPage() {
     try {
       console.log("Claiming rewards...");
       // Use the gameState's claimRewards method which is already set up correctly
-      // This internally uses the claimRewards function (0x372500ab)
       await gameState.claimReward();
       
       // After claiming, refetch the rewards to update the UI
@@ -1162,7 +1166,23 @@ export default function RoomPage() {
         refetchRewards();
       }, 5000); // Allow time for transaction to process
     } catch (error) {
-      console.error('Error claiming rewards:', error);
+      // Check if this is a user rejection error
+      const isUserRejection = 
+        error.message?.includes('User rejected') ||
+        error.message?.includes('user rejected') ||
+        error.message?.includes('denied transaction') ||
+        error.code === 4001 ||
+        error.message?.includes('User denied');
+        
+      if (isUserRejection) {
+        console.log('User canceled the claim transaction in their wallet');
+        // Don't show an alert for user rejection
+        return;
+      } else {
+        console.error('Error claiming rewards:', error);
+        // Only show error alert for non-rejection errors
+        alert(`Failed to claim rewards: ${error.message || 'Unknown error'}`);
+      }
     }
   };
 
@@ -1289,6 +1309,54 @@ export default function RoomPage() {
       }
     }
   }, [gameState.miners]);
+
+  // Global error handler for contract rejections
+  useEffect(() => {
+    const handleGlobalError = (event: ErrorEvent) => {
+      // Check if this is a contract rejection error
+      const errorMessage = event.error?.message || event.message;
+      
+      if (errorMessage && typeof errorMessage === 'string') {
+        const isUserRejection = 
+          errorMessage.includes('User rejected') ||
+          errorMessage.includes('user rejected') ||
+          errorMessage.includes('denied transaction') ||
+          errorMessage.includes('User denied');
+          
+        if (isUserRejection) {
+          // Prevent the error from showing in the UI
+          event.preventDefault();
+          console.log('User canceled a transaction - suppressing error');
+        }
+      }
+    };
+    
+    // Add global error handler
+    window.addEventListener('error', handleGlobalError);
+    window.addEventListener('unhandledrejection', (event) => {
+      // Check if this is a promise rejection with a contract error
+      const errorMessage = event.reason?.message || (typeof event.reason === 'string' ? event.reason : '');
+      
+      if (errorMessage && typeof errorMessage === 'string') {
+        const isUserRejection = 
+          errorMessage.includes('User rejected') ||
+          errorMessage.includes('user rejected') ||
+          errorMessage.includes('denied transaction') ||
+          errorMessage.includes('User denied');
+          
+        if (isUserRejection) {
+          // Prevent the error from showing in the UI
+          event.preventDefault();
+          console.log('User canceled a transaction promise - suppressing error');
+        }
+      }
+    });
+    
+    return () => {
+      window.removeEventListener('error', handleGlobalError);
+      window.removeEventListener('unhandledrejection', handleGlobalError);
+    };
+  }, []);
 
   if (!isConnected || !address) {
     return null;
@@ -1643,7 +1711,68 @@ export default function RoomPage() {
       case 'resources':
         return <ResourcesPanel />;
       case 'space':
-        return <SpaceTab />;
+        return (
+          <div className="p-3 space-y-3">
+            <div className="border-b border-white/20 pb-2">
+              <span className="font-press-start text-white text-sm">- YOUR APEROOM</span>
+            </div>
+            
+            {hasFacility && gameState.hasClaimedStarterMiner ? (
+              <>
+                <div className="border-b border-white/20 pb-2">
+                  <span className="font-press-start text-white text-sm">- TOTAL SPACES</span>
+                  <span className="font-press-start text-banana text-sm block mt-1 ml-2">
+                    {parsedFacility ? parsedFacility.capacity : 4} SPACES
+                  </span>
+                </div>
+                <div className="border-b border-white/20 pb-2">
+                  <span className="font-press-start text-white text-sm">- TOTAL GIGAWATTS</span>
+                  <span className="font-press-start text-banana text-sm block mt-1 ml-2">
+                    {parsedFacility ? parsedFacility.power : 28} GIGAWATTS
+                  </span>
+                </div>
+                <div className="border-b border-white/20 pb-2">
+                  <span className="font-press-start text-white text-sm">- FOOD SOURCE</span>
+                  <span className="font-press-start text-banana text-sm block mt-1 ml-2">FREE BANANAS 🍌 FROM APETOSHI</span>
+                </div>
+                {parsedFacility && (
+                  <div className="text-center mt-4">
+                    <button
+                      onClick={handleUpgradeFacility}
+                      disabled={gameState.isUpgradingFacility}
+                      className="bg-banana text-royal font-press-start text-sm py-2 px-4 rounded-md w-full"
+                    >
+                      {gameState.isUpgradingFacility ? "UPGRADING..." : "UPGRADE FACILITY"}
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="flex h-full flex-col items-center justify-center py-4">
+                <div className="pixel-text text-white text-sm mb-1">NO MINING SPACE</div>
+                <div className="font-press-start text-banana text-xs block mb-0.5">0 TOTAL SPACES</div>
+                <div className="font-press-start text-banana text-xs block mb-1">0 TOTAL GIGAWATTS</div>
+                <div className="pixel-text text-white text-sm mb-2">CANT MINE WITHOUT SPACE, BUDDY</div>
+                {hasFacility && !gameState.hasClaimedStarterMiner && (
+                  <button
+                    onClick={() => gameState.getStarterMiner(0, 0)}
+                    className="pixel-text bg-banana text-black hover:bg-banana/90 py-1 px-2 text-xs rounded-md"
+                  >
+                    Get Starter Miner
+                  </button>
+                )}
+                {!hasFacility && (
+                  <button
+                    onClick={gameState.purchaseFacility}
+                    className="pixel-text bg-banana text-black hover:bg-banana/90 py-1 px-2 text-xs rounded-md"
+                  >
+                    Buy a Facility
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        );
       case 'selectedTile':
         // Only log in development mode
         if (process.env.NODE_ENV === 'development') {
@@ -1742,7 +1871,7 @@ export default function RoomPage() {
             </div>
             
             {activeTab === 'resources' && (
-              <div className="bg-[#001420] border border-banana p-4 rounded-md space-y-3">
+              <div className="bg-[#001420]/70 border border-banana p-4 rounded-md space-y-3">
                 <div className="flex justify-between items-center border-b border-white/20 pb-2">
                   <span className="font-press-start text-white text-xs">APE:</span> 
                   <span className="font-press-start text-banana text-xs">{gameState.apeBalance || '0.54746334447510442'} APE</span>
@@ -1767,42 +1896,70 @@ export default function RoomPage() {
             )}
             
             {activeTab === 'space' && (
-              <div className="bg-[#001420] border border-banana p-4 rounded-md space-y-3">
+              <div className="bg-[#001420]/70 border border-banana p-4 rounded-md space-y-3">
                 <div className="border-b border-white/20 pb-2">
-                  <span className="font-press-start text-white text-xs">- YOUR BEDROOM</span>
+                  <span className="font-press-start text-white text-xs">- YOUR APEROOM</span>
                 </div>
-                <div className="border-b border-white/20 pb-2">
-                  <span className="font-press-start text-white text-xs">- TOTAL SPACES</span>
-                  <span className="font-press-start text-banana text-xs block mt-1 ml-2">
-                    {parsedFacility ? parsedFacility.capacity : 4} SPACES
-                  </span>
-                </div>
-                <div className="border-b border-white/20 pb-2">
-                  <span className="font-press-start text-white text-xs">- TOTAL GIGAWATTS</span>
-                  <span className="font-press-start text-banana text-xs block mt-1 ml-2">
-                    {parsedFacility ? parsedFacility.power : 28} GIGAWATTS
-                  </span>
-                </div>
-                <div className="border-b border-white/20 pb-2">
-                  <span className="font-press-start text-white text-xs">- FOOD SOURCE</span>
-                  <span className="font-press-start text-banana text-xs block mt-1 ml-2">FREE BANANAS 🍌 FROM APETOSHI</span>
-                </div>
-                {parsedFacility && (
-                  <div className="text-center mt-4">
-                    <button
-                      onClick={() => gameState.upgradeFacility()}
-                      disabled={gameState.isUpgradingFacility}
-                      className="bg-banana text-royal font-press-start text-xs py-2 px-4 rounded-md w-full"
-                    >
-                      {gameState.isUpgradingFacility ? "UPGRADING..." : "UPGRADE"}
-                    </button>
+                
+                {hasFacility && gameState.hasClaimedStarterMiner ? (
+                  <>
+                    <div className="border-b border-white/20 pb-2">
+                      <span className="font-press-start text-white text-xs">- TOTAL SPACES</span>
+                      <span className="font-press-start text-banana text-xs block mt-1 ml-2">
+                        {parsedFacility ? parsedFacility.capacity : 4} SPACES
+                      </span>
+                    </div>
+                    <div className="border-b border-white/20 pb-2">
+                      <span className="font-press-start text-white text-xs">- TOTAL GIGAWATTS</span>
+                      <span className="font-press-start text-banana text-xs block mt-1 ml-2">
+                        {parsedFacility ? parsedFacility.power : 28} GIGAWATTS
+                      </span>
+                    </div>
+                    <div className="border-b border-white/20 pb-2">
+                      <span className="font-press-start text-white text-xs">- FOOD SOURCE</span>
+                      <span className="font-press-start text-banana text-xs block mt-1 ml-2">FREE BANANAS 🍌 FROM APETOSHI</span>
+                    </div>
+                    {parsedFacility && (
+                      <div className="text-center mt-4">
+                        <button
+                          onClick={() => gameState.upgradeFacility()}
+                          disabled={gameState.isUpgradingFacility}
+                          className="bg-banana text-royal font-press-start text-xs py-2 px-4 rounded-md w-full"
+                        >
+                          {gameState.isUpgradingFacility ? "UPGRADING..." : "UPGRADE FACILITY"}
+                        </button>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="flex h-full flex-col items-center justify-center py-4">
+                    <div className="pixel-text text-white text-sm mb-1">NO MINING SPACE</div>
+                    <div className="font-press-start text-banana text-xs block mb-0.5">0 TOTAL SPACES</div>
+                    <div className="font-press-start text-banana text-xs block mb-1">0 TOTAL GIGAWATTS</div>
+                    <div className="pixel-text text-white text-sm mb-2">CANT MINE WITHOUT SPACE, BUDDY</div>
+                    {hasFacility && !gameState.hasClaimedStarterMiner && (
+                      <button
+                        onClick={() => gameState.getStarterMiner(0, 0)}
+                        className="pixel-text bg-banana text-black hover:bg-banana/90 py-1 px-2 text-xs rounded-md"
+                      >
+                        Get Starter Miner
+                      </button>
+                    )}
+                    {!hasFacility && (
+                      <button
+                        onClick={gameState.purchaseFacility}
+                        className="pixel-text bg-banana text-black hover:bg-banana/90 py-1 px-2 text-xs rounded-md"
+                      >
+                        Buy a Facility
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
             )}
             
             {activeTab === 'selectedTile' && selectedTile && (
-              <div className="bg-[#001420] border border-banana p-4 rounded-md space-y-3">
+              <div className="bg-[#001420]/70 border border-banana p-4 rounded-md space-y-3">
                 <div className="border-b border-white/20 pb-3 mb-1">
                   <span className="font-press-start text-white text-xs">LOCATION:</span>
                   <span className="font-press-start text-banana text-xs block mt-2">
@@ -1885,7 +2042,7 @@ export default function RoomPage() {
             
             {/* Simple Stats View */}
             {statsView === "simple" ? (
-              <div className="bg-[#001420] border border-banana p-4 rounded-md space-y-3 font-press-start">
+              <div className="bg-[#001420]/70 border border-banana p-4 rounded-md space-y-3 font-press-start">
                 <p className="text-white text-xs">- YOU ARE MINING <span className="text-banana">
                   {gameState.miningRate || miningRateData ? 
                     formatNumber(miningRateData as bigint, 2, '', 18) : 
@@ -1908,7 +2065,7 @@ export default function RoomPage() {
               </div>
             ) : (
               /* Pro Stats View */
-              <div className="bg-[#001420] border border-banana p-4 rounded-md space-y-3 font-press-start">
+              <div className="bg-[#001420]/70 border border-banana p-4 rounded-md space-y-3 font-press-start">
                 <p className="text-white text-xs">- <span className="text-banana">
                   {currentBitApePerBlockData !== undefined 
                     ? formatNumber(currentBitApePerBlockData, 2, '', 18) 
@@ -1930,7 +2087,7 @@ export default function RoomPage() {
         return (
           <div className="p-4">
             {/* CLAIM MINED $BIT Section - Replace the tabs from actions */}
-            <div className="bg-[#001420] border border-banana p-4 rounded-md mb-4 text-center">
+            <div className="bg-[#001420]/70 border border-banana p-4 rounded-md mb-4 text-center">
               <h3 className="font-press-start text-white text-sm mb-2">YOU HAVE MINED</h3>
               <p className="font-press-start text-banana text-xl mb-3">
                 {isUnclaimedRewardsLoading ? 
@@ -1980,49 +2137,22 @@ export default function RoomPage() {
   }, [selectedTile]);
 
   const handlePurchaseFacility = async () => {
-    // Only open the modal if it's not already open
-    if (!isBuyModalOpen) {
-      setIsBuyModalOpen(true);
+    try {
+      await gameState.purchaseFacility();
+    } catch (error: any) {
+      console.error("Error purchasing facility:", error);
     }
-    return Promise.resolve();
   };
 
   const handleUpgradeFacility = async () => {
     setIsUpgradeModalOpen(true);
   };
 
-  const handleMinerPurchase = async (minerType: MinerType, x: number, y: number) => {
-    if (!selectedTile || !address) return;
-    console.log(`Purchasing miner of type ${minerType} at position (${x}, ${y}) for address ${address}`);
-    
-    try {
-      // First ensure any existing local storage entries are wallet-specific
-      if (typeof window !== 'undefined') {
-        // Clean up any old non-wallet-specific data
-        const oldEntries = [
-          'monkey_toaster_purchased',
-          'monkey_toaster_position',
-          'claimedMinerPosition'
-        ];
-        
-        for (const key of oldEntries) {
-          localStorage.removeItem(key);
-        }
-        
-        // Add wallet-specific keys if needed
-        if (address) {
-          localStorage.setItem('lastConnectedAddress', address);
-        }
-      }
-      
-      // Now proceed with purchase through gameState
-      await gameState.purchaseMiner(minerType, x, y);
-      setShowMinerModal(false);
-    } catch (error) {
-      console.error('Error in handleMinerPurchase:', error);
-    }
-  };
-  
+  // Add a wrapper function to fix the type error with gameState.purchaseMiner
+  const handlePurchaseMiner = useCallback(async (minerType: MinerType, x: number, y: number): Promise<void> => {
+    await gameState.purchaseMiner(minerType, x, y);
+  }, [gameState]);
+
   // Add functionality to remove a miner from a tile
   const handleRemoveMiner = async (x: number, y: number) => {
     if (!confirm(`Are you sure you want to remove the miner at position (${x}, ${y})? This action cannot be undone.`)) {
@@ -2229,7 +2359,7 @@ export default function RoomPage() {
       {/* Mobile layout (1 column stacked) */}
       <div className="md:hidden flex flex-col h-screen">
         {/* Header */}
-        <div className="mobile-dashboard-header">
+        <div className="mobile-dashboard-header flex justify-between items-center">
           <Link href="/">
             <Image
               src="/bitape.png"
@@ -2240,28 +2370,75 @@ export default function RoomPage() {
               priority
             />
           </Link>
-          <button 
-            onClick={() => setIsProfileModalOpen(true)}
-            className="bigcoin-button"
-          >
-            PROFILE
-          </button>
+          <div className="relative">
+            <button 
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="bigcoin-button"
+              aria-label="Menu"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            {isMobileMenuOpen && (
+              <div className="absolute right-0 mt-1 w-48 bg-royal border-2 border-banana rounded-lg shadow-lg z-50">
+                <div className="p-2">
+                  <button 
+                    onClick={() => {
+                      setIsProfileModalOpen(true);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="block w-full text-left px-4 py-2 text-white hover:bg-banana hover:text-royal font-press-start text-xs transition-colors"
+                  >
+                    PROFILE
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setIsTradeModalOpen(true);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="block w-full text-left px-4 py-2 text-white hover:bg-banana hover:text-royal font-press-start text-xs transition-colors"
+                  >
+                    TRADE $BIT
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setIsAnnouncementsModalOpen(true);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="block w-full text-left px-4 py-2 text-white hover:bg-banana hover:text-royal font-press-start text-xs transition-colors"
+                  >
+                    ANNOUNCEMENTS
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setIsReferralModalOpen(true);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="block w-full text-left px-4 py-2 text-white hover:bg-banana hover:text-royal font-press-start text-xs transition-colors"
+                  >
+                    REFER A FRIEND
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
         
         {/* Main content area - add padding-bottom to account for fixed footer */}
         <div className="mobile-dashboard-content pb-24">
-          {/* Mobile tab content */}
+          {/* Mobile tab content first */}
           {renderMobileTabContent()}
           
-          {/* Room visualization */}
-          <div className="bigcoin-panel">
+          {/* Room visualization - This component already handles the BUY FACILITY UI */}
+          <div className="bigcoin-panel mt-4">
             <RoomVisualization 
               hasFacility={hasFacility}
               facilityData={visualizationFacilityData}
               onPurchaseFacility={handlePurchaseFacility}
               onGetStarterMiner={handleGetStarterMiner}
               onUpgradeFacility={handleUpgradeFacility}
-              onPurchaseMiner={gameState.purchaseMiner}
+              onPurchaseMiner={handlePurchaseMiner}
               isPurchasingFacility={gameState.isPurchasingFacility}
               isGettingStarterMiner={gameState.isGettingStarterMiner}
               isUpgradingFacility={gameState.isUpgradingFacility}
@@ -2279,24 +2456,47 @@ export default function RoomPage() {
         
         {/* Bottom tab navigation */}
         <div className="mobile-dashboard-footer">
-          <button 
-            className={`mobile-dashboard-tab ${activeMobileTab === 'actions' ? 'active' : ''}`}
-            onClick={() => setActiveMobileTab('actions')}
-          >
-            ACTIONS
-          </button>
-          <button 
-            className={`mobile-dashboard-tab ${activeMobileTab === 'stats' ? 'active' : ''}`}
-            onClick={() => setActiveMobileTab('stats')}
-          >
-            STATS
-          </button>
-          <button 
-            className={`mobile-dashboard-tab ${activeMobileTab === 'mining' ? 'active' : ''}`}
-            onClick={() => setActiveMobileTab('mining')}
-          >
-            MINING
-          </button>
+          {!hasFacility ? (
+            <button 
+              className="mobile-dashboard-tab active bg-gradient-to-r from-[#F0B90B] to-[#FFDD00] text-black font-bold w-full"
+              onClick={handlePurchaseFacility}
+            >
+              {gameState.isPurchasingFacility ? (
+                <span className="flex items-center justify-center">
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  PURCHASING...
+                </span>
+              ) : (
+                <span className="flex items-center justify-center">
+                  <span className="text-black font-bold">BUY FACILITY (FREE Miner)</span>
+                </span>
+              )}
+            </button>
+          ) : (
+            <>
+              <button 
+                className={`mobile-dashboard-tab ${activeMobileTab === 'actions' ? 'active' : ''}`}
+                onClick={() => setActiveMobileTab('actions')}
+              >
+                ACTIONS
+              </button>
+              <button 
+                className={`mobile-dashboard-tab ${activeMobileTab === 'stats' ? 'active' : ''}`}
+                onClick={() => setActiveMobileTab('stats')}
+              >
+                STATS
+              </button>
+              <button 
+                className={`mobile-dashboard-tab ${activeMobileTab === 'mining' ? 'active' : ''}`}
+                onClick={() => setActiveMobileTab('mining')}
+              >
+                MINING
+              </button>
+            </>
+          )}
         </div>
       </div>
       
@@ -2316,17 +2516,20 @@ export default function RoomPage() {
               />
             </Link>
           </div>
-          <nav className="flex items-center gap-2">
+          <nav className="hidden md:flex items-center gap-2">
             <Link href="/about" className="font-press-start text-sm text-white hover:text-banana">
               ABOUT
             </Link>
-            <Link href="/trade" className="font-press-start text-sm text-white hover:text-banana">
+            <button 
+              onClick={() => setIsTradeModalOpen(true)}
+              className="font-press-start text-sm text-white hover:text-banana"
+            >
               TRADE $BIT
-            </Link>
-            <Link href="/leaderboard" className="font-press-start text-sm text-[#4A5568] hover:text-banana">
-              LEADERBOARD
-            </Link>
-            <button className="font-press-start text-sm text-banana border-2 border-banana px-3 py-1 hover:bg-banana hover:text-royal pixel-button">
+            </button>
+            <button 
+              onClick={() => setIsAnnouncementsModalOpen(true)}
+              className="font-press-start text-sm text-banana border-2 border-banana px-3 py-1 hover:bg-banana hover:text-royal pixel-button"
+            >
               ANNOUNCEMENTS
             </button>
             <button 
@@ -2398,7 +2601,7 @@ export default function RoomPage() {
                 onPurchaseFacility={handlePurchaseFacility}
                 onGetStarterMiner={handleGetStarterMiner}
                 onUpgradeFacility={handleUpgradeFacility}
-                onPurchaseMiner={gameState.purchaseMiner}
+                onPurchaseMiner={handlePurchaseMiner}
                 isPurchasingFacility={gameState.isPurchasingFacility}
                 isGettingStarterMiner={gameState.isGettingStarterMiner}
                 isUpgradingFacility={gameState.isUpgradingFacility}
@@ -2411,9 +2614,98 @@ export default function RoomPage() {
                 selectedTileHasMiner={selectedTileHasMiner}
                 getMinerAtTile={getMinerAtTile}
               />
+              
+              {/* For desktop view, we'll place the purchase UI directly in the room */}
+              {!hasFacility && (
+                <div className="absolute inset-0 flex items-center justify-center z-30">
+                  <div className="max-w-md p-4 bg-transparent backdrop-blur-sm rounded-lg border border-[#F0B90B] shadow-lg relative overflow-hidden">
+                    {/* FREE Miner Badge */}
+                    <div className="absolute -right-12 top-6 bg-green-500 text-white font-press-start text-xs py-1 px-8 transform rotate-45 shadow-lg">
+                      FREE MINER
+                    </div>
+                    
+                    <p className="font-press-start text-white text-lg mb-4">Start Your Mining Operation Now!</p>
+                    
+                    {/* Free Miner Promotion */}
+                    <div className="bg-[#001420]/60 p-4 rounded-md mb-4 border-2 border-yellow-400 flex items-center">
+                      <div className="relative w-24 h-24 mr-4">
+                        <Image 
+                          src={MINERS[MinerType.BANANA_MINER].image}
+                          alt="Free Banana Miner" 
+                          width={96}
+                          height={96}
+                          className="object-contain"
+                          unoptimized={true}
+                        />
+                      </div>
+                      <div>
+                        <p className="text-yellow-400 font-press-start text-base mb-2">FREE BANANA MINER</p>
+                        <p className="text-white font-press-start text-sm mb-1">
+                          • {MINERS[MinerType.BANANA_MINER].hashrate} GH/s Hashrate
+                        </p>
+                        <p className="text-white font-press-start text-sm mb-1">
+                          • {MINERS[MinerType.BANANA_MINER].energyConsumption} WATTS Energy
+                        </p>
+                        <p className="text-banana font-press-start text-sm">
+                          • Start mining immediately!
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {/* Consolidated BUY FACILITY button with ApeCoin logo */}
+                    <div className="flex flex-col items-center">
+                      <button 
+                        onClick={handlePurchaseFacility}
+                        disabled={gameState.isPurchasingFacility}
+                        className="w-full font-press-start text-base px-8 py-4 bg-gradient-to-r from-[#F0B90B] to-[#FFDD00] text-black hover:opacity-90 transition-opacity rounded-md shadow-md font-bold flex items-center justify-center"
+                      >
+                        {gameState.isPurchasingFacility ? (
+                          <span className="flex items-center justify-center">
+                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            PURCHASING...
+                          </span>
+                        ) : (
+                          <div className="flex items-center">
+                            <span className="mr-3">BUY FACILITY</span>
+                            <div className="flex items-center bg-blue-600 rounded-full px-2 py-1">
+                              <span className="text-white mr-1 font-bold">10</span>
+                              <div className="w-5 h-5 relative">
+                                <Image 
+                                  src="/apecoin.png"
+                                  alt="APE" 
+                                  width={20}
+                                  height={20}
+                                  className="object-contain"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </button>
+                      <p className="text-white text-xs mt-1 opacity-80 text-center">(Initial facility includes a FREE Miner)</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
+        
+        {/* Footer with ApeChain branding */}
+        <footer className="py-2 text-center">
+          <div className="flex justify-center items-center">
+            <Image 
+              src="/ApeChain/Powered by ApeCoin-1.png" 
+              alt="Powered by ApeCoin" 
+              width={160}
+              height={32}
+              className="object-contain" 
+            />
+          </div>
+        </footer>
       </div>
       
       {/* Modals */}
@@ -2458,7 +2750,7 @@ export default function RoomPage() {
         }}
         onPurchase={(minerType, x, y) => {
           console.log(`Purchasing miner: type=${minerType}, position=(${x}, ${y})`);
-          return handleMinerPurchase(minerType, x, y);
+          return handlePurchaseMiner(minerType, x, y);
         }}
         selectedTile={selectedTile || undefined}
         isPurchasing={gameState.isPurchasingMiner}
@@ -2476,6 +2768,22 @@ export default function RoomPage() {
           gameState.upgradeFacility();
         }}
         isPurchasing={gameState.isUpgradingFacility}
+      />
+
+      {/* Trade Modal */}
+      <TradeModal
+        isOpen={isTradeModalOpen}
+        onClose={() => setIsTradeModalOpen(false)}
+      />
+
+      {/* Announcements Modal */}
+      <AnnouncementsModal
+        isOpen={isAnnouncementsModalOpen}
+        onClose={() => setIsAnnouncementsModalOpen(false)}
+        onOpenReferralModal={() => {
+          setIsAnnouncementsModalOpen(false);
+          setIsReferralModalOpen(true);
+        }}
       />
     </div>
   );

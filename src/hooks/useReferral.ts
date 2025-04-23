@@ -1,52 +1,65 @@
-'use client';
+import { useEffect, useState } from 'react';
+import { isAddress } from 'viem';
 
-import { useState, useEffect } from 'react';
-import { useAccount } from 'wagmi';
-import { useSearchParams } from 'next/navigation';
+// Default referral address if none provided
+const DEFAULT_REFERRAL = '0x0000003b0d921e12Cc0CdB780b476F966bB16DaE';
 
-// Explicitly export the hook
 export function useReferral() {
-  const { address } = useAccount();
-  const searchParams = useSearchParams();
-  const [referralAddress, setReferralAddress] = useState<string>('0x0000003b0d921e12Cc0CdB780b476F966bB16DaE');
-  const [isReferralCaptured, setIsReferralCaptured] = useState<boolean>(false);
+  const [referralAddress, setReferralAddress] = useState<string>(DEFAULT_REFERRAL);
+  const [isReferralCaptured, setIsReferralCaptured] = useState(false);
 
+  // Process referral on page load
   useEffect(() => {
-    // Check URL for referral
-    const ref = searchParams?.get('ref');
-    if (ref && ref.startsWith('0x') && ref.length === 42) {
-      console.log('Referral found in URL:', ref);
-      setReferralAddress(ref);
-      setIsReferralCaptured(true);
+    // Function to handle referral logic
+    const processReferral = () => {
+      // First check if we already have a stored referral
+      const storedReferral = localStorage.getItem('bitape_referral');
       
-      // Store in localStorage
-      try {
-        localStorage.setItem('referralAddress', ref);
-        localStorage.setItem('referralCaptureTime', Date.now().toString());
-      } catch (error) {
-        console.error('Failed to save referral to localStorage:', error);
+      if (storedReferral && isAddress(storedReferral)) {
+        // Use the stored referral and don't overwrite it
+        setReferralAddress(storedReferral);
+        return;
       }
-    } else {
-      // Check localStorage for saved referral
+      
+      // If no stored referral, check URL parameters
       try {
-        const savedReferral = localStorage.getItem('referralAddress');
-        if (savedReferral && savedReferral.startsWith('0x') && savedReferral.length === 42) {
-          console.log('Referral found in localStorage:', savedReferral);
-          setReferralAddress(savedReferral);
+        // Get referral from URL if present
+        const urlParams = new URLSearchParams(window.location.search);
+        const refParam = urlParams.get('ref');
+        
+        if (refParam && isAddress(refParam)) {
+          // Valid Ethereum address found in URL
+          localStorage.setItem('bitape_referral', refParam);
+          setReferralAddress(refParam);
           setIsReferralCaptured(true);
+          console.log('Referral captured:', refParam);
+          return;
         }
       } catch (error) {
-        console.error('Failed to retrieve referral from localStorage:', error);
+        console.error('Error processing referral:', error);
       }
-    }
-  }, [searchParams, address]);
+      
+      // If no valid referral in storage or URL, use default and store it
+      localStorage.setItem('bitape_referral', DEFAULT_REFERRAL);
+      setReferralAddress(DEFAULT_REFERRAL);
+    };
+    
+    // Execute the referral processing
+    processReferral();
+  }, []);
+
+  // Generate referral link for current user
+  const generateReferralLink = (address: string) => {
+    if (!address || !isAddress(address)) return '';
+    
+    // Build absolute URL regardless of current path
+    const baseUrl = 'https://bitape.org';
+    return `${baseUrl}?ref=${address}`;
+  };
 
   return {
     referralAddress,
     isReferralCaptured,
-    // Default referral code
-    DEFAULT_REFERRAL: '0x0000003b0d921e12Cc0CdB780b476F966bB16DaE'
+    generateReferralLink
   };
-}
-
-export default useReferral; 
+} 
