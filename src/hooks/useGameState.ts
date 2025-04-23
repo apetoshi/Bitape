@@ -3,7 +3,8 @@ import { formatEther, parseEther, zeroAddress, TransactionReceipt } from 'viem';
 import { CONTRACT_ADDRESSES, ERC20_ABI, APECHAIN_ID, MAIN_CONTRACT_ABI, BIT_TOKEN_ADDRESS, BIT_TOKEN_ABI } from '../config/contracts';
 import { MINERS, MinerType, MinerData } from '../config/miners';
 import { useEffect, useState } from 'react';
-import { useReferral } from './useReferral';
+// Import from the index file instead
+import { useReferral } from './';
 import { formatUnits } from 'viem';
 
 interface PlayerFacility {

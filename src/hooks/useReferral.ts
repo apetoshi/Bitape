@@ -1,8 +1,11 @@
+'use client';
+
 import { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 import { useSearchParams } from 'next/navigation';
 
-export const useReferral = () => {
+// Explicitly export the hook
+export function useReferral() {
   const { address } = useAccount();
   const searchParams = useSearchParams();
   const [referralAddress, setReferralAddress] = useState<string>('0x0000003b0d921e12Cc0CdB780b476F966bB16DaE');
@@ -44,6 +47,6 @@ export const useReferral = () => {
     // Default referral code
     DEFAULT_REFERRAL: '0x0000003b0d921e12Cc0CdB780b476F966bB16DaE'
   };
-};
+}
 
 export default useReferral; 
