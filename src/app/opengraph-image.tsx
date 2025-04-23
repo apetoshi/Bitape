@@ -44,22 +44,24 @@ export default async function Image() {
           }}
         />
 
-        {/* Main logo */}
+        {/* Logo placeholder (text instead of image) */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             marginBottom: 40,
+            width: 240,
+            height: 240,
+            borderRadius: '50%',
+            background: '#FFDD00',
+            color: '#001420',
+            fontSize: 100,
+            fontWeight: 'bold',
+            fontFamily: 'Inter',
           }}
         >
-          {/* Image will be fetched from the public directory */}
-          <img
-            src={new URL('../../public/bitape.png', import.meta.url).toString()}
-            alt="BitApe Logo"
-            width={240}
-            height={240}
-          />
+          BIT
         </div>
 
         {/* Title */}
