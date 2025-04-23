@@ -5,11 +5,9 @@ import { useGameState } from '@/hooks/useGameState';
 import { Button } from './ui/button';
 import { useAccount, useContractRead } from 'wagmi';
 import { CONTRACT_ADDRESSES, MAIN_CONTRACT_ABI } from '@/config/contracts';
-import { zeroAddress } from 'viem';
+import { zeroAddress, formatEther } from 'viem';
 import { useIsMounted } from '@/hooks/useIsMounted';
-import { Progress } from '@/components/ui/progress';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
-import { formatEther } from 'viem';
 
 // Default facility data with zeros
 const DEFAULT_FACILITY_DATA = {
