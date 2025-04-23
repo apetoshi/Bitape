@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useGameState } from '@/hooks/useGameState';
 import { Button } from './ui/button';
+import { Progress } from './ui/progress';
 import { useAccount, useContractRead } from 'wagmi';
 import { CONTRACT_ADDRESSES, MAIN_CONTRACT_ABI } from '@/config/contracts';
 import { zeroAddress, formatEther } from 'viem';
@@ -139,6 +140,18 @@ export default function SpaceTab() {
         <Button className="mt-4 pixel-text bg-banana text-black hover:bg-banana/90" onClick={gameState.purchaseFacility}>
           Buy a Facility
         </Button>
+        
+        {/* ApeCoin Powered Text */}
+        <div className="flex items-center justify-center mt-2">
+          <div className="w-3 h-3 mr-1">
+            <img 
+              src="/apecoin.png" 
+              alt="ApeCoin Logo" 
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <span className="text-banana font-press-start text-[8px]">Powered by ApeCoin</span>
+        </div>
       </div>
     );
   }

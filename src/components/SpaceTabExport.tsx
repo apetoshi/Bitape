@@ -211,6 +211,18 @@ export default function SpaceTab() {
             <Button className="pixel-text bg-banana text-black hover:bg-banana/90 py-1 px-2 text-xs" onClick={gameState.purchaseFacility}>
               Buy a Facility
             </Button>
+            
+            {/* ApeCoin Powered Text */}
+            <div className="flex items-center justify-center mt-2">
+              <div className="w-3 h-3 mr-1">
+                <img 
+                  src="/apecoin.png" 
+                  alt="ApeCoin Logo" 
+                  className="w-full h-full object-contain"
+                />
+              </div>
+              <span className="text-banana font-press-start text-[8px]">Powered by ApeCoin</span>
+            </div>
           </div>
         )}
 
