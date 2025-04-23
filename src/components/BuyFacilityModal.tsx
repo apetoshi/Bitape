@@ -1,4 +1,5 @@
 'use client';
+// Version 1.0.1 - Improved transaction handling
 
 import React from 'react';
 import { Dialog } from '@headlessui/react';
