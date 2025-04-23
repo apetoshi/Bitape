@@ -11,7 +11,7 @@ interface AnnouncementsModalProps {
   onOpenReferralModal?: () => void;
 }
 
-export function AnnouncementsModal({ isOpen, onClose, onOpenReferralModal }: AnnouncementsModalProps) {
+export default function AnnouncementsModal({ isOpen, onClose, onOpenReferralModal }: AnnouncementsModalProps) {
   // Get the Banana Miner data
   const bananaMiner = MINERS[MinerType.BANANA_MINER];
   

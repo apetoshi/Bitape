@@ -1,15 +1,16 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog } from '@headlessui/react';
 import Image from 'next/image';
+import { useGameState } from '@/hooks/useGameState';
 
 interface TradeModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-export function TradeModal({ isOpen, onClose }: TradeModalProps) {
+export default function TradeModal({ isOpen, onClose }: TradeModalProps) {
   return (
     <Dialog
       open={isOpen}
