@@ -1112,6 +1112,18 @@ export const RoomVisualization = React.memo(function RoomVisualization({
                       )}
                     </button>
                     <p className="text-white text-[8px] mt-0.5 opacity-80">(Initial facility includes a FREE Miner)</p>
+                    
+                    {/* ApeCoin Powered Text */}
+                    <div className="flex items-center justify-center mt-2">
+                      <div className="w-3 h-3 mr-1">
+                        <img 
+                          src="/apecoin.png" 
+                          alt="ApeCoin Logo" 
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                      <span className="text-banana font-press-start text-[8px]">Powered by ApeCoin</span>
+                    </div>
                   </div>
                 </div>
               </div>

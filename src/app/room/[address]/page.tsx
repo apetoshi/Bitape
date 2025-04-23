@@ -2686,6 +2686,18 @@ export default function RoomPage() {
                         )}
                       </button>
                       <p className="text-white text-xs mt-1 opacity-80 text-center">(Initial facility includes a FREE Miner)</p>
+                      
+                      {/* ApeCoin Powered Text */}
+                      <div className="flex items-center justify-center mt-2">
+                        <Image 
+                          src="/apecoin.png" 
+                          alt="ApeCoin Logo" 
+                          width={12} 
+                          height={12} 
+                          className="mr-1" 
+                        />
+                        <span className="text-banana font-press-start text-[8px] sm:text-[10px]">Powered by ApeCoin</span>
+                      </div>
                     </div>
                   </div>
                 </div>
