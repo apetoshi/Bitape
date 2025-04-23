@@ -15,8 +15,8 @@ export const contentType = 'image/png';
 // Image generation
 export default async function Image() {
   // Font
-  const interSemiBold = fetch(
-    new URL('https://fonts.gstatic.com/s/inter/v12/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuFuYAZ9hiA.woff2', import.meta.url)
+  const interSemiBold = await fetch(
+    new URL('./fonts/inter-semi-bold.woff', import.meta.url)
   ).then((res) => res.arrayBuffer());
 
   return new ImageResponse(
@@ -114,7 +114,7 @@ export default async function Image() {
       fonts: [
         {
           name: 'Inter',
-          data: await interSemiBold,
+          data: interSemiBold,
           style: 'normal',
           weight: 600,
         },
