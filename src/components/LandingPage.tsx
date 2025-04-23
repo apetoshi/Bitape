@@ -76,7 +76,7 @@ const LandingPage = () => {
             TRADE $BIT
           </Link>
           <span className="font-press-start text-gray-500 text-xs md:text-sm cursor-not-allowed">
-            LEADERBOARD
+            Brewing...
           </span>
           <Link href="/announcements" className="pixel-button text-xs md:text-sm">
             ANNOUNCEMENTS
@@ -139,6 +139,19 @@ const LandingPage = () => {
           </div>
         </div>
       </main>
+
+      {/* Footer with ApeChain branding */}
+      <footer className="py-4 text-center">
+        <div className="flex justify-center items-center">
+          <Image 
+            src="/ApeChain/Powered by ApeCoin-1.png" 
+            alt="Powered by ApeCoin" 
+            width={180}
+            height={36}
+            className="object-contain" 
+          />
+        </div>
+      </footer>
     </div>
   );
 };

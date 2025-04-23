@@ -1028,14 +1028,94 @@ export const RoomVisualization = React.memo(function RoomVisualization({
             }}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-dark-blue">
+          <div className="w-full h-full flex items-center justify-center">
             <Image 
               src="/bedroom.png" 
               alt="Empty Space" 
               width={690}
               height={690}
-              className="opacity-30"
+              className="absolute inset-0 object-contain w-full h-full"
             />
+            {/* Enhanced overlay with improved visibility and consistency across devices */}
+            {isMobile && (
+              <div className="absolute inset-0 flex items-center justify-center z-40">
+                <div className={`max-w-md p-2 bg-transparent backdrop-blur-sm rounded-lg border-2 border-banana shadow-lg relative overflow-hidden ${isMobile ? 'w-11/12' : ''}`}>
+                  {/* FREE Miner Badge */}
+                  <div className="absolute -right-12 top-3 bg-green-500 text-white font-press-start text-[8px] py-0.5 px-8 transform rotate-45 shadow-lg z-50">
+                    FREE MINER
+                  </div>
+                  
+                  <p className={`font-press-start text-white ${isMobile ? 'text-xs' : 'text-lg'} mb-1.5`}>Start Your Mining Operation Now!</p>
+                  
+                  {/* Free Miner Promotion */}
+                  <div className="bg-[#001420]/60 p-1.5 rounded-md mb-2 border-2 border-yellow-400 flex items-center">
+                    <div className={`relative ${isMobile ? 'w-10 h-10 mr-1.5' : 'w-24 h-24 mr-4'}`}>
+                      <Image 
+                        src={MINERS[MinerType.BANANA_MINER].image}
+                        alt="Free Banana Miner" 
+                        width={isMobile ? 40 : 96}
+                        height={isMobile ? 40 : 96}
+                        className="object-contain"
+                        unoptimized={true}
+                      />
+                    </div>
+                    <div>
+                      <p className={`text-yellow-400 font-press-start ${isMobile ? 'text-[10px]' : 'text-base'} mb-0.5`}>FREE BANANA MINER</p>
+                      <p className={`text-white font-press-start ${isMobile ? 'text-[8px]' : 'text-sm'} mb-0.5`}>
+                        • {MINERS[MinerType.BANANA_MINER].hashrate} GH/s Hashrate
+                      </p>
+                      <p className={`text-white font-press-start ${isMobile ? 'text-[8px]' : 'text-sm'} mb-0.5`}>
+                        • {MINERS[MinerType.BANANA_MINER].energyConsumption} WATTS Energy
+                      </p>
+                      <p className={`text-banana font-press-start ${isMobile ? 'text-[8px]' : 'text-sm'}`}>
+                        • Start mining immediately!
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Combined purchase button with cost indicator */}
+                  <div className="flex flex-col items-center">
+                    <button 
+                      onClick={onPurchaseFacility}
+                      disabled={isPurchasingFacility}
+                      className={`font-press-start ${isMobile ? 'text-[10px] px-2 py-1.5' : 'px-8 py-4 text-base'} w-full bg-gradient-to-r from-[#F0B90B] to-[#FFDD00] text-black hover:opacity-90 transition-opacity rounded-md shadow-md font-bold border-none flex items-center justify-center`}
+                    >
+                      {isPurchasingFacility ? (
+                        <span className="flex items-center justify-center">
+                          <svg className="animate-spin -ml-1 mr-1.5 h-2.5 w-2.5 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          PURCHASING...
+                        </span>
+                      ) : (
+                        <>
+                          <span>BUY FACILITY</span>
+                          <div className="flex items-center ml-1.5 bg-blue-600 rounded-full px-1 py-0.5">
+                            {isMobile ? (
+                              // For mobile: use text only (more reliable)
+                              <span className="text-white text-[8px] font-bold mr-0.5">10</span>
+                            ) : (
+                              // For desktop: use the ApeCoin logo image
+                              <div className="w-4 h-4 flex-shrink-0 mr-1 relative">
+                                <img 
+                                  src="/apecoin.png" 
+                                  alt="APE" 
+                                  className="w-full h-full object-contain"
+                                  style={{ maxWidth: '100%', maxHeight: '100%' }}
+                                />
+                              </div>
+                            )}
+                            <span className="text-white font-bold text-[8px]">{isMobile ? "" : "10 "}APE</span>
+                          </div>
+                        </>
+                      )}
+                    </button>
+                    <p className="text-white text-[8px] mt-0.5 opacity-80">(Initial facility includes a FREE Miner)</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
         
@@ -1090,20 +1170,6 @@ export const RoomVisualization = React.memo(function RoomVisualization({
             >
               {isGettingStarterMiner ? 'CLAIMING...' : 'CLAIM FREE STARTER MINER'}
             </button>
-          </div>
-        )}
-        
-        {/* Initial purchase UI if no facility exists */}
-        {!hasFacility && (
-          <div className="flex flex-col items-center justify-center h-full text-center p-4">
-            <p className="font-press-start text-xs text-[#FFD700] mb-6">You don't have any mining space yet.</p>
-            <button
-              onClick={onPurchaseFacility}
-              disabled={isPurchasingFacility}
-              className="bigcoin-button"
-            >
-              {isPurchasingFacility ? 'PURCHASING...' : 'PURCHASE FACILITY'}
-        </button>
           </div>
         )}
       </div>

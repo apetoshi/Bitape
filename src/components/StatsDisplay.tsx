@@ -3,6 +3,7 @@ import { ViewModeToggle, ViewMode } from '.';
 import { formatUnits } from 'viem';
 import { useContractRead } from 'wagmi';
 import { CONTRACT_ADDRESSES, BIT_TOKEN_ABI } from '../config/contracts';
+import Image from 'next/image';
 
 interface StatsDisplayProps {
   miningRateData: bigint | undefined;

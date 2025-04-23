@@ -1,6 +1,7 @@
 import React from 'react';
 import { Dialog } from '@headlessui/react';
 import { useAccount } from 'wagmi';
+import Image from 'next/image';
 
 interface ReferralModalProps {
   isOpen: boolean;
@@ -78,6 +79,20 @@ const ReferralModal: React.FC<ReferralModalProps> = ({
               >
                 CLOSE
               </button>
+            </div>
+            
+            {/* ApeCoin branding */}
+            <div className="mt-6 pt-3 border-t border-banana/20 flex justify-center">
+              <div className="flex items-center">
+                <Image 
+                  src="/apecoin.png" 
+                  alt="ApeCoin Logo" 
+                  width={16} 
+                  height={16} 
+                  className="mr-2" 
+                />
+                <span className="text-banana font-press-start text-[8px] sm:text-[10px]">Powered by ApeCoin</span>
+              </div>
             </div>
           </div>
         </Dialog.Panel>

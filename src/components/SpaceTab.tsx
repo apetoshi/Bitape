@@ -7,6 +7,9 @@ import { useAccount, useContractRead } from 'wagmi';
 import { CONTRACT_ADDRESSES, MAIN_CONTRACT_ABI } from '@/config/contracts';
 import { zeroAddress } from 'viem';
 import { useIsMounted } from '@/hooks/useIsMounted';
+import { Progress } from '@/components/ui/progress';
+import { useConnectModal } from '@rainbow-me/rainbowkit';
+import { formatEther } from 'viem';
 
 // Default facility data with zeros
 const DEFAULT_FACILITY_DATA = {
@@ -37,38 +40,38 @@ export default function SpaceTab() {
     }
   });
 
-  // Memoize facility data processing to avoid redundant updates
+  // Process contract data with memoization
   const processedContractData = useMemo(() => {
     if (!rawFacilityData || !Array.isArray(rawFacilityData) || rawFacilityData.length < 5) {
       return null;
     }
       
-      try {
-        // [facilityIndex, maxMiners, currMiners, totalPowerOutput, currPowerOutput, x, y]
-        const facilityIndex = Number(rawFacilityData[0] || 0);
-        const maxMiners = Number(rawFacilityData[1] || 0);
-        const currMiners = Number(rawFacilityData[2] || 0);
-        const totalPowerOutput = Number(rawFacilityData[3] || 0);
-        const currPowerOutput = Number(rawFacilityData[4] || 0);
-        
-      // Only return valid facility data if facilityIndex > 0
-        if (facilityIndex > 0) {
+    try {
+      // [facilityIndex, maxMiners, currMiners, totalPowerOutput, currPowerOutput, x, y]
+      const facilityIndex = Number(rawFacilityData[0] || 0);
+      const maxMiners = Number(rawFacilityData[1] || 0);
+      const currMiners = Number(rawFacilityData[2] || 0);
+      const totalPowerOutput = Number(rawFacilityData[3] || 0);
+      const currPowerOutput = Number(rawFacilityData[4] || 0);
+      
+      // Only set facility data if facilityIndex > 0 (user has a facility)
+      if (facilityIndex > 0) {
         return {
-            level: facilityIndex,
-            maxMiners,
-            currMiners,
-            totalPower: totalPowerOutput,
-            usedPower: currPowerOutput
-          };
-        }
-      } catch (error) {
-        console.error('Error processing facility data in SpaceTab:', error);
+          level: facilityIndex,
+          maxMiners,
+          currMiners,
+          totalPower: totalPowerOutput,
+          usedPower: currPowerOutput
+        };
+      }
+    } catch (error) {
+      console.error('Error processing facility data in SpaceTab:', error);
     }
     
     return null;
   }, [rawFacilityData]);
 
-  // Memoize gameState facility data
+  // Process gameState data with memoization
   const processedGameStateData = useMemo(() => {
     if (!gameState.hasFacility || !gameState.facilityData) {
       return null;
@@ -87,7 +90,6 @@ export default function SpaceTab() {
   useEffect(() => {
     if (!isMounted) return;
     
-    // Prevent update loops by using a single state update strategy
     // Priority: gameState > contract data > default
     if (processedGameStateData) {
       if (dataSource !== 'gameState' || 
@@ -110,26 +112,19 @@ export default function SpaceTab() {
     }
   }, [processedGameStateData, processedContractData, isMounted, dataSource, facilityData]);
   
-  // Reset data source when dependencies change to force re-evaluation
+  // Reset data source when dependencies change
   useEffect(() => {
     setDataSource('none');
   }, [address]);
 
-  // Calculate spaces left and power available - memoized
+  // Calculate derived values using memoization
   const { spacesLeft, gigawattsAvailable, userHasFacility } = useMemo(() => ({
     spacesLeft: facilityData.maxMiners - facilityData.currMiners,
     gigawattsAvailable: facilityData.totalPower - facilityData.usedPower,
     userHasFacility: facilityData.level > 0
   }), [facilityData]);
 
-  if (!isMounted) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center">
-        <div className="pixel-text text-white">Loading facility data...</div>
-      </div>
-    );
-  }
-
+  // If user is not connected, show connection message
   if (!isConnected) {
     return (
       <div className="flex h-full flex-col items-center justify-center">
@@ -138,6 +133,7 @@ export default function SpaceTab() {
     );
   }
 
+  // Check if user has a facility
   if (!userHasFacility && !gameState.hasFacility) {
     return (
       <div className="flex h-full flex-col items-center justify-center">
@@ -149,70 +145,64 @@ export default function SpaceTab() {
     );
   }
 
+  // Main facility data display - only show if user has a facility
   return (
-    <div className="bg-[#001420] p-3 rounded-md border-2 border-banana">
-      <h3 className="font-press-start text-white text-xs mb-4">FACILITY STATUS</h3>
-
-      {isConnected ? (
-        userHasFacility || gameState.hasFacility ? (
-          <div className="space-y-6">
-            {/* Slots/Spaces */}
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="font-press-start text-white text-xs">SPACES LEFT:</span>
-                <span className="font-press-start text-banana text-xs">{spacesLeft} SPACES</span>
-              </div>
-              <div className="w-full bg-blue-900 h-3 rounded-full overflow-hidden">
-                <div 
-                  className="bg-yellow-400 h-full" 
-                  style={{ width: `${facilityData.maxMiners ? (facilityData.currMiners / facilityData.maxMiners) * 100 : 0}%` }}
-                />
-              </div>
-              <div className="flex justify-between">
-                <span className="font-press-start text-white text-[9px]">USED: {facilityData.currMiners}</span>
-                <span className="font-press-start text-white text-[9px]">MAX: {facilityData.maxMiners}</span>
-              </div>
-            </div>
-
-            {/* Power */}
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="font-press-start text-white text-xs">GIGAWATTS AVAILABLE:</span>
-                <span className="font-press-start text-banana text-xs">{gigawattsAvailable} GW</span>
-              </div>
-              <div className="w-full bg-blue-900 h-3 rounded-full overflow-hidden">
-                <div 
-                  className="bg-yellow-400 h-full" 
-                  style={{ width: `${facilityData.totalPower ? (facilityData.usedPower / facilityData.totalPower) * 100 : 0}%` }}
-                />
-              </div>
-              <div className="flex justify-between">
-                <span className="font-press-start text-white text-[9px]">USED: {facilityData.usedPower} GW</span>
-                <span className="font-press-start text-white text-[9px]">MAX: {facilityData.totalPower} GW</span>
-              </div>
-            </div>
-
-            {/* Upgrade Requirements (Shown only to keep UI consistent) */}
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="font-press-start text-white text-xs">UPGRADE REQUIREMENTS:</span>
-              </div>
-              <div className="pl-4 space-y-1">
-                <p className="font-press-start text-white text-[9px]">• LEVEL: {facilityData.level}</p>
-                <p className="font-press-start text-white text-[9px]">Upgrade in $BIT</p>
-              </div>
-            </div>
+    <div className="h-full p-4 flex flex-col space-y-6">
+      <div className="space-y-6 flex-grow">
+        {/* Space Usage */}
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <div className="pixel-text text-white">Spaces Left:</div>
+            <div className="pixel-text text-banana">{spacesLeft} Spaces</div>
           </div>
-        ) : (
-          <div className="text-center py-4">
-            <p className="font-press-start text-white text-xs">NO FACILITY DETECTED</p>
-            <p className="font-press-start text-white text-[9px] mt-2">PURCHASE A FACILITY TO BEGIN MINING</p>
+          
+          <Progress 
+            value={(facilityData.currMiners / facilityData.maxMiners) * 100} 
+            className="h-2 bg-blue-950" 
+          />
+          
+          <div className="flex justify-between text-xs">
+            <div className="pixel-text text-white/70">Used: {facilityData.currMiners}</div>
+            <div className="pixel-text text-white/70">Max: {facilityData.maxMiners}</div>
           </div>
-        )
-      ) : (
-        <div className="text-center py-4">
-          <p className="font-press-start text-white text-xs">CONNECT WALLET TO VIEW FACILITY</p>
         </div>
+        
+        {/* Power Usage */}
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <div className="pixel-text text-white">Gigawatts Available:</div>
+            <div className="pixel-text text-banana">{gigawattsAvailable} GW</div>
+          </div>
+          
+          <Progress 
+            value={(facilityData.usedPower / facilityData.totalPower) * 100} 
+            className="h-2 bg-blue-950" 
+          />
+          
+          <div className="flex justify-between text-xs">
+            <div className="pixel-text text-white/70">Used: {facilityData.usedPower} GW</div>
+            <div className="pixel-text text-white/70">Max: {facilityData.totalPower} GW</div>
+          </div>
+        </div>
+        
+        {/* Facility Level */}
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <div className="pixel-text text-white">Facility Level:</div>
+            <div className="pixel-text text-banana">Level {facilityData.level}</div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Upgrade Button - only show if user can upgrade */}
+      {gameState.hasFacility && (
+        <Button 
+          className="w-full bg-banana pixel-text text-black hover:bg-banana/90"
+          onClick={gameState.upgradeFacility}
+          disabled={gameState.isUpgradingFacility}
+        >
+          {gameState.isUpgradingFacility ? 'UPGRADING...' : 'UPGRADE FACILITY'}
+        </Button>
       )}
     </div>
   );

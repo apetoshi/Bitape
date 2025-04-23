@@ -3,6 +3,7 @@ import '@/styles/animations.css';
 import { useWriteContract, useContractRead, useAccount } from 'wagmi';
 import { CONTRACT_ADDRESSES, MAIN_CONTRACT_ABI } from '@/config/contracts';
 import { formatEther, zeroAddress } from 'viem';
+import Image from 'next/image';
 
 interface EnhancedMiningClaimSectionProps {
   minedBit: string;
