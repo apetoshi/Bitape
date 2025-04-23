@@ -3,6 +3,8 @@ import { formatEther, parseEther, zeroAddress, TransactionReceipt } from 'viem';
 import { CONTRACT_ADDRESSES, ERC20_ABI, APECHAIN_ID, MAIN_CONTRACT_ABI, BIT_TOKEN_ADDRESS, BIT_TOKEN_ABI } from '../config/contracts';
 import { MINERS, MinerType, MinerData } from '../config/miners';
 import { useEffect, useState } from 'react';
+import { useReferral } from './useReferral';
+import { formatUnits } from 'viem';
 
 interface PlayerFacility {
   facilityIndex: bigint;
@@ -76,11 +78,11 @@ export interface GameState {
   stats: PlayerStats;
   
   // Actions
-  purchaseFacility: () => Promise<void>;
-  getStarterMiner: (x: number, y: number) => Promise<void>;
-  purchaseMiner: (minerType: MinerType, x: number, y: number) => Promise<void>;
-  claimReward: () => Promise<void>;
-  upgradeFacility: () => Promise<void>;
+  purchaseFacility: () => Promise<boolean | void>;
+  getStarterMiner: (x: number, y: number) => Promise<boolean | void>;
+  purchaseMiner: (minerType: MinerType, x: number, y: number) => Promise<boolean | void>;
+  claimReward: () => Promise<boolean | void>;
+  upgradeFacility: () => Promise<boolean | void>;
   
   // Loading states
   isPurchasingFacility: boolean;
@@ -116,6 +118,9 @@ export interface GameState {
   // Miner types directly from contract
   minerTypesFromContract: Record<number, any>;
 }
+
+// At the top of the file, after imports
+type TransactionHash = `0x${string}` | undefined;
 
 /**
  * Utility to retry failed contract calls with exponential backoff
@@ -163,6 +168,8 @@ async function retryContractCall<T>(
 export function useGameState(): GameState {
   const { address, isConnected } = useAccount();
   const publicClient = usePublicClient();
+  const { writeContractAsync } = useWriteContract();
+  const { referralAddress } = useReferral();
   
   // State variables
   const [apeBalance, setApeBalance] = useState('0');
@@ -536,6 +543,36 @@ export function useGameState(): GameState {
     }
   }, [bitBalanceData]);
   
+  // Update balances when address changes
+  useEffect(() => {
+    const fetchBalances = async () => {
+      if (address && publicClient) {
+        try {
+          // Fetch APE balance
+          const apeBalance = await publicClient.getBalance({
+            address: address as `0x${string}`
+          });
+          setApeBalance(formatEther(apeBalance));
+          
+          // Fetch BIT balance
+          if (BIT_TOKEN_ADDRESS) {
+            const bitBalance = await publicClient.readContract({
+              address: BIT_TOKEN_ADDRESS as `0x${string}`,
+              abi: BIT_TOKEN_ABI,
+              functionName: 'balanceOf',
+              args: [address as `0x${string}`]
+            });
+            setBitBalance(formatEther(bitBalance as bigint));
+          }
+        } catch (error) {
+          console.error('Error fetching balances:', error);
+        }
+      }
+    };
+    
+    fetchBalances();
+  }, [address, publicClient]);
+
   // Contract write functions
   const { writeContract } = useWriteContract();
 
@@ -555,187 +592,327 @@ export function useGameState(): GameState {
     }
   }, [isConnected, address]);
 
+  // Define refetchUserInfo at the top of the hook
+  const refetchUserInfo = async () => {
+    console.log('Refetching user info...');
+    
+    // Use the refetch functions that exist in the hook
+    if (refetchFacility) refetchFacility();
+    if (refetchStats) refetchStats();
+    if (refetchStarterMiner) refetchStarterMiner();
+    if (refetchMinerIds) refetchMinerIds();
+  };
+
+  // Return type fix for purchaseFacility function
   const handlePurchaseFacility = async () => {
-    if (!address) {
-      console.error('Cannot purchase facility: wallet not connected');
-      alert('Please connect your wallet to purchase a facility');
-      return;
-    }
-
+    setIsPurchasingFacility(true);
+    
     try {
-      console.log('Starting facility purchase transaction...');
-      setIsPurchasingFacility(true);
-      
-      // Validate APE balance first
-      const requiredBalance = parseEther('0.005');
-      const currentBalance = apeBalanceData?.value || BigInt(0);
-      
-      if (currentBalance < requiredBalance) {
-        console.error(`Insufficient APE balance: have ${formatEther(currentBalance)}, need 0.005`);
-        alert('You need at least 0.005 APE to purchase a facility');
-        setIsPurchasingFacility(false);
-        return;
+      if (!address) {
+        throw new Error('Address not found');
       }
       
-      // Verify we're on ApeChain
-      if (publicClient?.chain?.id !== APECHAIN_ID) {
-        console.error(`Wrong network: connected to ${publicClient?.chain?.name} but need ApeChain`);
-        alert('Please switch to ApeChain network to purchase a facility');
-        setIsPurchasingFacility(false);
-        return;
-      }
-
-      // Add timeout to reset state if transaction takes too long
-      const resetTimeout = setTimeout(() => {
-        if (isPurchasingFacility) {
-          console.warn('Facility purchase timeout - resetting state');
-          setIsPurchasingFacility(false);
-        }
-      }, 60000); // 1 minute timeout
-
+      // First simulate transaction with 10 APE value to match 0x3e89bb13 signature
+      await publicClient?.simulateContract({
+        address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
+        abi: MAIN_CONTRACT_ABI,
+        functionName: 'purchaseInitialFacility',
+        account: address,
+        args: [referralAddress as `0x${string}`],
+        value: parseEther('10') // Send 10 APE to match signature 0x3e89bb13
+      });
+      
+      console.log('Purchasing facility with referrer:', referralAddress);
+      console.log('Requesting wallet confirmation to spend 10 APE...');
+      
+      // Attempt to get the transaction hash without retry logic
+      let hash: `0x${string}` | undefined;
+      
       try {
-        // Execute transaction with retry logic
-        await retryContractCall(async () => {
-          const config = {
-            address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
-            abi: MAIN_CONTRACT_ABI,
-            functionName: 'purchaseInitialFacility',
-            args: [zeroAddress as `0x${string}`],
-            value: requiredBalance,
-          };
-          
-          return writeContract({
-            ...config,
-            chain: publicClient?.chain,
-            account: address
-          } as any);
+        // Send transaction with 10 APE to match signature 0x3e89bb13
+        const writeResult = await writeContract({
+          address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
+          abi: MAIN_CONTRACT_ABI,
+          functionName: 'purchaseInitialFacility',
+          args: [referralAddress as `0x${string}`],
+          account: address as `0x${string}`,
+          value: parseEther('10'), // Send 10 APE to match signature 0x3e89bb13
+          chain: publicClient?.chain
         });
-      } catch (txError) {
-        clearTimeout(resetTimeout);
-        console.error('Transaction error:', txError);
         
-        // Provide helpful message based on error type
-        if (txError.message?.includes('MetaMask') && txError.message?.includes('restart')) {
-          alert('MetaMask requires a restart. Please refresh your browser and try again.');
-        } else if (txError.message?.includes('underpriced')) {
-          alert('Transaction underpriced. Please try again with higher gas settings.');
+        hash = writeResult;
+        console.log('Purchase transaction hash:', hash);
+        
+        // Only proceed with waiting for receipt if we have a valid hash
+        if (hash) {
+          try {
+            const receipt = await publicClient.waitForTransactionReceipt({
+              hash,
+            });
+            console.log('Purchase confirmed:', receipt);
+            
+            // Update game state after successful purchase
+            setTimeout(async () => {
+              try {
+                console.log("Refreshing game state after facility purchase");
+                await refetchUserInfo();
+                alert('Facility purchased successfully!');
+              } catch (refreshError) {
+                console.error("Error refreshing game state:", refreshError);
+              }
+            }, 2000);
+            
+            return true;
+          } catch (receiptError) {
+            console.error('Error waiting for purchase confirmation:', receiptError);
+            throw new Error('Purchase transaction failed');
+          }
         } else {
-          alert('Failed to send transaction. Please try again.');
+          // Don't show an error here - the wallet interaction might still be processing
+          console.log('Waiting for transaction confirmation...');
+          return false;
+        }
+      } catch (writeError: any) {
+        // Check if user rejected the transaction
+        if (writeError.message?.includes('User rejected') || 
+            writeError.message?.includes('user rejected') || 
+            writeError.message?.includes('rejected') || 
+            writeError.message?.includes('denied') || 
+            writeError.message?.includes('cancelled') || 
+            writeError.message?.includes('canceled') || 
+            writeError.code === 4001) {
+          console.log('User rejected purchase transaction');
+          alert('You canceled the facility purchase.');
+          return false;
         }
         
-        setIsPurchasingFacility(false);
+        // For other errors, rethrow
+        throw writeError;
       }
-    } catch (error) {
-      console.error('Unexpected error in facility purchase:', error);
-      alert('An unexpected error occurred. Please try again later.');
+    } catch (error: any) {
+      console.error('Error purchasing facility:', error);
+      
+      // Double-check for user rejection
+      if (error.message?.includes('User rejected') || 
+          error.message?.includes('user rejected') || 
+          error.message?.includes('rejected') || 
+          error.message?.includes('denied') || 
+          error.message?.includes('cancelled') || 
+          error.message?.includes('canceled') || 
+          error.code === 4001) {
+        console.log('User rejected purchase transaction');
+        alert('You canceled the facility purchase.');
+        return false;
+      }
+      
+      // More friendly error message
+      if (error.message?.includes('Failed to get transaction hash')) {
+        alert('Transaction was not processed. Please try again.');
+      } else {
+        alert(`Error purchasing facility: ${error.message}`);
+      }
+      return false;
+    } finally {
       setIsPurchasingFacility(false);
     }
   };
-  
+
+  // Fix handleClaimRewards
   const handleClaimRewards = async () => {
+    setIsClaimingReward(true);
     try {
-      setIsClaimingReward(true);
-      await writeContract({
-        address: CONTRACT_ADDRESSES.MAIN,
+      if (!address) {
+        throw new Error('Address not found');
+      }
+      
+      console.log('Claiming rewards from', CONTRACT_ADDRESSES.MAIN);
+      const hash = await writeContract({
+        address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
         abi: MAIN_CONTRACT_ABI,
         functionName: 'claimRewards',
+        account: address as `0x${string}`,
+        chain: publicClient?.chain
       });
-      await refetchStats();
+      
+      console.log('Claim transaction hash:', hash);
+      
+      try {
+        const receipt = await publicClient.waitForTransactionReceipt({
+          hash,
+        });
+        console.log('Claim confirmed:', receipt);
+        
+        // Update game state after successful claim
+        setTimeout(async () => {
+          try {
+            console.log("Refreshing game state after claiming rewards");
+            await refetchUserInfo();
+          } catch (refreshError) {
+            console.error("Error refreshing game state:", refreshError);
+          }
+        }, 2000);
+        
+        return true;
+      } catch (error) {
+        console.error('Error waiting for claim confirmation:', error);
+        throw new Error('Claim transaction failed');
+      }
     } catch (error) {
       console.error('Error claiming rewards:', error);
+      
+      // Check if user rejected the transaction
+      if (error.message?.includes('User rejected') || error.message?.includes('user rejected') || error.code === 4001) {
+        console.log('User rejected claim transaction');
+        return false;
+      }
+      
+      throw error;
     } finally {
       setIsClaimingReward(false);
     }
   };
-  
+
+  // Fix handleUpgradeFacility with proper typescript return types
   const handleUpgradeFacility = async () => {
+    setIsUpgrading(true);
+    
     try {
-      setIsUpgrading(true);
-      await writeContract({
-        address: CONTRACT_ADDRESSES.MAIN,
-        abi: MAIN_CONTRACT_ABI,
-        functionName: 'upgradeFacility',
-      });
-      await refetchStats();
+      if (!address) {
+        throw new Error('Address not found');
+      }
+      
+      console.log('Upgrading facility...');
+      let hash: `0x${string}` | undefined;
+      
+      try {
+        hash = await writeContract({
+          address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
+          abi: MAIN_CONTRACT_ABI,
+          functionName: 'upgradeFacility',
+          args: [], // No arguments needed for upgradeFacility
+          account: address as `0x${string}`,
+          chain: publicClient?.chain
+        });
+        
+        console.log('Upgrade transaction hash:', hash);
+      } catch (writeError) {
+        console.error('Error sending upgrade transaction:', writeError);
+        throw writeError;
+      }
+      
+      if (!hash) {
+        throw new Error('Failed to get transaction hash');
+      }
+      
+      try {
+        const receipt = await publicClient.waitForTransactionReceipt({
+          hash: hash,
+        });
+        console.log('Upgrade confirmed:', receipt);
+        
+        // Update game state after successful upgrade
+        setTimeout(async () => {
+          try {
+            console.log("Refreshing game state after facility upgrade");
+            await refetchUserInfo();
+            alert('Facility upgraded successfully!');
+          } catch (refreshError) {
+            console.error("Error refreshing game state:", refreshError);
+          }
+        }, 2000);
+        
+        return true;
+      } catch (error) {
+        console.error('Error waiting for upgrade confirmation:', error);
+        throw new Error('Upgrade transaction failed');
+      }
     } catch (error) {
       console.error('Error upgrading facility:', error);
+      
+      // Check if user rejected the transaction
+      if (error.message?.includes('User rejected') || error.message?.includes('user rejected') || error.code === 4001) {
+        console.log('User rejected upgrade transaction');
+        alert('You canceled the facility upgrade.');
+        return false;
+      }
+      
+      alert(`Error upgrading facility: ${error.message}`);
+      return false;
     } finally {
       setIsUpgrading(false);
     }
   };
 
-  const handleGetStarterMiner = async (x: number, y: number) => {
-    if (!address) {
-      console.error('No wallet connected');
-      alert('Please connect your wallet to claim your starter miner');
-      return;
-    }
-
+  // Fix handleGetStarterMiner with proper typescript return types
+  const handleGetStarterMiner = async () => {
+    setIsGettingStarterMiner(true);
+    
     try {
-      setIsGettingStarterMiner(true);
+      console.log('Getting starter miner...');
+      if (!address) {
+        throw new Error('Address not found');
+      }
       
-      // Safely log the attempt
-      console.log('Claiming starter miner at position:', {x, y}, 'for address:', address);
+      let hash: `0x${string}` | undefined;
       
       try {
-        // Submit transaction with enhanced error handling
-        writeContract({
-          address: CONTRACT_ADDRESSES.MAIN,
+        hash = await writeContract({
+          address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
           abi: MAIN_CONTRACT_ABI,
           functionName: 'getFreeStarterMiner',
-          args: [BigInt(x), BigInt(y)],
-        }, {
-          onSuccess: async (txHash) => {
-            console.log('Starter miner transaction submitted:', txHash);
-            
-            // Force refresh to update UI
-            await refetchStarterMiner();
-            await refetchMinerIds();
-            
-            // Show success and update UI state
-            alert('Starter miner transaction submitted successfully!');
-            setIsGettingStarterMiner(false);
-          },
-          onError: (error) => {
-            console.error('Error claiming starter miner:', error);
-            
-            // Show user-friendly error
-            if (error.message?.includes('user rejected')) {
-              alert('Transaction cancelled by user');
-            } else if (error.message?.includes('insufficient funds')) {
-              alert('Insufficient funds for gas. Please make sure you have enough APE for transaction fees.');
-            } else if (error.message?.includes('already claimed')) { 
-              alert('You have already claimed your free starter miner');
-              // Force refresh to update UI
-              refetchStarterMiner();
-              refetchMinerIds();
-            } else if (error.message?.includes('connector.getChainId') || error.message?.includes('connector is not')) {
-              alert('Wallet connection issue. Please try disconnecting and reconnecting your wallet.');
-            } else {
-              alert(`Failed to claim starter miner: ${error.message || 'Unknown error'}`);
-            }
-            
-            setIsGettingStarterMiner(false);
-          }
+          args: [BigInt(0), BigInt(0)], // Pass coordinates for the miner placement
+          account: address as `0x${string}`,
+          chain: publicClient?.chain
         });
-      } catch (txError) {
-        console.error('Error preparing starter miner transaction:', txError);
         
-        // Handle wallet connector errors
-        if (typeof txError === 'object' && txError && 
-           (txError.message?.includes('connector') || 
-            txError.message?.includes('getChainId') || 
-            txError.message?.includes('is not a function'))) {
-          alert('Your wallet connection is having issues. Please try reconnecting your wallet.');
-        } else {
-          alert('Failed to prepare transaction. Please try again.');
-        }
+        console.log('Starter miner transaction hash:', hash);
+      } catch (writeError) {
+        console.error('Error sending starter miner transaction:', writeError);
+        throw writeError;
+      }
+      
+      if (!hash) {
+        throw new Error('Failed to get transaction hash');
+      }
+      
+      try {
+        const receipt = await publicClient.waitForTransactionReceipt({
+          hash: hash,
+        });
+        console.log('Starter miner confirmed:', receipt);
         
-        setIsGettingStarterMiner(false);
+        // Update game state after getting starter miner
+        setTimeout(async () => {
+          try {
+            console.log("Refreshing game state after getting starter miner");
+            await refetchUserInfo();
+            alert('Starter miner claimed successfully!');
+          } catch (refreshError) {
+            console.error("Error refreshing game state:", refreshError);
+          }
+        }, 2000);
+        
+        return true;
+      } catch (error) {
+        console.error('Error waiting for starter miner confirmation:', error);
+        throw new Error('Starter miner transaction failed');
       }
     } catch (error) {
-      console.error('Unexpected error claiming starter miner:', error);
-      alert('An unexpected error occurred. Please refresh the page and try again.');
+      console.error('Error getting starter miner:', error);
+      
+      // Check if user rejected the transaction
+      if (error.message?.includes('User rejected') || error.message?.includes('user rejected') || error.code === 4001) {
+        console.log('User rejected starter miner transaction');
+        alert('You canceled the starter miner claim.');
+        return false;
+      } else if (error.message?.includes('execution reverted')) {
+        alert('You already have a starter miner!');
+        return false;
+      } else {
+        alert(`Error getting starter miner: ${error.message}`);
+        return false;
+      }
+    } finally {
       setIsGettingStarterMiner(false);
     }
   };
@@ -755,195 +932,186 @@ export function useGameState(): GameState {
     await refetchMinerIds();
   };
 
-  // Add purchase miner function
-  const handlePurchaseMiner = async (minerType: MinerType, x: number, y: number) => {
-    if (!address) {
-      console.error('Cannot purchase miner: wallet not connected');
-      alert('Please connect your wallet to purchase a miner');
-      return;
-    }
+  // Handle purchasing a miner with BIT token
+  const handlePurchaseMiner = async (minerType: number, x: number, y: number) => {
+    setIsPurchasingMiner(true);
     
     try {
-      console.log(`=== MINER PURCHASE FLOW STARTED ===`);
-      console.log(`Attempting to purchase miner type ${minerType} at position (${x}, ${y})`);
-      console.log(`Using BIT token address: ${BIT_TOKEN_ADDRESS}`);
-      console.log(`Using MAIN contract address: ${CONTRACT_ADDRESSES.MAIN}`);
+      console.log("User has BIT balance:", bitBalance);
+      console.log(`Attempting to purchase miner of type ${minerType} at position (${x}, ${y})`);
       
-      setIsPurchasingMiner(true);
+      // Create a localStorage cache for allowances to avoid unnecessary approval requests
+      const allowanceCacheKey = `bit_allowance_${address}`;
+      let cachedAllowance = localStorage.getItem(allowanceCacheKey);
+      let currentAllowance: bigint;
       
-      // Validate contract addresses first to prevent undefined errors
-      if (!BIT_TOKEN_ADDRESS) {
-        throw new Error('BIT token address is not defined');
-      }
-      
-      if (!CONTRACT_ADDRESSES.MAIN) {
-        throw new Error('Main contract address is not defined');
-      }
-      
-      // Verify we're on ApeChain
-      if (publicClient?.chain?.id !== APECHAIN_ID) {
-        console.error(`Wrong network: connected to ${publicClient?.chain?.name} but need ApeChain`);
-        alert('Please switch to ApeChain network to purchase a miner');
-        setIsPurchasingMiner(false);
-        return;
-      }
-      
-      // Validate that user has a facility
-      if (!hasFacility) {
-        console.error('You must purchase a facility before buying miners');
-        alert('You need to purchase a facility before buying miners. Please buy a facility first.');
-        setIsPurchasingMiner(false);
-        return;
-      }
-      
-      // For the free starter miner
-      if (minerType === MinerType.BANANA_MINER && !hasClaimedStarterMiner) {
-        console.log(`Processing free starter miner claim...`);
-        await handleGetStarterMiner(x, y);
-        return;
-      }
-      
-      // For paid miners
-      const minerConfig = MINERS[minerType];
-      console.log(`Miner config for type ${minerType}:`, minerConfig);
-      
-      // Log miner type information
-      if (minerType === MinerType.BANANA_MINER) {
-        console.log('Purchasing a BANANA MINER (Type 1)');
-      } else if (minerType === MinerType.MONKEY_TOASTER) {
-        console.log('Purchasing a MONKEY TOASTER (Type 2)');
-      } else if (minerType === MinerType.APEPAD_MINI) {
-        console.log('Purchasing an APEPAD MINI (Type 3)');
-      } else if (minerType === MinerType.GORILLA_GADGET) {
-        console.log('Purchasing a GORILLA GADGET (Type 4)');
-      }
-      
-      const minerPrice = minerConfig.price.toString();
-      const formattedPrice = parseEther(minerPrice);
-      
-      console.log(`=== MINER TRANSACTION INFO ===`);
-      console.log(`Miner price: ${minerPrice} BIT (${formattedPrice} wei)`);
-      
-      // Check if user has enough BIT tokens
-      const bitBalanceBigInt = bitBalanceData ? (bitBalanceData as bigint) : BigInt(0);
-      if (bitBalanceBigInt < formattedPrice) {
-        console.error(`Insufficient BIT balance: have ${formatEther(bitBalanceBigInt)}, need ${minerPrice}`);
-        alert(`You don't have enough BIT tokens. You need ${minerPrice} BIT to purchase this miner.`);
-        setIsPurchasingMiner(false);
-        return;
-      }
-      
-      // Check and handle token approval for paid miners
-      if (minerPrice !== '0') {
-        console.log(`=== CHECKING TOKEN APPROVAL ===`);
-        
-        // IMPORTANT: Make sure we have publicClient before proceeding
-        if (!publicClient) {
-          throw new Error('Public client not available, cannot check allowance');
+      if (cachedAllowance) {
+        console.log("Using cached allowance:", cachedAllowance);
+        currentAllowance = BigInt(cachedAllowance);
+      } else {
+        // Read allowance from contract
+        if (!address) {
+          throw new Error("Address not found");
         }
         
-        // First check current allowance
         try {
-          const allowanceResult = await publicClient.readContract({
-            address: BIT_TOKEN_ADDRESS as `0x${string}`,
+          console.log("Reading allowance from contract");
+          const allowanceData = await publicClient.readContract({
+            address: CONTRACT_ADDRESSES.BIT_TOKEN as `0x${string}`,
             abi: BIT_TOKEN_ABI,
             functionName: 'allowance',
-            args: [address as `0x${string}`, CONTRACT_ADDRESSES.MAIN as `0x${string}`]
+            args: [address, CONTRACT_ADDRESSES.MAIN],
           });
           
-          const currentAllowance = allowanceResult as bigint;
-          console.log(`Current token allowance: ${formatEther(currentAllowance)} BIT`);
+          currentAllowance = allowanceData as bigint;
+          console.log("Current allowance:", formatEther(currentAllowance));
           
-          // If allowance is insufficient, request approval first
-          if (currentAllowance < formattedPrice) {
-            console.log('Insufficient allowance. Requesting approval first...');
-            
-            // Use a safe approval amount (100 BIT)
-            const safeApprovalAmount = parseEther('100');
-            
-            // Request token approval
-            writeContract({
-              address: BIT_TOKEN_ADDRESS as `0x${string}`,
-              abi: BIT_TOKEN_ABI,
-              functionName: 'approve',
-              args: [CONTRACT_ADDRESSES.MAIN as `0x${string}`, safeApprovalAmount]
-            }, {
-              onSuccess: async (txHash) => {
-                console.log('Approval transaction submitted:', txHash);
-                
-                try {
-                  // Wait for approval to be confirmed
-                  const receipt = await publicClient.waitForTransactionReceipt({
-                    hash: txHash
-                  });
-                  
-                  console.log('Approval confirmed:', receipt);
-                  
-                  // Now proceed with the purchase
-                  purchaseMinerAfterApproval(minerType, x, y);
-                } catch (error) {
-                  console.error('Error waiting for approval confirmation:', error);
-                  alert('There was an error confirming your approval transaction. Please try again.');
-                  setIsPurchasingMiner(false);
-                }
-              },
-              onError: (error) => {
-                console.error('Error approving token spend:', error);
-                alert('Failed to approve BIT token spending: ' + error.message);
-                setIsPurchasingMiner(false);
-              }
+          // Cache the allowance
+          localStorage.setItem(allowanceCacheKey, currentAllowance.toString());
+        } catch (error) {
+          console.error("Error reading allowance:", error);
+          throw new Error("Failed to read token allowance");
+        }
+      }
+      
+      // Get miner cost from contract
+      const minerCostResult = await publicClient.readContract({
+        address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
+        abi: MAIN_CONTRACT_ABI,
+        functionName: 'buyMinerCost',
+        args: [BigInt(minerType)],
+      });
+      
+      // Convert result to bigint, handling potential array return
+      const minerCost = typeof minerCostResult === 'bigint' 
+        ? minerCostResult 
+        : Array.isArray(minerCostResult) && minerCostResult.length > 0 
+          ? minerCostResult[0] as bigint
+          : BigInt(0);
+      
+      console.log("Miner cost:", formatEther(minerCost));
+      
+      // Check if we have enough allowance, if not, request approval
+      if (currentAllowance < minerCost) {
+        console.log("Allowance insufficient, requesting approval");
+        // The max approval amount (uint256 max value)
+        const maxApprovalAmount = BigInt("115792089237316195423570985008687907853269984665640564039457584007913129639935");
+        
+        try {
+          // Request approval for spending BIT
+          const hash = await publicClient.writeContract({
+            address: CONTRACT_ADDRESSES.BIT_TOKEN as `0x${string}`,
+            abi: BIT_TOKEN_ABI,
+            functionName: 'approve',
+            args: [CONTRACT_ADDRESSES.MAIN, maxApprovalAmount],
+            account: address as `0x${string}`,
+            chain: publicClient?.chain
+          });
+          
+          console.log("Approval transaction submitted:", hash);
+          
+          // Wait for the approval to be confirmed
+          try {
+            const receipt = await publicClient.waitForTransactionReceipt({
+              hash,
             });
-          } else {
-            // Allowance is sufficient, proceed with purchase
-            console.log('Token allowance is sufficient. Proceeding with purchase...');
-            purchaseMinerAfterApproval(minerType, x, y);
+            console.log("Approval confirmed:", receipt);
+            
+            // Update the cached allowance
+            localStorage.setItem(allowanceCacheKey, maxApprovalAmount.toString());
+            
+            // Proceed with purchase after approval
+            return await purchaseMinerAfterApproval(minerType, x, y);
+          } catch (error) {
+            console.error("Error waiting for approval:", error);
+            throw new Error("Approval transaction failed");
           }
         } catch (error) {
-          console.error('Error checking allowance:', error);
-          alert('Failed to check your token allowance. Please try again.');
-          setIsPurchasingMiner(false);
+          // Check if user rejected the transaction
+          if (error.message?.includes('User rejected') || error.message?.includes('user rejected') || error.code === 4001) {
+            console.log("User rejected approval transaction");
+            alert("You need to approve the transaction to purchase a miner.");
+            setIsPurchasingMiner(false);
+            return false;
+          }
+          
+          console.error("Error approving token:", error);
+          throw new Error("Failed to approve token spending");
         }
       } else {
-        // Free miner (should not reach here, as free miners are handled above)
-        console.log('Free miner detected, proceeding with purchase...');
-        purchaseMinerAfterApproval(minerType, x, y);
+        console.log("Allowance sufficient, proceeding with purchase");
+        return await purchaseMinerAfterApproval(minerType, x, y);
       }
-    } catch (error: any) {
-      console.error('Error during miner purchase flow:', error);
-      alert(`Error purchasing miner: ${error.message || 'Unknown error'}`);
+    } catch (error) {
+      console.error("Error in purchase miner flow:", error);
+      
+      // Check if user rejected the transaction
+      if (error.message?.includes('User rejected') || error.message?.includes('user rejected') || error.code === 4001) {
+        console.log("User rejected transaction");
+        alert("Purchase canceled.");
+      } else {
+        alert(`Error purchasing miner: ${error.message}`);
+      }
+      
+      return false;
+    } finally {
       setIsPurchasingMiner(false);
     }
   };
-  
-  // Helper function to handle the actual miner purchase after approval
-  const purchaseMinerAfterApproval = (minerType: MinerType, x: number, y: number) => {
-    console.log(`Executing miner purchase for type ${minerType} at (${x}, ${y})`);
-    
-    // Add retry logic for the miner purchase
-    retryContractCall(async () => {
-      const config = {
+
+  const purchaseMinerAfterApproval = async (minerType: number, x: number, y: number) => {
+    try {
+      console.log(`Executing miner purchase of type ${minerType} at (${x}, ${y})`);
+      
+      if (!address) {
+        throw new Error("Address not found");
+      }
+      
+      // Submit the transaction to purchase the miner
+      const hash = await publicClient.writeContract({
         address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
         abi: MAIN_CONTRACT_ABI,
-        functionName: 'buyMiner',
-        args: [BigInt(minerType), BigInt(x), BigInt(y)]
-      };
+        functionName: 'purchaseMiner',
+        args: [minerType, x, y],
+        account: address as `0x${string}`,
+        chain: publicClient?.chain
+      });
       
-      return writeContract({
-        ...config,
-        chain: publicClient?.chain,
-        account: address
-      } as any);
-    }).catch(error => {
-      console.error('Final miner purchase error:', error);
-      setIsPurchasingMiner(false);
+      console.log("Purchase transaction submitted:", hash);
       
-      // Provide specific error message for MetaMask issues
-      if (error.message?.includes('MetaMask')) {
-        alert('MetaMask is having trouble. Please refresh the page or restart MetaMask, then try again.');
-      } else {
-        alert(`Error purchasing miner: ${error.message || 'Unknown error'}`);
+      // Wait for the transaction to be confirmed
+      try {
+        const receipt = await publicClient.waitForTransactionReceipt({
+          hash,
+        });
+        console.log("Purchase confirmed:", receipt);
+        
+        // Update game state after successful purchase
+        setTimeout(async () => {
+          try {
+            console.log("Refreshing game state after miner purchase");
+            await refetchUserInfo();
+            alert("Miner purchased successfully!");
+          } catch (refreshError) {
+            console.error("Error refreshing game state:", refreshError);
+          }
+        }, 2000);
+        
+        return true;
+      } catch (error) {
+        console.error("Error waiting for purchase confirmation:", error);
+        throw new Error("Purchase transaction failed");
       }
-    });
+    } catch (error) {
+      // Check if user rejected the transaction
+      if (error.message?.includes('User rejected') || error.message?.includes('user rejected') || error.code === 4001) {
+        console.log("User rejected purchase transaction");
+        return false;
+      }
+      
+      console.error("Error purchasing miner:", error);
+      throw error;
+    }
   };
 
   const refetchAll = () => {
