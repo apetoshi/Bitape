@@ -34,7 +34,7 @@ export const metadata: Metadata = {
     description: 'Mine BitApe with your virtual mining facility on ApeChain',
     images: [
       {
-        url: 'https://bitape.org/opengraph-image.png',
+        url: '/opengraph-image.png',
         width: 1200,
         height: 630,
         alt: 'BitApe Logo',
@@ -48,7 +48,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'BitApe - A Peer-to-Peer Electronic Ape Cash System',
     description: 'Mine BitApe with your virtual mining facility on ApeChain',
-    images: ['https://bitape.org/opengraph-image.png'],
+    images: ['/opengraph-image.png'],
     creator: '@BitApeOrg',
   },
 };
