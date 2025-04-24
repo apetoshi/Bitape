@@ -9,8 +9,55 @@
   --banana: #FFDD00;
   --banana-gradient-start: #F0B90B;
   --banana-gradient-end: #FFDD00;
-  --royal: #001420;
-  --dark-blue: #000710;
+  --darkGrey: #212121;
+  --purple: #330033;
+  --darkPurple: #220022;
+  --screen-scale: 1;
+}
+
+/* Apply scaling specifically for laptop screens */
+@media (min-width: 1024px) and (max-width: 1536px) {
+  :root {
+    --screen-scale: 0.9;
+  }
+}
+
+/* Scale down UI elements on medium-sized screens (laptops) */
+@media (min-width: 1024px) and (max-width: 1680px) {
+  :root {
+    --screen-scale: 0.9;
+  }
+  
+  /* Apply scaling to major containers */
+  .container,
+  .max-w-md,
+  .max-w-lg,
+  .max-w-xl,
+  .max-w-2xl,
+  .max-w-3xl,
+  .max-w-4xl,
+  .max-w-5xl,
+  .max-w-6xl,
+  .max-w-7xl {
+    transform: scale(var(--screen-scale));
+    transform-origin: top center;
+  }
+  
+  /* Adjust font sizes for better readability */
+  .font-press-start {
+    font-size: calc(1em * var(--screen-scale));
+  }
+  
+  /* Adjust padding and margins */
+  .p-2, .p-3, .p-4, .p-5, .p-6,
+  .px-2, .px-3, .px-4, .px-5, .px-6,
+  .py-2, .py-3, .py-4, .py-5, .py-6,
+  .m-2, .m-3, .m-4, .m-5, .m-6,
+  .mx-2, .mx-3, .mx-4, .mx-5, .mx-6,
+  .my-2, .my-3, .my-4, .my-5, .my-6 {
+    padding: calc(var(--padding, 0.5rem) * var(--screen-scale));
+    margin: calc(var(--margin, 0.5rem) * var(--screen-scale));
+  }
 }
 
 /* ApeChain branded gradient */
@@ -251,4 +298,36 @@ body {
 
 .animate-fadeIn {
   animation: fadeIn 0.3s ease-out forwards;
+}
+
+@layer components {
+  .card {
+    @apply bg-darkPurple border-2 border-banana flex flex-col items-center justify-center py-6 px-4 rounded-sm;
+    transform: scale(var(--screen-scale));
+  }
+
+  .container {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+    transform: scale(var(--screen-scale));
+    transform-origin: top center;
+  }
+
+  .dashboard-card {
+    transform: scale(var(--screen-scale));
+    transform-origin: center;
+  }
+
+  .responsive-scale {
+    transform: scale(var(--screen-scale));
+    transform-origin: center;
+  }
+
+  /* Only apply to specific UI components that need scaling */
+  .dashboard-container {
+    @apply responsive-scale;
+  }
+
+  .room-visualization {
+    @apply responsive-scale;
+  }
 } 

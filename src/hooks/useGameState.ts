@@ -634,7 +634,7 @@ export function useGameState(): GameState {
         // If simulation fails with a non-user rejection, show error and exit
         if (!simError.message?.includes('User rejected') && 
             !simError.message?.includes('user rejected') && 
-            !simError.code === 4001) {
+            simError.code !== 4001) {
           alert(`Cannot purchase facility: ${simError.message}`);
           return false;
         }
@@ -642,7 +642,7 @@ export function useGameState(): GameState {
       }
       
       // Send the transaction - this will open the wallet for user confirmation
-      const hash = await writeContract({
+      const hash = await writeContractAsync({
         address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
         abi: MAIN_CONTRACT_ABI,
         functionName: 'purchaseInitialFacility',
@@ -702,7 +702,7 @@ export function useGameState(): GameState {
     }
   };
 
-  // Fix handleClaimRewards
+  // Fix handleClaimRewards to use writeContractAsync
   const handleClaimRewards = async () => {
     setIsClaimingReward(true);
     try {
@@ -711,7 +711,7 @@ export function useGameState(): GameState {
       }
       
       console.log('Claiming rewards from', CONTRACT_ADDRESSES.MAIN);
-      const hash = await writeContract({
+      const hash = await writeContractAsync({
         address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
         abi: MAIN_CONTRACT_ABI,
         functionName: 'claimRewards',
@@ -767,10 +767,10 @@ export function useGameState(): GameState {
       }
       
       console.log('Upgrading facility...');
-      let hash: `0x${string}` | undefined;
+      let hash: `0x${string}`;
       
       try {
-        hash = await writeContract({
+        hash = await writeContractAsync({
           address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
           abi: MAIN_CONTRACT_ABI,
           functionName: 'upgradeFacility',
@@ -791,7 +791,7 @@ export function useGameState(): GameState {
       
       try {
         const receipt = await publicClient.waitForTransactionReceipt({
-          hash: hash,
+          hash: hash as `0x${string}`,
         });
         console.log('Upgrade confirmed:', receipt);
         
@@ -828,7 +828,7 @@ export function useGameState(): GameState {
     }
   };
 
-  // Fix handleGetStarterMiner with proper typescript return types
+  // Fix handleGetStarterMiner with proper typescript and remove duplicate hash declarations
   const handleGetStarterMiner = async () => {
     setIsGettingStarterMiner(true);
     
@@ -838,31 +838,24 @@ export function useGameState(): GameState {
         throw new Error('Address not found');
       }
       
-      let hash: `0x${string}` | undefined;
-      
       try {
-        hash = await writeContract({
+        const hash = await writeContractAsync({
           address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
           abi: MAIN_CONTRACT_ABI,
           functionName: 'getFreeStarterMiner',
-          args: [], // No arguments needed for getFreeStarterMiner
+          args: undefined, // No arguments needed
           account: address as `0x${string}`,
           chain: publicClient?.chain
         });
         
         console.log('Starter miner transaction hash:', hash);
-      } catch (writeError) {
-        console.error('Error sending starter miner transaction:', writeError);
-        throw writeError;
-      }
-      
-      if (!hash) {
-        throw new Error('Failed to get transaction hash');
-      }
-      
-      try {
+        
+        if (!hash) {
+          throw new Error('Failed to get transaction hash');
+        }
+        
         const receipt = await publicClient.waitForTransactionReceipt({
-          hash: hash,
+          hash,
         });
         console.log('Starter miner confirmed:', receipt);
         
@@ -878,9 +871,9 @@ export function useGameState(): GameState {
         }, 2000);
         
         return true;
-      } catch (error) {
-        console.error('Error waiting for starter miner confirmation:', error);
-        throw new Error('Starter miner transaction failed');
+      } catch (txError) {
+        console.error('Error in starter miner transaction:', txError);
+        throw txError;
       }
     } catch (error) {
       console.error('Error getting starter miner:', error);
@@ -1194,7 +1187,8 @@ export function useGameState(): GameState {
     setIsPurchasingMiner(true);
     
     try {
-      console.log("User has BIT balance:", formatEther(bitBalance));
+      // Log balance without using formatEther to avoid type errors
+      console.log("User has BIT balance:", bitBalance);
       console.log(`Attempting to purchase miner of type ${minerType} at position (${x}, ${y})`);
       
       // Check conditions before proceeding

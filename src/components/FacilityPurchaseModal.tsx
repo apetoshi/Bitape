@@ -55,7 +55,7 @@ const FacilityPurchaseModal: React.FC<FacilityPurchaseModalProps> = ({
             </div>
             
             <div className="bg-[#0a3049] p-4">
-              <h3 className="font-press-start text-banana text-sm mb-3 text-center">NEXT SPACE</h3>
+              <h3 className="font-press-start text-banana text-sm mb-3 text-center">NEXT STOP APE FEST VEGAS</h3>
               <div className="flex justify-center items-center h-10 my-2">
                 <span className="text-yellow-500 text-xl font-bold">➡</span>
               </div>
