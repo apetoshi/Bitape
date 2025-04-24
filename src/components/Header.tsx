@@ -12,6 +12,7 @@ import { useAccount, useDisconnect } from 'wagmi';
 import { FaChevronDown } from 'react-icons/fa';
 import ReferralModal from './ReferralModal';
 import AnnouncementsModal from './AnnouncementsModal';
+import DisclaimerModal from './DisclaimerModal';
 
 const ConnectButton = dynamic(() => import('@/components/ConnectWalletButton'), {
   ssr: false
@@ -34,6 +35,7 @@ const Header: React.FC = () => {
   const { isOpen: isProfileOpen, onOpen: onProfileOpen, onClose: onProfileClose } = useDisclosure();
   const { isOpen: isReferralOpen, onOpen: onReferralOpen, onClose: onReferralClose } = useDisclosure();
   const { isOpen: isAnnouncementsOpen, onOpen: onAnnouncementsOpen, onClose: onAnnouncementsClose } = useDisclosure();
+  const { isOpen: isDisclaimerOpen, onOpen: onDisclaimerOpen, onClose: onDisclaimerClose } = useDisclosure();
   const { address, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
   const { apeBalance, bitBalance, totalReferrals, totalBitEarned } = useGameState();
@@ -63,22 +65,13 @@ const Header: React.FC = () => {
   };
 
   return (
-    <header className="nav-bar flex justify-between items-center px-3 sm:px-4 py-2 relative z-30">
-      <div className="flex items-center">
-        <Link href="/" className="flex items-center">
-          <Image
-            src="/bitape.png"
-            alt="BitApe Logo"
-            width={120}
-            height={120}
-            className="hover:opacity-80 transition-opacity -my-1"
-            priority
-          />
-        </Link>
+    <header className="nav-bar flex justify-between items-center px-2 sm:px-3 py-1 relative z-30">
+      <div className="flex-none">
+        {/* Logo removed from here to save space, will be used directly in LandingPage */}
       </div>
       
-      {/* Connect wallet button - always visible */}
-      <div className="flex items-center">
+      {/* Central connect wallet button */}
+      <div className="flex-grow flex justify-center items-center mx-2">
         {isConnected && address ? (
           <button
             onClick={onProfileOpen}
@@ -95,38 +88,38 @@ const Header: React.FC = () => {
             <FaChevronDown className="w-3 h-3 text-yellow-400" />
           </button>
         ) : (
-          <div className="scale-90 transform-origin-right">
+          <div className="scale-90 transform-origin-center">
             <ConnectButton />
           </div>
         )}
       </div>
       
-      {/* Desktop navigation - hidden on mobile since we use dock menu there */}
-      <nav className="hidden md:flex items-center ml-6 space-x-3">
+      {/* Desktop navigation - right aligned */}
+      <nav className="hidden md:flex items-center flex-none space-x-2">
         <Link href="/about" className="font-press-start text-white text-xs hover:text-banana">
           ABOUT
         </Link>
-        <span className="font-press-start text-gray-500 text-xs cursor-not-allowed">
-          TRADE $BIT
-        </span>
-        <span className="font-press-start text-gray-500 text-xs cursor-not-allowed">
+        <Link href="/leaderboard" className="font-press-start text-white text-xs hover:text-banana">
           LEADERBOARD
-        </span>
+        </Link>
         <button 
           onClick={onReferralOpen}
-          className="pixel-button text-xs py-1 px-2"
+          className="font-press-start text-white text-xs hover:text-banana"
         >
           REFER
         </button>
         <button 
           onClick={onAnnouncementsOpen}
-          className="pixel-button text-xs py-1 px-2"
+          className="font-press-start text-white text-xs hover:text-banana"
         >
           ANNOUNCEMENTS
         </button>
-        <span className="font-press-start text-gray-500 text-xs cursor-not-allowed">
+        <button 
+          onClick={onDisclaimerOpen}
+          className="font-press-start text-white text-xs hover:text-banana"
+        >
           DISCLAIMER
-        </span>
+        </button>
       </nav>
 
       {isConnected && address && (
@@ -149,6 +142,11 @@ const Header: React.FC = () => {
       <AnnouncementsModal
         isOpen={isAnnouncementsOpen}
         onClose={onAnnouncementsClose}
+      />
+      
+      <DisclaimerModal
+        isOpen={isDisclaimerOpen}
+        onClose={onDisclaimerClose}
       />
     </header>
   );
