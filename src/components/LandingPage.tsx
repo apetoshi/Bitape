@@ -10,14 +10,12 @@ import { useContractRead } from 'wagmi';
 import { CONTRACT_ADDRESSES, MAIN_CONTRACT_ABI } from '../config/contracts';
 import { formatUnits } from 'viem';
 import ThreeJSGlobe from './ThreeJSGlobe';
-import ThreeJSBitcoin from './ThreeJSBitcoin';
 import AnimatedCounter from './AnimatedCounter';
 
 const LandingPage = () => {
   const router = useRouter();
   const { isConnected, address } = useAccount();
   const [minedBit, setMinedBit] = useState(0);
-  const [use3DGlobe, setUse3DGlobe] = useState(true); // Switch between globe and bitcoin
   const [dimensions, setDimensions] = useState({ width: 200, height: 200 });
 
   // Handle responsive sizing
@@ -69,15 +67,6 @@ const LandingPage = () => {
       }
     }
   }, [totalSupplyData]);
-
-  // Toggle between globe and bitcoin every 15 seconds for added visual interest
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      setUse3DGlobe(prev => !prev);
-    }, 15000);
-    
-    return () => clearInterval(intervalId);
-  }, []);
 
   useEffect(() => {
     if (isConnected && address) {
@@ -172,13 +161,9 @@ const LandingPage = () => {
           </p>
 
           <div className="my-6 md:my-10">
-            {/* Responsive 3D component - sized based on viewport */}
+            {/* ApeChain themed 3D globe */}
             <div className="relative w-[200px] h-[200px] md:w-[300px] md:h-[300px] mx-auto">
-              {use3DGlobe ? (
-                <ThreeJSGlobe width={dimensions.width} height={dimensions.height} />
-              ) : (
-                <ThreeJSBitcoin width={dimensions.width} height={dimensions.height} />
-              )}
+              <ThreeJSGlobe width={dimensions.width} height={dimensions.height} />
             </div>
           </div>
 
