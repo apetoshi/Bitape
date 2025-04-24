@@ -917,6 +917,278 @@ export function useGameState(): GameState {
     await refetchMinerIds();
   };
 
+  // Add a helper function to check conditions before purchase
+  const checkBeforePurchase = async (minerType: number, x: number, y: number): Promise<{ canPurchase: boolean; reason?: string }> => {
+    if (!address || !publicClient) {
+      return { canPurchase: false, reason: "Wallet not connected" };
+    }
+    
+    try {
+      // 1. Check if the coordinates are already occupied
+      let isOccupied = false;
+      try {
+        // Check if there's a player miner at that location
+        const playerMiners = await publicClient.readContract({
+          address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
+          abi: MAIN_CONTRACT_ABI,
+          functionName: 'getPlayerMinersPaginated',
+          args: [address, BigInt(0), BigInt(100)]
+        });
+        
+        if (Array.isArray(playerMiners)) {
+          isOccupied = playerMiners.some(miner => 
+            Number(miner.x) === x && Number(miner.y) === y
+          );
+          
+          if (isOccupied) {
+            return { canPurchase: false, reason: `Position (${x}, ${y}) is already occupied by another miner` };
+          }
+        }
+      } catch (error) {
+        console.warn("Error checking if position is occupied:", error);
+        // Continue with other checks
+      }
+      
+      // 2. Check if player has enough BIT tokens to buy this miner
+      try {
+        // Get miner cost
+        const minerData = await publicClient.readContract({
+          address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
+          abi: MAIN_CONTRACT_ABI,
+          functionName: 'miners',
+          args: [BigInt(minerType)]
+        });
+        
+        if (Array.isArray(minerData) && minerData.length > 6) {
+          const cost = minerData[6] as bigint;
+          const playerBitBalance = await publicClient.readContract({
+            address: BIT_TOKEN_ADDRESS as `0x${string}`,
+            abi: BIT_TOKEN_ABI,
+            functionName: 'balanceOf',
+            args: [address]
+          });
+          
+          console.log(`Miner cost: ${formatEther(cost)} BIT, Player BIT balance: ${formatEther(playerBitBalance as bigint)}`);
+          
+          if ((playerBitBalance as bigint) < cost) {
+            return { 
+              canPurchase: false, 
+              reason: `Insufficient BIT tokens. Need ${formatEther(cost)} BIT, you have ${formatEther(playerBitBalance as bigint)} BIT` 
+            };
+          }
+        }
+      } catch (error) {
+        console.warn("Error checking BIT balance:", error);
+        // Continue with other checks
+      }
+      
+      // 3. Check if player has enough space and power for this miner
+      try {
+        // Get facility data
+        const facilityData = await publicClient.readContract({
+          address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
+          abi: MAIN_CONTRACT_ABI,
+          functionName: 'ownerToFacility',
+          args: [address]
+        });
+        
+        if (Array.isArray(facilityData) && facilityData.length >= 5) {
+          const maxMiners = facilityData[1] as bigint;
+          const currMiners = facilityData[2] as bigint;
+          const totalPower = facilityData[3] as bigint;
+          const usedPower = facilityData[4] as bigint;
+          
+          // Get miner power consumption
+          const minerData = await publicClient.readContract({
+            address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
+            abi: MAIN_CONTRACT_ABI,
+            functionName: 'miners',
+            args: [BigInt(minerType)]
+          });
+          
+          if (Array.isArray(minerData) && minerData.length > 5) {
+            const powerConsumption = minerData[5] as bigint;
+            
+            // Check space
+            if (currMiners >= maxMiners) {
+              return { canPurchase: false, reason: "No space left in your facility" };
+            }
+            
+            // Check power
+            if (usedPower + powerConsumption > totalPower) {
+              return { 
+                canPurchase: false, 
+                reason: `Not enough power. Need ${powerConsumption} watts, have ${totalPower - usedPower} watts available` 
+              };
+            }
+          }
+        }
+      } catch (error) {
+        console.warn("Error checking facility capacity:", error);
+        // Continue with other checks
+      }
+      
+      // All checks passed
+      return { canPurchase: true };
+    } catch (error) {
+      console.error("Error in purchase validation checks:", error);
+      return { canPurchase: false, reason: "Error validating purchase conditions" };
+    }
+  };
+
+  const purchaseMinerAfterApproval = async (minerType: number, x: number, y: number) => {
+    try {
+      console.log(`Executing miner purchase of type ${minerType} at (${x}, ${y})`);
+      
+      if (!address) {
+        throw new Error("Address not found");
+      }
+      
+      // Perform pre-purchase checks
+      const validation = await checkBeforePurchase(minerType, x, y);
+      if (!validation.canPurchase) {
+        console.error(`Cannot purchase miner: ${validation.reason}`);
+        alert(`Cannot purchase miner: ${validation.reason}`);
+        return false;
+      }
+      
+      // Log all parameters being sent to contract for debugging
+      console.log("Purchase parameters:", {
+        contract: CONTRACT_ADDRESSES.MAIN,
+        function: "buyMiner (0x476e2e66)",
+        minerIndex: minerType,
+        x: x,
+        y: y,
+        sender: address
+      });
+      
+      // Improve error handling with a try-catch specifically for simulation
+      try {
+        // Submit the transaction to purchase the miner - first simulate
+        const { request } = await publicClient.simulateContract({
+          address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
+          abi: MAIN_CONTRACT_ABI,
+          functionName: 'buyMiner',
+          args: [BigInt(minerType), BigInt(x), BigInt(y)],
+          account: address as `0x${string}`
+        });
+        
+        // Then execute the transaction 
+        const hash = await writeContractAsync(request);
+        
+        console.log("Purchase transaction submitted:", hash);
+        
+        // Wait for the transaction to be confirmed
+        try {
+          const receipt = await publicClient.waitForTransactionReceipt({
+            hash,
+          });
+          console.log("Purchase confirmed:", receipt);
+          
+          // Update game state after successful purchase
+          setTimeout(async () => {
+            try {
+              console.log("Refreshing game state after miner purchase");
+              await refetchUserInfo();
+              alert("Miner purchased successfully!");
+            } catch (refreshError) {
+              console.error("Error refreshing game state:", refreshError);
+            }
+          }, 2000);
+          
+          return true;
+        } catch (error) {
+          console.error("Error waiting for purchase confirmation:", error);
+          throw new Error("Purchase transaction failed");
+        }
+      } catch (simError) {
+        // Enhanced error logging for simulation errors
+        console.error("Contract simulation failed:", simError);
+        
+        // Check if it's the specific error we're seeing
+        if (typeof simError.message === 'string' && simError.message.includes('0xfbfd2f40')) {
+          console.error("Contract rejected the miner purchase with error 0xfbfd2f40.");
+          console.error("This might mean: insufficient funds, position already occupied, invalid miner type, or other contract condition not met.");
+          alert("Your miner purchase was rejected. Possible reasons: insufficient funds, position already occupied, or invalid miner type.");
+        } else {
+          // Generic error handling
+          throw simError;
+        }
+        return false;
+      }
+    } catch (error) {
+      // Check if user rejected the transaction
+      if (error.message?.includes('User rejected') || error.message?.includes('user rejected') || error.code === 4001) {
+        console.log("User rejected purchase transaction");
+        return false;
+      }
+      
+      console.error("Error purchasing miner:", error);
+      throw error;
+    }
+  };
+
+  const refetchAll = () => {
+    console.log('Refetching all game state data...');
+    refetchFacility();
+    refetchStats();
+    refetchStarterMiner();
+    refetchMinerIds();
+  };
+
+  // Add removeMiner loading state
+  const [isRemovingMiner, setIsRemovingMiner] = useState(false);
+  
+  // Add this function before the return statement
+  const handleRemoveMiner = async (minerId: number): Promise<boolean> => {
+    console.log(`Removing miner with ID: ${minerId}`);
+    
+    if (!address || !isConnected || !publicClient) {
+      console.error('Cannot remove miner: wallet not connected');
+      return false;
+    }
+    
+    try {
+      setIsRemovingMiner(true);
+      
+      // Call the sellMiner contract function
+      const { request } = await publicClient.simulateContract({
+        address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
+        abi: MAIN_CONTRACT_ABI,
+        functionName: 'sellMiner',
+        args: [BigInt(minerId)],
+        account: address
+      });
+      
+      const hash = await writeContractAsync(request);
+      console.log('Remove miner transaction submitted:', hash);
+      
+      // Wait for the transaction to be mined
+      if (hash) {
+        const receipt = await publicClient.waitForTransactionReceipt({ 
+          hash: hash 
+        });
+        
+        console.log('Remove miner transaction receipt:', receipt);
+        
+        // Refetch miners data
+        await refetchMiners();
+        
+        // Force a refresh of the UI
+        setForceRender(prev => !prev);
+        
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error removing miner:', error);
+      return false;
+    } finally {
+      setIsRemovingMiner(false);
+    }
+  };
+
   // Handle purchasing a miner with BIT token
   const handlePurchaseMiner = async (minerType: number, x: number, y: number) => {
     setIsPurchasingMiner(true);
@@ -924,6 +1196,14 @@ export function useGameState(): GameState {
     try {
       console.log("User has BIT balance:", formatEther(bitBalance));
       console.log(`Attempting to purchase miner of type ${minerType} at position (${x}, ${y})`);
+      
+      // Check conditions before proceeding
+      const validation = await checkBeforePurchase(minerType, x, y);
+      if (!validation.canPurchase) {
+        console.error(`Cannot purchase miner: ${validation.reason}`);
+        alert(`Cannot purchase miner: ${validation.reason}`);
+        return false;
+      }
       
       // Create a localStorage cache for allowances to avoid unnecessary approval requests
       const allowanceCacheKey = `bit_allowance_${address}`;
@@ -1041,124 +1321,6 @@ export function useGameState(): GameState {
       return false;
     } finally {
       setIsPurchasingMiner(false);
-    }
-  };
-
-  const purchaseMinerAfterApproval = async (minerType: number, x: number, y: number) => {
-    try {
-      console.log(`Executing miner purchase of type ${minerType} at (${x}, ${y})`);
-      
-      if (!address) {
-        throw new Error("Address not found");
-      }
-      
-      // Submit the transaction to purchase the miner - first simulate
-      const { request } = await publicClient.simulateContract({
-        address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
-        abi: MAIN_CONTRACT_ABI,
-        functionName: 'buyMiner',
-        args: [BigInt(minerType), BigInt(x), BigInt(y)],
-        account: address as `0x${string}`
-      });
-      
-      // Then execute the transaction
-      const hash = await writeContractAsync(request);
-      
-      console.log("Purchase transaction submitted:", hash);
-      
-      // Wait for the transaction to be confirmed
-      try {
-        const receipt = await publicClient.waitForTransactionReceipt({
-          hash,
-        });
-        console.log("Purchase confirmed:", receipt);
-        
-        // Update game state after successful purchase
-        setTimeout(async () => {
-          try {
-            console.log("Refreshing game state after miner purchase");
-            await refetchUserInfo();
-            alert("Miner purchased successfully!");
-          } catch (refreshError) {
-            console.error("Error refreshing game state:", refreshError);
-          }
-        }, 2000);
-        
-        return true;
-      } catch (error) {
-        console.error("Error waiting for purchase confirmation:", error);
-        throw new Error("Purchase transaction failed");
-      }
-    } catch (error) {
-      // Check if user rejected the transaction
-      if (error.message?.includes('User rejected') || error.message?.includes('user rejected') || error.code === 4001) {
-        console.log("User rejected purchase transaction");
-        return false;
-      }
-      
-      console.error("Error purchasing miner:", error);
-      throw error;
-    }
-  };
-
-  const refetchAll = () => {
-    console.log('Refetching all game state data...');
-    refetchFacility();
-    refetchStats();
-    refetchStarterMiner();
-    refetchMinerIds();
-  };
-
-  // Add removeMiner loading state
-  const [isRemovingMiner, setIsRemovingMiner] = useState(false);
-  
-  // Add this function before the return statement
-  const handleRemoveMiner = async (minerId: number): Promise<boolean> => {
-    console.log(`Removing miner with ID: ${minerId}`);
-    
-    if (!address || !isConnected || !publicClient) {
-      console.error('Cannot remove miner: wallet not connected');
-      return false;
-    }
-    
-    try {
-      setIsRemovingMiner(true);
-      
-      // Call the sellMiner contract function
-      const { request } = await publicClient.simulateContract({
-        address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
-        abi: MAIN_CONTRACT_ABI,
-        functionName: 'sellMiner',
-        args: [BigInt(minerId)],
-        account: address
-      });
-      
-      const hash = await writeContractAsync(request);
-      console.log('Remove miner transaction submitted:', hash);
-      
-      // Wait for the transaction to be mined
-      if (hash) {
-        const receipt = await publicClient.waitForTransactionReceipt({ 
-          hash: hash 
-        });
-        
-        console.log('Remove miner transaction receipt:', receipt);
-        
-        // Refetch miners data
-        await refetchMiners();
-        
-        // Force a refresh of the UI
-        setForceRender(prev => !prev);
-        
-        return true;
-      }
-      
-      return false;
-    } catch (error) {
-      console.error('Error removing miner:', error);
-      return false;
-    } finally {
-      setIsRemovingMiner(false);
     }
   };
 
