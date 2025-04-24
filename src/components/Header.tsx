@@ -63,7 +63,7 @@ const Header: React.FC = () => {
   };
 
   return (
-    <header className="nav-bar flex justify-between items-center px-3 sm:px-6 py-4 relative z-30">
+    <header className="nav-bar flex justify-between items-center px-3 sm:px-6 py-4 relative z-50 fixed top-0 left-0 right-0 bg-royal bg-opacity-95 backdrop-blur-sm">
       <div className="flex items-center">
         <Link href="/" className="flex items-center">
           <Image

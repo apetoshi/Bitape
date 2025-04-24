@@ -5,7 +5,7 @@ import Link from 'next/link';
 const Footer: React.FC = () => {
   return (
     <footer 
-      className="w-full py-4 border-t border-apecoin-blue/30 z-50 relative" 
+      className="w-full py-4 border-t border-apecoin-blue/30 z-50 relative mt-auto" 
       style={{
         background: 'var(--blue-gradient)',
         paddingBottom: `calc(1rem + env(safe-area-inset-bottom, 0px))`,

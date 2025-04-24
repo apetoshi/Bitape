@@ -145,7 +145,26 @@ export default function RootLayout({
           `}
         </Script>
       </head>
-      <body className={`${inter.className} bg-royal text-white overflow-x-hidden`}>
+      <body className={`${inter.className} bg-royal text-white overflow-x-hidden min-h-screen flex flex-col`}>
+        <style jsx global>{`
+          :root {
+            --header-height: 80px;
+            --footer-height: 100px;
+          }
+          
+          main {
+            padding-top: var(--header-height);
+            padding-bottom: var(--footer-height);
+            min-height: 100vh;
+          }
+          
+          @media (max-width: 768px) {
+            :root {
+              --header-height: 70px;
+              --footer-height: 120px;
+            }
+          }
+        `}</style>
         <Providers>
           {children}
         </Providers>
