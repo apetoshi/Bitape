@@ -44,19 +44,19 @@ export default async function Image() {
           }}
         />
 
-        {/* Logo placeholder (text instead of image) */}
+        {/* Logo */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             marginBottom: 40,
-            width: 240,
-            height: 240,
+            width: 120,
+            height: 120,
             borderRadius: '50%',
             background: '#FFDD00',
             color: '#001420',
-            fontSize: 100,
+            fontSize: 50,
             fontWeight: 'bold',
             fontFamily: 'Inter',
           }}

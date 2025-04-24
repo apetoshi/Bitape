@@ -19,6 +19,7 @@ export const metadata: Metadata = {
   title: 'BitApe - A Peer-to-Peer Electronic Ape Cash System',
   description: 'Mine BitApe with your virtual mining facility on ApeChain',
   manifest: '/manifest.json',
+  metadataBase: new URL('https://www.bitape.org'),
   themeColor: '#000000',
   appleWebApp: {
     capable: true,
