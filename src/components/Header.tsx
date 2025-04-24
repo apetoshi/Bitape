@@ -63,7 +63,7 @@ const Header: React.FC = () => {
   };
 
   return (
-    <header className="nav-bar flex justify-between items-center px-3 sm:px-6 py-4 relative z-50 fixed top-0 left-0 right-0 bg-royal bg-opacity-95 backdrop-blur-sm">
+    <header className="nav-bar flex justify-between items-center px-3 sm:px-4 py-2 relative z-30">
       <div className="flex items-center">
         <Link href="/" className="flex items-center">
           <Image
@@ -71,7 +71,7 @@ const Header: React.FC = () => {
             alt="BitApe Logo"
             width={120}
             height={120}
-            className="hover:opacity-80 transition-opacity"
+            className="hover:opacity-80 transition-opacity -my-1"
             priority
           />
         </Link>
@@ -82,7 +82,7 @@ const Header: React.FC = () => {
         {isConnected && address ? (
           <button
             onClick={onProfileOpen}
-            className="flex items-center px-2 py-1 bg-[#001420] rounded-lg border border-yellow-400 hover:bg-[#001F33]"
+            className="flex items-center px-2 py-1 bg-[#001420] rounded-lg border border-yellow-400 hover:bg-[#001F33] text-xs"
             aria-label="Open profile"
           >
             <div className="mr-2 text-right hidden sm:block">
@@ -102,29 +102,29 @@ const Header: React.FC = () => {
       </div>
       
       {/* Desktop navigation - hidden on mobile since we use dock menu there */}
-      <nav className="hidden md:flex items-center ml-8 space-x-4">
-        <Link href="/about" className="font-press-start text-white text-sm hover:text-banana">
+      <nav className="hidden md:flex items-center ml-6 space-x-3">
+        <Link href="/about" className="font-press-start text-white text-xs hover:text-banana">
           ABOUT
         </Link>
-        <span className="font-press-start text-gray-500 text-sm cursor-not-allowed">
+        <span className="font-press-start text-gray-500 text-xs cursor-not-allowed">
           TRADE $BIT
         </span>
-        <span className="font-press-start text-gray-500 text-sm cursor-not-allowed">
+        <span className="font-press-start text-gray-500 text-xs cursor-not-allowed">
           LEADERBOARD
         </span>
         <button 
           onClick={onReferralOpen}
-          className="pixel-button text-sm"
+          className="pixel-button text-xs py-1 px-2"
         >
           REFER
         </button>
         <button 
           onClick={onAnnouncementsOpen}
-          className="pixel-button text-sm"
+          className="pixel-button text-xs py-1 px-2"
         >
           ANNOUNCEMENTS
         </button>
-        <span className="font-press-start text-gray-500 text-sm cursor-not-allowed">
+        <span className="font-press-start text-gray-500 text-xs cursor-not-allowed">
           DISCLAIMER
         </span>
       </nav>
