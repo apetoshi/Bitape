@@ -9,11 +9,37 @@ import { useAccount } from 'wagmi';
 import { useContractRead } from 'wagmi';
 import { CONTRACT_ADDRESSES, MAIN_CONTRACT_ABI } from '../config/contracts';
 import { formatUnits } from 'viem';
+import ThreeJSGlobe from './ThreeJSGlobe';
+import ThreeJSBitcoin from './ThreeJSBitcoin';
+import AnimatedCounter from './AnimatedCounter';
 
 const LandingPage = () => {
   const router = useRouter();
   const { isConnected, address } = useAccount();
-  const [minedBit, setMinedBit] = useState("0");
+  const [minedBit, setMinedBit] = useState(0);
+  const [use3DGlobe, setUse3DGlobe] = useState(true); // Switch between globe and bitcoin
+  const [dimensions, setDimensions] = useState({ width: 200, height: 200 });
+
+  // Handle responsive sizing
+  useEffect(() => {
+    // Set initial dimensions
+    const updateSize = () => {
+      const isMobile = window.innerWidth < 768;
+      setDimensions({
+        width: isMobile ? 200 : 300,
+        height: isMobile ? 200 : 300
+      });
+    };
+    
+    // Set size on mount
+    updateSize();
+    
+    // Update on resize
+    window.addEventListener('resize', updateSize);
+    
+    // Cleanup
+    return () => window.removeEventListener('resize', updateSize);
+  }, []);
 
   // Read total BIT supply from the token contract
   const { data: totalSupplyData } = useContractRead({
@@ -34,21 +60,38 @@ const LandingPage = () => {
   useEffect(() => {
     if (totalSupplyData) {
       try {
-        // Format the bigint value to a human-readable string with 2 decimal places
-        const formattedSupply = Number(formatUnits(totalSupplyData as bigint, 18)).toFixed(2);
+        // Convert to a number for the animated counter
+        const formattedSupply = Number(formatUnits(totalSupplyData as bigint, 18));
         setMinedBit(formattedSupply);
       } catch (error) {
         console.error("Error formatting total supply:", error);
-        setMinedBit("0.00");
+        setMinedBit(0);
       }
     }
   }, [totalSupplyData]);
+
+  // Toggle between globe and bitcoin every 15 seconds for added visual interest
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setUse3DGlobe(prev => !prev);
+    }, 15000);
+    
+    return () => clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     if (isConnected && address) {
       router.push(`/room/${address}`);
     }
   }, [isConnected, address, router]);
+
+  // Format the animated counter value with commas
+  const formatNumber = (value: number) => {
+    return value.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-royal">
@@ -114,8 +157,14 @@ const LandingPage = () => {
             <span className="block"> APE CASH SYSTEM</span>
           </h1>
           
-          <p className="text-lg sm:text-xl md:text-3xl font-press-start text-banana pixel-text mt-6">
-            {minedBit} $BIT HAS ALREADY BEEN MINED.
+          <p className="text-lg sm:text-xl md:text-3xl font-press-start pixel-text mt-6">
+            <AnimatedCounter 
+              targetValue={minedBit} 
+              formatFn={formatNumber} 
+              className="text-banana"
+              offset={50} // Smaller offset for a more subtle effect
+              duration={10000} // 10 seconds for one full cycle
+            /> $BIT HAS ALREADY BEEN MINED.
           </p>
           
           <p className="text-base sm:text-lg md:text-xl font-press-start text-white pixel-text mt-4">
@@ -123,14 +172,13 @@ const LandingPage = () => {
           </p>
 
           <div className="my-6 md:my-10">
-            <div className="relative w-[150px] h-[150px] md:w-[200px] md:h-[200px] mx-auto border-2 border-banana">
-              <Image
-                src="/globe.svg"
-                alt="Globe Animation"
-                fill
-                priority
-                className="object-contain"
-              />
+            {/* Responsive 3D component - sized based on viewport */}
+            <div className="relative w-[200px] h-[200px] md:w-[300px] md:h-[300px] mx-auto">
+              {use3DGlobe ? (
+                <ThreeJSGlobe width={dimensions.width} height={dimensions.height} />
+              ) : (
+                <ThreeJSBitcoin width={dimensions.width} height={dimensions.height} />
+              )}
             </div>
           </div>
 
