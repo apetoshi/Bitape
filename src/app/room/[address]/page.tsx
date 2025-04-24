@@ -1511,6 +1511,18 @@ export default function RoomPage() {
           >
             REMOVE MINER
           </button>
+          
+          {/* ApeCoin Powered Text */}
+          <div className="flex items-center justify-center mt-2">
+            <Image 
+              src="/apecoin.png" 
+              alt="ApeCoin Logo" 
+              width={12} 
+              height={12} 
+              className="mr-1" 
+            />
+            <span className="text-banana font-press-start text-[8px] sm:text-[10px]">Powered by ApeCoin</span>
+          </div>
         </div>
         
         {/* Warning dialog for removing miner */}
@@ -1624,6 +1636,18 @@ export default function RoomPage() {
                   : "No mining slots available. Upgrade facility first."}
               </p>
             )}
+            
+            {/* ApeCoin Powered Text */}
+            <div className="flex items-center justify-center mt-2">
+              <Image 
+                src="/apecoin.png" 
+                alt="ApeCoin Logo" 
+                width={12} 
+                height={12} 
+                className="mr-1" 
+              />
+              <span className="text-banana font-press-start text-[8px] sm:text-[10px]">Powered by ApeCoin</span>
+            </div>
           </div>
         </div>
       </div>
@@ -1751,6 +1775,18 @@ export default function RoomPage() {
                     >
                       {gameState.isUpgradingFacility ? "UPGRADING..." : "UPGRADE FACILITY"}
                     </button>
+                    
+                    {/* ApeCoin Powered Text */}
+                    <div className="flex items-center justify-center mt-2">
+                      <Image 
+                        src="/apecoin.png" 
+                        alt="ApeCoin Logo" 
+                        width={12} 
+                        height={12} 
+                        className="mr-1" 
+                      />
+                      <span className="text-banana font-press-start text-[8px] sm:text-[10px]">Powered by ApeCoin</span>
+                    </div>
                   </div>
                 )}
               </>
@@ -2003,6 +2039,18 @@ export default function RoomPage() {
                             >
                               REMOVE MINER
                             </button>
+                            
+                            {/* ApeCoin Powered Text */}
+                            <div className="flex items-center justify-center mt-2">
+                              <Image 
+                                src="/apecoin.png" 
+                                alt="ApeCoin Logo" 
+                                width={12} 
+                                height={12} 
+                                className="mr-1" 
+                              />
+                              <span className="text-banana font-press-start text-[8px] sm:text-[10px]">Powered by ApeCoin</span>
+                            </div>
                           </div>
                         </>
                       );
@@ -2019,6 +2067,18 @@ export default function RoomPage() {
                         >
                           BUY MINER
                         </button>
+                        
+                        {/* ApeCoin Powered Text */}
+                        <div className="flex items-center justify-center mt-2">
+                          <Image 
+                            src="/apecoin.png" 
+                            alt="ApeCoin Logo" 
+                            width={12} 
+                            height={12} 
+                            className="mr-1" 
+                          />
+                          <span className="text-banana font-press-start text-[8px] sm:text-[10px]">Powered by ApeCoin</span>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -2286,6 +2346,7 @@ export default function RoomPage() {
           localStorage.setItem('claimedMinerPosition', JSON.stringify({x: 1, y: 0}));
         }
       }
+    }
     }
   }, [gameState.hasClaimedStarterMiner, tileOneZeroOccupied]);
 
@@ -2603,7 +2664,7 @@ export default function RoomPage() {
 
           {/* Main Room Area */}
           <div className="col-span-8 flex flex-col items-center justify-center">
-            <div className="relative w-[700px] h-[700px] border border-banana overflow-hidden p-1.5">
+            <div className="relative w-[700px] h-[700px] border border-banana overflow-hidden p-1.5 lg:w-[630px] lg:h-[630px]">
               <RoomVisualization 
                 hasFacility={hasFacility}
                 facilityData={visualizationFacilityData}
