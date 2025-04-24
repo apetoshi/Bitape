@@ -963,16 +963,14 @@ export function useGameState(): GameState {
       const minerCostResult = await publicClient.readContract({
         address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
         abi: MAIN_CONTRACT_ABI,
-        functionName: 'buyMiner',
+        functionName: 'miners',
         args: [BigInt(minerType)],
       });
       
-      // Convert result to bigint, handling potential array return
-      const minerCost = typeof minerCostResult === 'bigint' 
-        ? minerCostResult 
-        : Array.isArray(minerCostResult) && minerCostResult.length > 0 
-          ? minerCostResult[0] as bigint
-          : BigInt(0);
+      // Extract the cost from the miner data (index 6 is cost)
+      const minerCost = Array.isArray(minerCostResult) && minerCostResult.length > 6 
+        ? minerCostResult[6] as bigint 
+        : BigInt(0);
       
       console.log("Miner cost:", formatEther(minerCost));
       
