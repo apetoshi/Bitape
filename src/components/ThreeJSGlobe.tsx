@@ -146,8 +146,8 @@ function ApeGlobe() {
   
   // Load textures with error handling
   const [apeTexture, apeIcon] = useLoader(THREE.TextureLoader, [
-    '/ApeChain/Mask group.png',
-    '/ApeChain/ApeChain Icon Outlined - White.png'
+    '/ApeChain/gradient.png',
+    '/ApeChain/Mask group.png'
   ]);
   
   // Create grid lines effect
