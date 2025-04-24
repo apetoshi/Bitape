@@ -981,15 +981,17 @@ export function useGameState(): GameState {
         const maxApprovalAmount = BigInt("115792089237316195423570985008687907853269984665640564039457584007913129639935");
         
         try {
-          // Request approval for spending BIT
-          const hash = await publicClient.writeContract({
+          // Request approval for spending BIT - first simulate the transaction
+          const { request } = await publicClient.simulateContract({
             address: CONTRACT_ADDRESSES.BIT_TOKEN as `0x${string}`,
             abi: BIT_TOKEN_ABI,
             functionName: 'approve',
             args: [CONTRACT_ADDRESSES.MAIN, maxApprovalAmount],
-            account: address as `0x${string}`,
-            chain: publicClient?.chain
+            account: address as `0x${string}`
           });
+          
+          // Then execute the transaction using writeContractAsync
+          const hash = await writeContractAsync(request);
           
           console.log("Approval transaction submitted:", hash);
           
@@ -1050,15 +1052,17 @@ export function useGameState(): GameState {
         throw new Error("Address not found");
       }
       
-      // Submit the transaction to purchase the miner
-      const hash = await publicClient.writeContract({
+      // Submit the transaction to purchase the miner - first simulate
+      const { request } = await publicClient.simulateContract({
         address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
         abi: MAIN_CONTRACT_ABI,
         functionName: 'buyMiner',
         args: [BigInt(minerType), BigInt(x), BigInt(y)],
-        account: address as `0x${string}`,
-        chain: publicClient?.chain
+        account: address as `0x${string}`
       });
+      
+      // Then execute the transaction
+      const hash = await writeContractAsync(request);
       
       console.log("Purchase transaction submitted:", hash);
       
@@ -1122,7 +1126,7 @@ export function useGameState(): GameState {
       
       // Call the sellMiner contract function
       const { request } = await publicClient.simulateContract({
-        address: CONTRACT_ADDRESSES.MAIN as Address,
+        address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
         abi: MAIN_CONTRACT_ABI,
         functionName: 'sellMiner',
         args: [BigInt(minerId)],
