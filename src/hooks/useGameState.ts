@@ -963,7 +963,7 @@ export function useGameState(): GameState {
       const minerCostResult = await publicClient.readContract({
         address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
         abi: MAIN_CONTRACT_ABI,
-        functionName: 'miners',
+        functionName: 'buyMiner',
         args: [BigInt(minerType)],
       });
       
@@ -971,7 +971,7 @@ export function useGameState(): GameState {
       const minerCost = typeof minerCostResult === 'bigint' 
         ? minerCostResult 
         : Array.isArray(minerCostResult) && minerCostResult.length > 0 
-          ? minerCostResult[6] as bigint  // Cost is at index 6 in the miners tuple
+          ? minerCostResult[0] as bigint
           : BigInt(0);
       
       console.log("Miner cost:", formatEther(minerCost));
@@ -1056,8 +1056,8 @@ export function useGameState(): GameState {
       const hash = await publicClient.writeContract({
         address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
         abi: MAIN_CONTRACT_ABI,
-        functionName: 'purchaseMiner',
-        args: [minerType, x, y],
+        functionName: 'buyMiner',
+        args: [BigInt(minerType), BigInt(x), BigInt(y)],
         account: address as `0x${string}`,
         chain: publicClient?.chain
       });
