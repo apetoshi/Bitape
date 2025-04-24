@@ -1415,45 +1415,52 @@ export default function RoomPage() {
       if (!selectedTile) return;
       
       try {
-        // Since the contract doesn't have a removeMiner function, we'll use a UI-only simulation
-        console.log(`Simulating removal of miner at position (${selectedTile.x}, ${selectedTile.y})`);
-        console.warn('Using UI-only miner removal simulation');
+        console.log(`Removing miner at position (${selectedTile.x}, ${selectedTile.y})`);
         
-        // Remove from localStorage to simulate removal
-        if (typeof window !== 'undefined' && address) {
-          // Remove from our miner map if available
-          try {
-            const minerKey = `miner_${address}_${selectedTile.x}_${selectedTile.y}`;
-            localStorage.removeItem(minerKey);
-            console.log(`Removed miner data from localStorage: ${minerKey}`);
+        // Get the miner at this position to find its ID
+        const miner = getMinerAtTile(selectedTile.x, selectedTile.y);
+        
+        if (!miner || !miner.id) {
+          console.error('Cannot remove miner: no miner ID found');
+          alert('Failed to remove miner. Miner data not found.');
+          setShowRemoveWarning(false);
+          return;
+        }
+        
+        console.log('Found miner to remove:', miner);
+        
+        // Use the gameState.removeMiner function to call the contract
+        if (gameState.removeMiner) {
+          const success = await gameState.removeMiner(Number(miner.id));
+          
+          if (success) {
+            console.log('Miner successfully removed via contract call');
+            // Close the warning dialog
+            setShowRemoveWarning(false);
             
-            // Also try to update fixed miner map if available
-            if (typeof addMinerToMap === 'function') {
-              // Set to an invalid type to simulate removal
-              addMinerToMap(address, {x: selectedTile.x, y: selectedTile.y}, 0);
-              console.log('Updated miner map with invalid miner type to simulate removal');
+            // Refresh the UI to reflect the change
+            if (gameState.refetch) {
+              await gameState.refetch();
             }
-          } catch (err) {
-            console.error('Error removing from localStorage:', err);
+            
+            // Force UI update
+            setSelectedTile({...selectedTile});
+            
+            // Switch to resources tab
+            setActiveTab('resources');
+          } else {
+            console.error('Contract call to remove miner failed');
+            alert('Failed to remove miner. Please try again.');
           }
+        } else {
+          console.error('removeMiner function not available in gameState');
+          alert('Cannot remove miner: function not available');
+          setShowRemoveWarning(false);
         }
-        
-        // Close the warning dialog
-        setShowRemoveWarning(false);
-        
-        // Refresh the UI to reflect the change
-        if (gameState.refetch) {
-          await gameState.refetch();
-        }
-        
-        // Force UI update
-        setSelectedTile({...selectedTile});
-        
-        // Switch to resources tab
-        setActiveTab('resources');
       } catch (error) {
         console.error('Error removing miner:', error);
         alert('Failed to remove miner. Please try again.');
+        setShowRemoveWarning(false);
       }
     };
 
@@ -2162,50 +2169,52 @@ export default function RoomPage() {
     try {
       console.log(`Removing miner at position (${x}, ${y})`);
       
-      // Since the contract doesn't have a removeMiner function, we'll use a UI-only simulation
-      console.warn('Contract does not have removeMiner function - using UI-only simulation');
+      // Get the miner at this position to find its ID
+      const miner = getMinerAtTile(x, y);
       
-      // Remove from localStorage to simulate removal
-      if (typeof window !== 'undefined' && address) {
-        // Try to remove from our miner map
-        try {
-          const minerKey = `miner_${address}_${x}_${y}`;
-          localStorage.removeItem(minerKey);
-          console.log(`Removed miner data from localStorage: ${minerKey}`);
+      if (!miner || !miner.id) {
+        console.error('Cannot remove miner: no miner ID found');
+        alert('Failed to remove miner. Miner data not found.');
+        return;
+      }
+      
+      console.log('Found miner to remove:', miner);
+      
+      // Use the gameState.removeMiner function to call the contract
+      if (gameState.removeMiner) {
+        const success = await gameState.removeMiner(Number(miner.id));
+        
+        if (success) {
+          console.log('Miner successfully removed via contract call');
           
-          // Also try to delete from fixed miner map
-          if (typeof addMinerToMap === 'function') {
-            // We don't have a direct removeMiner function, so we'll set to an invalid type
-            addMinerToMap(address, {x, y}, 0);
-            console.log('Updated miner map with invalid miner type to simulate removal');
+          // Refresh game state to update UI
+          if (gameState.refetch) {
+            console.log('Refreshing game state after removing miner');
+            await gameState.refetch();
           }
-        } catch (err) {
-          console.error('Error removing from localStorage:', err);
+          
+          // Force a re-render of the selected tile
+          if (selectedTile) {
+            setSelectedTile({...selectedTile});
+          }
+          
+          // Switch to resources tab to show updated stats
+          setActiveTab('resources');
+          
+          // Wait a moment and then check again (async refresh might take time)
+          setTimeout(() => {
+            if (gameState.refetch) {
+              gameState.refetch();
+            }
+          }, 2000);
+        } else {
+          console.error('Contract call to remove miner failed');
+          alert('Failed to remove miner. Please try again.');
         }
+      } else {
+        console.error('removeMiner function not available in gameState');
+        alert('Cannot remove miner: function not available');
       }
-      
-      console.log('Miner removed successfully');
-      
-      // Refresh game state to update UI
-      if (gameState.refetch) {
-        console.log('Refreshing game state after removing miner');
-        await gameState.refetch();
-      }
-      
-      // Force a re-render of the selected tile
-      if (selectedTile) {
-        setSelectedTile({...selectedTile});
-      }
-      
-      // Switch to resources tab to show updated stats
-      setActiveTab('resources');
-      
-      // Wait a moment and then check again (async refresh might take time)
-      setTimeout(() => {
-        if (gameState.refetch) {
-          gameState.refetch();
-        }
-      }, 2000);
     } catch (error) {
       console.error('Error removing miner:', error);
       alert('Failed to remove miner. Please try again.');

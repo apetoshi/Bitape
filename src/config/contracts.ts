@@ -230,6 +230,13 @@ export const MAIN_CONTRACT_ABI = [
     type: 'function',
   },
   {
+    inputs: [{ internalType: 'uint256', name: 'minerId', type: 'uint256' }],
+    name: 'sellMiner',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
     inputs: [
       { internalType: 'address', name: 'player', type: 'address' },
       { internalType: 'uint256', name: 'startIndex', type: 'uint256' },
