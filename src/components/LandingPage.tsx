@@ -18,15 +18,30 @@ const LandingPage = () => {
   const [minedBit, setMinedBit] = useState(0);
   const [dimensions, setDimensions] = useState({ width: 200, height: 200 });
 
-  // Handle responsive sizing
+  // Handle responsive sizing with enhanced dimensions for larger screens
   useEffect(() => {
-    // Set initial dimensions
+    // Set initial dimensions based on screen size
     const updateSize = () => {
-      const isMobile = window.innerWidth < 768;
-      setDimensions({
-        width: isMobile ? 200 : 300,
-        height: isMobile ? 200 : 300
-      });
+      const width = window.innerWidth;
+      if (width < 768) {
+        // Mobile
+        setDimensions({
+          width: 200,
+          height: 200
+        });
+      } else if (width < 1280) {
+        // Tablet/Small laptop
+        setDimensions({
+          width: 300,
+          height: 300
+        });
+      } else {
+        // Large laptop/Desktop
+        setDimensions({
+          width: 400,
+          height: 400
+        });
+      }
     };
     
     // Set size on mount
@@ -85,7 +100,7 @@ const LandingPage = () => {
   return (
     <div className="min-h-screen flex flex-col bg-royal">
       {/* Header */}
-      <header className="nav-bar flex justify-between items-center px-3 sm:px-6 py-3 relative z-30">
+      <header className="nav-bar flex justify-between items-center px-3 sm:px-6 lg:px-12 py-3 lg:py-4 relative z-30">
         <div className="flex items-center">
           <Link href="/" className="flex items-center">
             <Image
@@ -100,23 +115,23 @@ const LandingPage = () => {
         </div>
         
         {/* Desktop navigation - hidden on mobile */}
-        <nav className="hidden md:flex items-center gap-4">
-          <Link href="/about" className="font-press-start text-white text-xs md:text-sm hover:text-banana">
+        <nav className="hidden md:flex items-center gap-4 lg:gap-6">
+          <Link href="/about" className="font-press-start text-white text-xs md:text-sm lg:text-base hover:text-banana">
             ABOUT
           </Link>
-          <Link href="/trade" className="font-press-start text-white text-xs md:text-sm hover:text-banana">
+          <Link href="/trade" className="font-press-start text-white text-xs md:text-sm lg:text-base hover:text-banana">
             TRADE $BIT
           </Link>
-          <span className="font-press-start text-gray-500 text-xs md:text-sm cursor-not-allowed">
+          <span className="font-press-start text-gray-500 text-xs md:text-sm lg:text-base cursor-not-allowed">
             Brewing...
           </span>
-          <Link href="/announcements" className="pixel-button text-xs md:text-sm">
+          <Link href="/announcements" className="pixel-button text-xs md:text-sm lg:text-base">
             ANNOUNCEMENTS
           </Link>
-          <Link href="/refer" className="pixel-button text-xs md:text-sm">
+          <Link href="/refer" className="pixel-button text-xs md:text-sm lg:text-base">
             REFER A FRIEND
           </Link>
-          <ConnectWalletButton className="scale-90" />
+          <ConnectWalletButton className="scale-90 lg:scale-100" />
         </nav>
         
         {/* Mobile connect button */}
@@ -126,7 +141,7 @@ const LandingPage = () => {
       </header>
 
       {/* Main Content */}
-      <main className="flex-grow flex flex-col items-center justify-center p-4 relative overflow-hidden">
+      <main className="flex-grow flex flex-col items-center justify-center p-4 md:p-6 lg:p-10 relative overflow-hidden">
         {/* Grid Background */}
         <div className="absolute inset-0"
           style={{
@@ -139,14 +154,14 @@ const LandingPage = () => {
           }}
         />
 
-        <div className="relative z-10 w-full max-w-4xl mx-auto text-center space-y-4 md:space-y-8 py-4 md:py-8">
-          <h1 className="text-2xl sm:text-3xl md:text-5xl font-press-start text-banana pixel-text leading-relaxed">
-            <span className="text-banana block sm:inline">BITAPE:</span> 
-            <span className="block sm:inline"> A PEER-TO-PEER</span>
-            <span className="block"> APE CASH SYSTEM</span>
+        <div className="relative z-10 w-full max-w-5xl mx-auto text-center space-y-4 md:space-y-6 lg:space-y-10 py-4 md:py-8 lg:py-12">
+          <h1 className="text-2xl sm:text-3xl md:text-5xl lg:text-6xl font-press-start text-banana pixel-text leading-relaxed">
+            <span className="text-banana inline-block lg:inline">BITAPE:</span> 
+            <span className="inline-block lg:inline"> A PEER-TO-PEER</span>
+            <span className="inline-block lg:inline"> APE CASH SYSTEM</span>
           </h1>
           
-          <p className="text-lg sm:text-xl md:text-3xl font-press-start pixel-text mt-6">
+          <p className="text-lg sm:text-xl md:text-3xl lg:text-4xl font-press-start pixel-text mt-6 lg:mt-8">
             <AnimatedCounter 
               targetValue={minedBit} 
               formatFn={formatNumber} 
@@ -156,32 +171,32 @@ const LandingPage = () => {
             /> $BIT HAS ALREADY BEEN MINED.
           </p>
           
-          <p className="text-base sm:text-lg md:text-xl font-press-start text-white pixel-text mt-4">
+          <p className="text-base sm:text-lg md:text-xl lg:text-2xl font-press-start text-white pixel-text mt-4 lg:mt-6">
             START EARNING TODAY.
           </p>
 
-          <div className="my-6 md:my-10">
-            {/* ApeChain themed 3D globe */}
-            <div className="relative w-[200px] h-[200px] md:w-[300px] md:h-[300px] mx-auto">
+          <div className="my-6 md:my-10 lg:my-12">
+            {/* ApeChain themed 3D globe with responsive sizing */}
+            <div className="relative w-[200px] h-[200px] md:w-[300px] md:h-[300px] lg:w-[400px] lg:h-[400px] xl:w-[500px] xl:h-[500px] mx-auto">
               <ThreeJSGlobe width={dimensions.width} height={dimensions.height} />
             </div>
           </div>
 
-          <div className="w-full max-w-sm mx-auto">
-            <ConnectWalletButton className="w-full font-press-start text-sm md:text-lg py-3 md:py-4 px-6 md:px-8 bg-transparent border-2 border-banana text-banana hover:bg-banana hover:text-royal transition-colors pixel-button" />
+          <div className="w-full max-w-sm md:max-w-md lg:max-w-lg mx-auto">
+            <ConnectWalletButton className="w-full font-press-start text-sm md:text-lg lg:text-xl py-3 md:py-4 lg:py-5 px-6 md:px-8 lg:px-10 bg-transparent border-2 border-banana text-banana hover:bg-banana hover:text-royal transition-colors pixel-button" />
           </div>
         </div>
       </main>
 
       {/* Footer with ApeChain branding */}
-      <footer className="py-4 text-center">
+      <footer className="py-4 md:py-6 lg:py-8 text-center">
         <div className="flex justify-center items-center">
           <Image 
             src="/ApeChain/Powered by ApeCoin-1.png" 
             alt="Powered by ApeCoin" 
             width={180}
             height={36}
-            className="object-contain" 
+            className="object-contain md:w-[200px] lg:w-[220px]" 
           />
         </div>
       </footer>
