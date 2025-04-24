@@ -2347,7 +2347,6 @@ export default function RoomPage() {
         }
       }
     }
-    }
   }, [gameState.hasClaimedStarterMiner, tileOneZeroOccupied]);
 
   // Handle buying a miner
