@@ -20,6 +20,44 @@
   --bigcoin-blue: #0c1c31;
   --bigcoin-dark-blue: #091525;
   --bigcoin-gold: #FFD700;
+  --screen-scale: 1; /* Default scale factor */
+}
+
+/* Scale down specifically for laptop screens (13-16 inches) */
+@media (min-width: 1024px) and (max-width: 1600px) {
+  :root {
+    --screen-scale: 0.9; /* 10% reduction */
+  }
+  
+  /* Apply scaling to main content container */
+  .room-container, 
+  .stats-panel,
+  .game-panel,
+  .bigcoin-panel {
+    transform: scale(var(--screen-scale));
+    transform-origin: top center;
+    margin-bottom: calc(1rem * var(--screen-scale));
+  }
+  
+  /* Scale down text elements */
+  .game-text,
+  .font-press-start,
+  .bigcoin-text,
+  .pixel-text {
+    font-size: calc(1em * var(--screen-scale));
+  }
+  
+  /* Adjust spacing for scaled elements */
+  .p-4, .p-6, 
+  .px-4, .px-6,
+  .py-4, .py-6 {
+    padding: calc(var(--padding, 1rem) * var(--screen-scale));
+  }
+  
+  /* Adjust grid gap */
+  .gap-4, .gap-6 {
+    gap: calc(var(--gap, 1rem) * var(--screen-scale));
+  }
 }
 
 @tailwind base;
