@@ -83,6 +83,7 @@ export interface GameState {
   purchaseMiner: (minerType: MinerType, x: number, y: number) => Promise<boolean>;
   claimReward: () => Promise<boolean>;
   upgradeFacility: () => Promise<boolean>;
+  removeMiner: (minerId: number) => Promise<boolean>;
   
   // Loading states
   isPurchasingFacility: boolean;
@@ -117,6 +118,9 @@ export interface GameState {
 
   // Miner types directly from contract
   minerTypesFromContract: Record<number, any>;
+
+  // Add removeMiner loading state
+  isRemovingMiner: boolean;
 }
 
 // At the top of the file, after imports
@@ -1103,6 +1107,59 @@ export function useGameState(): GameState {
     refetchMinerIds();
   };
 
+  // Add removeMiner loading state
+  const [isRemovingMiner, setIsRemovingMiner] = useState(false);
+  
+  // Add this function before the return statement
+  const handleRemoveMiner = async (minerId: number): Promise<boolean> => {
+    console.log(`Removing miner with ID: ${minerId}`);
+    
+    if (!address || !isConnected || !publicClient) {
+      console.error('Cannot remove miner: wallet not connected');
+      return false;
+    }
+    
+    try {
+      setIsRemovingMiner(true);
+      
+      // Call the sellMiner contract function
+      const { request } = await publicClient.simulateContract({
+        address: CONTRACT_ADDRESSES.MAIN as Address,
+        abi: MAIN_CONTRACT_ABI,
+        functionName: 'sellMiner',
+        args: [BigInt(minerId)],
+        account: address
+      });
+      
+      const hash = await writeContractAsync(request);
+      console.log('Remove miner transaction submitted:', hash);
+      
+      // Wait for the transaction to be mined
+      if (hash) {
+        const receipt = await publicClient.waitForTransactionReceipt({ 
+          hash: hash 
+        });
+        
+        console.log('Remove miner transaction receipt:', receipt);
+        
+        // Refetch miners data
+        await refetchMiners();
+        
+        // Force a refresh of the UI
+        setForceRender(prev => !prev);
+        
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error removing miner:', error);
+      return false;
+    } finally {
+      setIsRemovingMiner(false);
+    }
+  };
+
   // Add a final check before return to ensure hardcoded values are used
   const finalGameState = {
     // User state
@@ -1161,6 +1218,7 @@ export function useGameState(): GameState {
     purchaseMiner: handlePurchaseMiner,
     claimReward: handleClaimRewards,
     upgradeFacility: handleUpgradeFacility,
+    removeMiner: handleRemoveMiner,
     
     // Loading states
     isPurchasingFacility,
@@ -1194,7 +1252,10 @@ export function useGameState(): GameState {
     miners: miners,
 
     // Miner types from contract
-    minerTypesFromContract
+    minerTypesFromContract,
+
+    // Remove miner loading state
+    isRemovingMiner
   };
 
   console.log('🔄 RETURNING GameState with facilityData:', finalGameState.facilityData);

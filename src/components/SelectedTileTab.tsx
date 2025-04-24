@@ -212,16 +212,48 @@ export const SelectedTileTab: React.FC<SelectedTileTabProps> = ({
                               e.preventDefault();
                               if (confirm("Are you sure you want to remove this miner? This action cannot be undone.")) {
                                 console.log('Removing miner at position:', selectedTile);
-                                handleShowMinerModal();
+                                // Get the miner ID
+                                const miner = getMinerAtTile(selectedTile.x, selectedTile.y);
+                                if (miner && miner.id) {
+                                  console.log('Removing miner with ID:', miner.id);
+                                  // Call gameState function to remove the miner
+                                  if (gameState.removeMiner) {
+                                    gameState.removeMiner(Number(miner.id))
+                                      .then(() => {
+                                        console.log('Miner successfully removed');
+                                        // After removal, no need to show the modal
+                                      })
+                                      .catch(error => {
+                                        console.error('Error removing miner:', error);
+                                        // If there's an error, we might want to show the modal for additional options
+                                        handleShowMinerModal();
+                                      });
+                                  } else {
+                                    console.warn('removeMiner function not available in gameState');
+                                    handleShowMinerModal();
+                                  }
+                                } else {
+                                  console.warn('No miner ID found, cannot remove');
+                                  handleShowMinerModal();
+                                }
                               }
                             }}
+                            disabled={gameState.isRemovingMiner}
                             className="w-full pixel-button font-press-start text-xs bg-red-600 text-white"
                             style={{
                               position: 'relative',
                               zIndex: 10
                             }}
                           >
-                            REMOVE MINER
+                            {gameState.isRemovingMiner ? (
+                              <div className="flex items-center justify-center">
+                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                REMOVING...
+                              </div>
+                            ) : 'REMOVE MINER'}
                           </button>
                         </div>
                       )}
