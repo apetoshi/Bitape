@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { Dialog } from '@headlessui/react';
 import { useAccount, useContractRead, useWriteContract } from 'wagmi';
@@ -112,6 +112,92 @@ const FacilityPurchaseModal: React.FC<FacilityPurchaseModalProps> = ({
     error: approvalError,
     reset: resetApproval
   } = useWriteContract();
+  
+  // Add a new useWriteContract hook for direct facility operations
+  const {
+    writeContract: writeFacilityContract,
+    isPending: isFacilityWritePending,
+    status: facilityWriteStatus,
+    error: facilityWriteError,
+    reset: resetFacilityWrite
+  } = useWriteContract();
+
+  // Track transaction progress with a ref to avoid race conditions
+  const transactionInProgressRef = useRef(false);
+  const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Reset all states when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      // Reset all states when modal closes
+      setIsProcessing(false);
+      setFacilityPurchaseError('');
+      setShouldProceedWithPurchase(false);
+      setIsApprovingTokens(false);
+      resetApproval?.();
+      resetFacilityWrite?.();
+      
+      // Clear any pending intervals
+      if (checkIntervalRef.current) {
+        clearInterval(checkIntervalRef.current);
+        checkIntervalRef.current = null;
+      }
+      
+      // Reset transaction in progress flag
+      transactionInProgressRef.current = false;
+    }
+  }, [isOpen, resetApproval, resetFacilityWrite]);
+
+  // Add effect to monitor facility write status changes
+  useEffect(() => {
+    if (facilityWriteStatus === 'success' && transactionInProgressRef.current) {
+      console.log('Facility upgrade transaction succeeded');
+      
+      // Reset the transaction flag
+      transactionInProgressRef.current = false;
+      
+      // Clear any check intervals
+      if (checkIntervalRef.current) {
+        clearInterval(checkIntervalRef.current);
+        checkIntervalRef.current = null;
+      }
+      
+      // Refresh contract data to get the updated facility level
+      const refreshData = async () => {
+        if (gameState.refetch) {
+          try {
+            await gameState.refetch();
+            console.log('Refreshed game state after facility upgrade');
+          } catch (refreshError) {
+            console.error('Error refreshing data after upgrade:', refreshError);
+          }
+        }
+        
+        // Always reset processing state
+        setIsProcessing(false);
+        
+        // Notify parent components
+        onPurchase();
+        onClose();
+      };
+      
+      refreshData();
+    } 
+    else if (facilityWriteStatus === 'error' && transactionInProgressRef.current) {
+      console.error("Error upgrading facility:", facilityWriteError);
+      setFacilityPurchaseError(`Error: ${facilityWriteError?.message || 'Transaction failed'}`);
+      
+      // Reset states
+      setIsProcessing(false);
+      transactionInProgressRef.current = false;
+      
+      // Clear any check intervals
+      if (checkIntervalRef.current) {
+        clearInterval(checkIntervalRef.current);
+        checkIntervalRef.current = null;
+      }
+    }
+  }, [facilityWriteStatus, facilityWriteError, gameState, onPurchase, onClose]);
 
   // Check if user has sufficient BIT balance and allowance
   useEffect(() => {
@@ -199,37 +285,64 @@ const FacilityPurchaseModal: React.FC<FacilityPurchaseModalProps> = ({
       setIsProcessing(true);
       setFacilityPurchaseError('');
       
-      // Use the right upgrade function based on whether this is an initial purchase or upgrade
-      const result = validatedLevel === 0 
-        ? await gameState.purchaseFacility() 
-        : await gameState.upgradeFacility();
-      
-      if (result) {
-        console.log('Facility upgrade successful!');
-        
-        // Refresh contract data to get the updated facility level
-        if (gameState.refetch) {
-          try {
-            await gameState.refetch();
-            console.log('Refreshed game state after facility upgrade');
-          } catch (refreshError) {
-            console.error('Error refreshing data after upgrade:', refreshError);
+      // For initial purchase, use the gameState method
+      if (validatedLevel === 0) {
+        const result = await gameState.purchaseFacility();
+        if (result) {
+          console.log('Initial facility purchase successful!');
+          
+          // Refresh contract data to get the updated facility level
+          if (gameState.refetch) {
+            try {
+              await gameState.refetch();
+              console.log('Refreshed game state after facility purchase');
+            } catch (refreshError) {
+              console.error('Error refreshing data after purchase:', refreshError);
+            }
           }
-        }
-        
-        // Wait a short moment to ensure data is refreshed
-        setTimeout(() => {
+          
           // Call the onPurchase callback to update the UI
           onPurchase();
           // Close the modal
           onClose();
-        }, 500);
+        }
+        
+        // Always reset processing state for initial purchase
+        setIsProcessing(false);
+        return true;
+      } else {
+        // For upgrades, directly call the buyNewFacility function
+        console.log('Calling buyNewFacility function directly...');
+        
+        // Set transaction in progress flag
+        transactionInProgressRef.current = true;
+        
+        // Send the transaction
+        writeFacilityContract({
+          address: CONTRACT_ADDRESSES.MAIN,
+          abi: MAIN_CONTRACT_ABI,
+          functionName: 'buyNewFacility',
+          args: []
+        });
+        
+        // Set a safety timeout to reset UI if transaction status never updates
+        const safetyTimeout = setTimeout(() => {
+          if (transactionInProgressRef.current) {
+            console.warn('Safety timeout triggered - resetting processing state');
+            setIsProcessing(false);
+            transactionInProgressRef.current = false;
+            setFacilityPurchaseError('Transaction status unknown. Please check your wallet for confirmation.');
+          }
+        }, 60000); // 60 second safety timeout
+        
+        return true;
       }
     } catch (error: any) {
       console.error("Error purchasing facility:", error);
       setFacilityPurchaseError(`Error: ${error.message || 'Transaction failed'}`);
-    } finally {
       setIsProcessing(false);
+      transactionInProgressRef.current = false;
+      return false;
     }
   };
 
@@ -255,6 +368,25 @@ const FacilityPurchaseModal: React.FC<FacilityPurchaseModalProps> = ({
       await executeFacilityPurchase();
     }
   };
+
+  // Add an effect to detect when the user cancels from the wallet
+  useEffect(() => {
+    // If isPending was true and now is false without a success/error status
+    // it likely means the user rejected in the wallet
+    if (!isFacilityWritePending && transactionInProgressRef.current && 
+        facilityWriteStatus !== 'success' && facilityWriteStatus !== 'error') {
+      const checkRejection = setTimeout(() => {
+        if (transactionInProgressRef.current) {
+          console.log('Transaction appears to have been rejected in wallet');
+          setIsProcessing(false);
+          transactionInProgressRef.current = false;
+          setFacilityPurchaseError('Transaction was rejected or failed to send.');
+        }
+      }, 1000);
+      
+      return () => clearTimeout(checkRejection);
+    }
+  }, [isFacilityWritePending, facilityWriteStatus]);
 
   if (!isOpen) return null;
 
@@ -361,10 +493,10 @@ const FacilityPurchaseModal: React.FC<FacilityPurchaseModalProps> = ({
             </button>
             <button
               onClick={handleBuyNewFacility}
-              disabled={isPurchasing || isProcessing || !hasSufficientBalance || isApprovingTokens || isApprovePending}
+              disabled={isPurchasing || isProcessing || !hasSufficientBalance || isApprovingTokens || isApprovePending || isFacilityWritePending}
               className={`font-press-start px-8 py-2 ${hasSufficientBalance ? 'bg-banana text-royal hover:bg-banana/90' : 'bg-[#444444] text-[#888888]'} transition-colors disabled:opacity-50`}
             >
-              {isPurchasing || isProcessing ? 'UPGRADING...' : 
+              {isPurchasing || isProcessing || isFacilityWritePending ? 'UPGRADING...' : 
                isApprovingTokens || isApprovePending ? 'APPROVING...' : 
                !hasSufficientAllowance ? 'APPROVE & UPGRADE' : 'UPGRADE NOW'}
             </button>

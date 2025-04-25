@@ -61,6 +61,16 @@ const pulseStyle = `
   .miner-preview {
     animation: preview-pulse 1.5s infinite;
   }
+  
+  @keyframes pulse-strong {
+    0% { filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.7)); }
+    50% { filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.9)); }
+    100% { filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.7)); }
+  }
+  
+  .miner-pulse-strong {
+    animation: pulse-strong 1.5s infinite;
+  }
 `;
 
 interface PlayerMiner {
@@ -369,10 +379,22 @@ export const RoomVisualization = React.memo(function RoomVisualization({
         const minerX = Number(propMiner.x);
         const minerY = Number(propMiner.y);
         
-        // Sanity check for valid grid positions (0,0), (0,1), (1,0), (1,1)
-        if (minerX > 1 || minerY > 1 || minerX < 0 || minerY < 0) {
+        // Get the current facility level
+        const facilityLevel = contractFacilityLevel || (facilityData?.level || 1);
+        
+        // Sanity check for valid grid positions based on facility level
+        let isValidCoordinate = false;
+        if (facilityLevel >= 2) {
+          // For level 2 facilities, valid coordinates are (0-1, 0-3)
+          isValidCoordinate = minerX >= 0 && minerX <= 1 && minerY >= 0 && minerY <= 3;
+        } else {
+          // For level 1 facilities, valid coordinates are (0-1, 0-1)
+          isValidCoordinate = minerX >= 0 && minerX <= 1 && minerY >= 0 && minerY <= 1;
+        }
+        
+        if (!isValidCoordinate) {
           if (DEBUG_MINERS) {
-            console.log(`Filtering out miner ID ${propMiner.id} with invalid coordinates (${minerX}, ${minerY})`);
+            console.log(`Filtering out miner ID ${propMiner.id} with invalid coordinates (${minerX}, ${minerY}) for facility level ${facilityLevel}`);
           }
           return; // Skip this miner as it has invalid coordinates
         }
@@ -402,11 +424,22 @@ export const RoomVisualization = React.memo(function RoomVisualization({
     const result = allMiners.filter(m => {
       const x = Number(m.x);
       const y = Number(m.y);
-      const validCoordinates = x <= 1 && y <= 1 && x >= 0 && y >= 0 && !isNaN(x) && !isNaN(y);
+      
+      // Get the current facility level
+      const facilityLevel = contractFacilityLevel || (facilityData?.level || 1);
+      
+      // Validate coordinates based on facility level
+      let validCoordinates = false;
+      if (facilityLevel >= 2) {
+        // For level 2 facilities, valid coordinates are (0-1, 0-3)
+        validCoordinates = x >= 0 && x <= 1 && y >= 0 && y <= 3 && !isNaN(x) && !isNaN(y);
+      } else {
+        // For level 1 facilities, valid coordinates are (0-1, 0-1)
+        validCoordinates = x >= 0 && x <= 1 && y >= 0 && y <= 1 && !isNaN(x) && !isNaN(y);
+      }
+      
       if (!validCoordinates && DEBUG_MINERS) {
-        console.log(`Mapping miner ID ${m.id} with type ${m.minerType} at position (${x}, ${y})`);
-        console.log(`Validated miner ID ${m.id} at (${x}, ${y})`);
-        console.log(`Filtering out miner ID ${m.id} with invalid coordinates (${x}, ${y})`);
+        console.log(`Filtering out miner ID ${m.id} with invalid coordinates (${x}, ${y}) for facility level ${facilityLevel}`);
       }
       return validCoordinates;
     });
@@ -420,7 +453,7 @@ export const RoomVisualization = React.memo(function RoomVisualization({
     };
     
     return result;
-  }, [miners, contractMiners, DEBUG_MINERS]);
+  }, [miners, contractMiners, DEBUG_MINERS, contractFacilityLevel, facilityData?.level]);
   
   // Filter out miners with non-zero rewardDebt
   const processedMiners = useMemo(() => {
@@ -440,6 +473,10 @@ export const RoomVisualization = React.memo(function RoomVisualization({
     const minersByIds = new Map();
     const processedItems: PlayerMiner[] = [];
     
+    // Debug logging for facility level
+    const facilityLevel = contractFacilityLevel || (facilityData?.level || 1);
+    console.log(`Processing combinedMinersData with facility level: ${facilityLevel}`);
+    
     // Add items from both sources to our maps
     [...(processedMiners || []), ...allMinersData].forEach(miner => {
       if (!miner) return; // Skip null/undefined miners
@@ -448,9 +485,24 @@ export const RoomVisualization = React.memo(function RoomVisualization({
       const y = Number(miner.y);
       const id = String(miner.id);
       
-      // Skip miners with invalid coordinates
-      if (x > 1 || y > 1 || x < 0 || y < 0) {
+      // Skip miners with invalid coordinates based on facility level
+      let isValidCoordinate = false;
+      if (facilityLevel >= 2) {
+        isValidCoordinate = x >= 0 && x <= 1 && y >= 0 && y <= 3;
+      } else {
+        isValidCoordinate = x >= 0 && x <= 1 && y >= 0 && y <= 1;
+      }
+      
+      if (!isValidCoordinate) {
+        if (DEBUG_MINERS) {
+          console.log(`Filtering out miner ID ${id} with invalid coordinates (${x}, ${y}) for facility level ${facilityLevel}`);
+        }
         return;
+      }
+      
+      // Special debug for position (0,2)
+      if (x === 0 && y === 2) {
+        console.log(`Found miner at (0,2) with ID ${id} while processing combinedMinersData`, miner);
       }
       
       // Use position and ID as unique keys
@@ -464,7 +516,7 @@ export const RoomVisualization = React.memo(function RoomVisualization({
     });
     
     // Extract values from position map to create final array
-    for (const [_, miner] of minersByPosition) {
+    for (const [posKey, miner] of minersByPosition) {
       processedItems.push({
         ...miner,
         minerType: Number(miner.minerType || miner.type || 0),
@@ -473,10 +525,15 @@ export const RoomVisualization = React.memo(function RoomVisualization({
         y: Number(miner.y),
         id: String(miner.id)
       });
+      
+      // Debug logging for position (0,2)
+      if (Number(miner.x) === 0 && Number(miner.y) === 2) {
+        console.log(`Added miner at (0,2) to processedItems with image: ${miner.image || '/banana-miner.gif'}`);
+      }
     }
     
     return processedItems;
-  }, [processedMiners, allMinersData]);
+  }, [processedMiners, allMinersData, DEBUG_MINERS, contractFacilityLevel, facilityData?.level]);
   
   // Helper function to check if a tile is occupied by a miner - make stable with useCallback
   const isTileOccupied = useCallback((x: number, y: number) => {
@@ -498,9 +555,39 @@ export const RoomVisualization = React.memo(function RoomVisualization({
     const targetX = Number(x);
     const targetY = Number(y);
     
+    // Check facility level to validate if this is a valid position
+    const facilityLevel = contractFacilityLevel || (facilityData?.level || 1);
+    
+    // For facility level 2, valid coordinates are (0-1, 0-3)
+    // For facility level 1, valid coordinates are (0-1, 0-1)
+    let isValidPosition = false;
+    if (facilityLevel >= 2) {
+      isValidPosition = targetX >= 0 && targetX <= 1 && targetY >= 0 && targetY <= 3;
+    } else {
+      isValidPosition = targetX >= 0 && targetX <= 1 && targetY >= 0 && targetY <= 1;
+    }
+    
+    // Debugging for position (0,2)
+    if (targetX === 0 && targetY === 2) {
+      console.log(`getMinerAtTileLocal checking (0,2): facilityLevel=${facilityLevel}, isValidPosition=${isValidPosition}`);
+    }
+    
+    // If position is invalid for current facility level, return null
+    if (!isValidPosition) {
+      if (targetX === 0 && targetY === 2) {
+        console.log(`Position (0,2) is invalid for facility level ${facilityLevel}`);
+      }
+      return null;
+    }
+    
     // If the parent component provided a function, use it
     if (getMinerAtTile) {
       const miner = getMinerAtTile(targetX, targetY);
+      
+      // Log for position (0,2)
+      if (targetX === 0 && targetY === 2) {
+        console.log('getMinerAtTile result for (0,2):', miner);
+      }
       
       // If the parent provided a miner, process it to ensure it has the right properties
       if (miner) {
@@ -530,13 +617,21 @@ export const RoomVisualization = React.memo(function RoomVisualization({
     }
     
     // Fallback to our pre-computed combinedMinersData if getMinerAtTile function is not provided
-    return combinedMinersData.find(miner => {
+    const miner = combinedMinersData.find(miner => {
       const minerX = Number(miner.x);
       const minerY = Number(miner.y);
       // Ensure strict number comparison
       return minerX === targetX && minerY === targetY;
-    }) || null;
-  }, [getMinerAtTile, combinedMinersData]);
+    });
+    
+    // Log for position (0,2)
+    if (targetX === 0 && targetY === 2) {
+      console.log('combinedMinersData result for (0,2):', miner || 'not found');
+      console.log('All miners in combinedMinersData:', combinedMinersData);
+    }
+    
+    return miner || null;
+  }, [getMinerAtTile, combinedMinersData, contractFacilityLevel, facilityData?.level]);
 
   // Add a function to get a display label for miners - moved up before it's used
   const getMinerLabel = (miner: any) => {
@@ -791,19 +886,19 @@ export const RoomVisualization = React.memo(function RoomVisualization({
         x: 0, y: 2,
         style: { 
           position: 'absolute' as const,
-          top: isMobile ? '52%' : '50%',
-          left: isMobile ? '60%' : '55%',
-          width: isMobile ? '35px' : '100px',
-          height: isMobile ? '35px' : '100px',
-          zIndex: 20
+          top: isMobile ? '52%' : '47%',
+          left: isMobile ? '60%' : '60%',
+          width: isMobile ? '45px' : '120px', // Make slightly larger for better visibility
+          height: isMobile ? '45px' : '120px',
+          zIndex: 25 // Higher z-index to ensure visibility
         }
       },
       { 
         x: 1, y: 2,
         style: { 
           position: 'absolute' as const,
-          top: isMobile ? '52%' : '50%',
-          left: isMobile ? '30%' : '25%',
+          top: isMobile ? '52%' : '60%',
+          left: isMobile ? '30%' : '43%',
           width: isMobile ? '35px' : '100px',
           height: isMobile ? '35px' : '100px',
           zIndex: 20
@@ -855,6 +950,11 @@ export const RoomVisualization = React.memo(function RoomVisualization({
     combinedMinersData.forEach(miner => {
       const key = `${Number(miner.x)}-${Number(miner.y)}`;
       posMap.set(key, miner);
+      
+      // Debug log when a miner at position (0,2) is found
+      if (Number(miner.x) === 0 && Number(miner.y) === 2) {
+        console.log('Found miner at position (0,2):', miner);
+      }
     });
     return posMap;
   }, [combinedMinersData]);
@@ -865,6 +965,16 @@ export const RoomVisualization = React.memo(function RoomVisualization({
     if (DEBUG_RENDERS) {
       renderCount.current++;
       console.log(`renderMiningSpaces called (${renderCount.current} times)`);
+    }
+
+    // Get the facility level for validation
+    const facilityLevel = contractFacilityLevel || (facilityData?.level || 1);
+    
+    // Log positions of all miners for debugging
+    if (DEBUG_MINERS && combinedMinersData) {
+      combinedMinersData.forEach((miner) => {
+        console.log(`Grid miner found: ID=${miner.id}, Type=${miner.minerType}, Position=(${miner.x},${miner.y})`);
+      });
     }
 
     return customPositions.map(pos => {
@@ -879,17 +989,55 @@ export const RoomVisualization = React.memo(function RoomVisualization({
       // Create a unique key for this tile
       const key = `tile-${x}-${y}`;
       
+      // Skip positions that are invalid for the current facility level
+      let isValidPosition = false;
+      if (facilityLevel >= 2) {
+        // For level 2 facilities, valid coordinates are (0-1, 0-3)
+        isValidPosition = x >= 0 && x <= 1 && y >= 0 && y <= 3;
+      } else {
+        // For level 1 facilities, valid coordinates are (0-1, 0-1)
+        isValidPosition = x >= 0 && x <= 1 && y >= 0 && y <= 1;
+      }
+      
+      if (!isValidPosition) {
+        if (DEBUG_MINERS) {
+          console.log(`Skipping invalid position (${x},${y}) for facility level ${facilityLevel}`);
+        }
+        return null;
+      }
+      
       // Use a local cached variable to avoid calling functions during render
       // This breaks potential render loops by not triggering re-renders
-      const miner = getMinerAtTileLocal(x, y);
-      const hasMiner = miner !== null;
-          
-          return (
-            <div 
+      // Force direct lookup in combinedMinersData for more reliable detection
+      let miner = getMinerAtTileLocal(x, y);
+      
+      // If that fails, try direct lookup in combinedMinersData
+      if (!miner && combinedMinersData && combinedMinersData.length > 0) {
+        const foundMiner = combinedMinersData.find(m => 
+          Number(m.x) === Number(x) && Number(m.y) === Number(y)
+        );
+        if (foundMiner) {
+          miner = foundMiner;
+        }
+      }
+      
+      const hasMiner = Boolean(miner);
+      
+      // Add debug for positions (0,2) and (1,2)
+      if ((x === 0 && y === 2) || (x === 1 && y === 2)) {
+        console.log(`Grid rendering for position (${x},${y}) - Has miner: ${hasMiner}`, miner);
+      }
+      
+      // Check if this is the special position with APEPAD_MINI
+      const isSpecialAPEPAD = hasMiner && miner && 
+                          Number(miner.minerType || miner.type || 0) === 3; // APEPAD_MINI is type 3
+        
+      return (
+        <div 
           key={key}
-          className={`mining-space ${isSelected ? 'selected' : ''} ${hasMiner ? 'has-miner' : ''}`}
+          className={`mining-space ${isSelected ? 'selected' : ''} ${hasMiner ? 'has-miner' : ''} ${isSpecialAPEPAD ? 'apepad-special' : ''}`}
           onClick={() => handleTileClick(x, y)}
-              style={{
+          style={{
             ...style,
             position: 'relative',
             width: '100%',
@@ -901,7 +1049,19 @@ export const RoomVisualization = React.memo(function RoomVisualization({
             cursor: 'pointer',
             transition: 'all 0.2s ease',
             // Add debug outline when in development
-            ...(process.env.NODE_ENV === 'development' && DEBUG_MINERS ? { outline: '1px solid rgba(255,255,0,0.3)' } : {})
+            ...(process.env.NODE_ENV === 'development' && DEBUG_MINERS ? { outline: '1px solid rgba(255,255,0,0.3)' } : {}),
+            // Make positions stand out more when in grid mode
+            ...(hasMiner ? {
+              backgroundColor: 'rgba(0, 0, 0, 0.6)', 
+              boxShadow: '0 0 10px rgba(255, 221, 0, 0.5)',
+              border: '2px solid rgba(255, 221, 0, 0.5)'
+            } : {}),
+            // Make APEPAD MINI stand out even more
+            ...(isSpecialAPEPAD ? {
+              backgroundColor: 'rgba(0, 0, 0, 0.6)', 
+              boxShadow: '0 0 15px rgba(255, 255, 255, 0.5)',
+              border: '2px solid rgba(255, 255, 255, 0.5)'
+            } : {})
           }}
         >
           {/* Display coordinates when grid mode is active */}
@@ -912,7 +1072,7 @@ export const RoomVisualization = React.memo(function RoomVisualization({
               left: '5px',
               fontSize: '10px',
               fontWeight: 'bold',
-              color: '#FFDD00',
+              color: isSpecialAPEPAD ? '#FFFFFF' : '#FFDD00',
               fontFamily: 'monospace',
               zIndex: 30,
               textShadow: '1px 1px 1px rgba(0,0,0,0.8)'
@@ -920,36 +1080,85 @@ export const RoomVisualization = React.memo(function RoomVisualization({
           )}
 
           {/* Show miner in grid if one exists */}
-          {hasMiner && isGridMode && (
+          {hasMiner && miner && isGridMode && (
             <div 
-              className="grid-miner-container" 
-                  style={{ 
+              className={`grid-miner-container ${isSpecialAPEPAD ? 'grid-miner-apepad' : ''}`}
+              style={{ 
                 position: 'relative',
-                width: '80%',
-                height: '80%',
+                width: isSpecialAPEPAD ? '90%' : '80%',
+                height: isSpecialAPEPAD ? '90%' : '80%',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                zIndex: 25
+                zIndex: 25,
+                ...(isSpecialAPEPAD ? { filter: 'brightness(1.3) drop-shadow(0 0 10px rgba(255, 255, 255, 0.7))' } : {})
               }}
             >
               <Image
                 src={miner.image || '/banana-miner.gif'}
                 alt={`Miner ${miner.id}`}
                 fill
-                className="object-contain"
+                className={`object-contain ${isSpecialAPEPAD ? 'miner-pulse-strong' : ''}`}
                 priority
               />
-                  </div>
-                )}
+              
+              {/* For APEPAD at special positions, add a label for better visibility */}
+              {isSpecialAPEPAD && (
+                <div style={{
+                  position: 'absolute',
+                  bottom: '-5px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  fontSize: '9px',
+                  color: '#ffffff',
+                  backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                  padding: '1px 4px',
+                  borderRadius: '3px',
+                  whiteSpace: 'nowrap',
+                  zIndex: 30
+                }}>
+                  APEPAD MINI
+                </div>
+              )}
             </div>
-          );
-    });
-  }, [isGridMode, DEBUG_MINERS, DEBUG_RENDERS, getMinerAtTileLocal, handleTileClick, customPositions]);
+          )}
+        </div>
+      );
+    }).filter(Boolean); // Filter out null entries (invalid positions)
+  }, [isGridMode, DEBUG_MINERS, DEBUG_RENDERS, getMinerAtTileLocal, handleTileClick, customPositions, contractFacilityLevel, facilityData?.level, combinedMinersData]);
 
+  // Function to ensure a miner has the correct image based on its type
+  const getMinerImage = useCallback((miner: PlayerMiner) => {
+    if (!miner) return '/banana-miner.gif'; // Default fallback
+    
+    const minerType = Number(miner.minerType || miner.type || 0);
+    
+    // If the miner already has an image property, use it
+    if (miner.image) return miner.image;
+    
+    // Otherwise map based on miner type
+    switch (minerType) {
+      case 1: return '/banana-miner.gif'; // BANANA_MINER
+      case 2: return '/monkey-toaster.gif'; // MONKEY_TOASTER 
+      case 3: return '/apepad.png'; // APEPAD_MINI
+      case 4: return '/gorilla-gadget.gif'; // GORILLA_GADGET
+      default: return '/banana-miner.gif'; // Default fallback
+    }
+  }, []);
+  
   // Separate function to render active miners on the blue floor tiles
   const renderActiveMiners = useCallback(() => {
     if (!hasFacility || !combinedMinersData) return null;
+
+    // Add debugging to check all miners in combinedMinersData
+    if (DEBUG_MINERS) {
+      console.log('All miners in combinedMinersData:', combinedMinersData);
+      // Check specifically for position (0,2)
+      const miner02 = combinedMinersData.find(m => Number(m.x) === 0 && Number(m.y) === 2);
+      if (miner02) {
+        console.log('Found miner at (0,2) in combinedMinersData:', miner02);
+      }
+    }
 
     return minerPositions.map(pos => {
       const { x, y, style } = pos;
@@ -959,26 +1168,38 @@ export const RoomVisualization = React.memo(function RoomVisualization({
       const posKey = `${x}-${y}`;
       const miner = minersByPosition.get(posKey);
       
+      // Debug for position (0,2)
+      if (x === 0 && y === 2) {
+        console.log(`Checking miner at position (0,2): ${miner ? 'FOUND' : 'NOT FOUND'}`);
+        if (miner) {
+          console.log('Miner details:', miner);
+        }
+      }
+      
       // Skip rendering if no miner at this position
       if (!miner) return null;
       
-      // Different miner sizes depending on their type
-      const getMinerSize = () => {
-        const minerType = Number(miner.minerType || miner.type || 0);
-        switch (minerType) {
-          case 1: return { width: '130%', height: '130%' }; // BANANA_MINER
-          case 2: return { width: '140%', height: '140%' }; // GORILLA_GADGET
-          case 3: return { width: '135%', height: '135%' }; // MONKEY_TOASTER
-          case 4: return { width: '130%', height: '130%' }; // APEPAD_MINI
-          default: return { width: '130%', height: '130%' };
-        }
-      };
+      // Get the proper miner image
+      const minerImage = getMinerImage(miner);
+      
+      // If this is position (0,2), add even more debug
+      if (x === 0 && y === 2) {
+        console.log(`Rendering miner at (0,2) with image: ${minerImage}`);
+        console.log(`Miner type: ${miner.minerType || miner.type}, Position: (${miner.x}, ${miner.y})`);
+      }
+      
+      // Check if this is the special position (0,2) with APEPAD_MINI
+      const isSpecialAPEPAD = x === 0 && y === 2 && 
+                            Number(miner.minerType || miner.type || 0) === 3; // APEPAD_MINI is type 3
+      
+      // Apply a special class instead of inline styles to avoid the conflict with "fill"
+      const minerClassName = `object-contain ${isSpecialAPEPAD ? 'miner-pulse-strong apepad-mini' : 'miner-pulse'}`;
 
-          return (
-            <div
+      return (
+        <div
           key={`active-miner-${x}-${y}`}
           className="active-miner-container" 
-              style={{
+          style={{
             ...style,
             opacity: isGridMode ? 0 : 1,
             transition: 'opacity 0.3s ease'
@@ -990,13 +1211,14 @@ export const RoomVisualization = React.memo(function RoomVisualization({
             height: '100%',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center'
+            justifyContent: 'center',
+            ...(isSpecialAPEPAD ? { filter: 'brightness(1.3) drop-shadow(0 0 10px rgba(255, 255, 255, 0.7))' } : {})
           }}>
             <Image
-              src={miner.image || '/banana-miner.gif'}
+              src={minerImage}
               alt={`Miner ${miner.id}`}
               fill
-              className="object-contain miner-pulse"
+              className={minerClassName}
               priority
             />
             {DEBUG_MINERS && (
@@ -1014,10 +1236,10 @@ export const RoomVisualization = React.memo(function RoomVisualization({
               </div>
             )}
           </div>
-      </div>
-    );
+        </div>
+      );
     }).filter(Boolean); // Filter out null entries (positions without miners)
-  }, [hasFacility, combinedMinersData, isGridMode, DEBUG_MINERS, getMinerLabel, minerPositions, minersByPosition]);
+  }, [hasFacility, combinedMinersData, isGridMode, DEBUG_MINERS, getMinerLabel, minerPositions, minersByPosition, getMinerImage]);
 
   // Add debugging to monitor excessive re-renders in development
   useEffect(() => {
@@ -1029,11 +1251,31 @@ export const RoomVisualization = React.memo(function RoomVisualization({
     if (renderCount.current % 5 === 0) {
       console.log(`RoomVisualization has re-rendered ${renderCount.current} times`);
     }
-  });
+    
+    // Debug level 2 facility positions for position (0,2)
+    const facilityLevel = contractFacilityLevel || (facilityData?.level || 1);
+    if (facilityLevel === 2) {
+      console.log('Level 2 facility detected - checking for level 2 positions');
+      
+      // Check customPositions for position (0,2)
+      const hasPos02InGrid = customPositions.some(pos => pos.x === 0 && pos.y === 2);
+      console.log(`Position (0,2) exists in customPositions: ${hasPos02InGrid}`);
+      
+      // Check minerPositions for position (0,2)
+      const hasPos02InMiners = minerPositions.some(pos => pos.x === 0 && pos.y === 2);
+      console.log(`Position (0,2) exists in minerPositions: ${hasPos02InMiners}`);
+      
+      // Check if a miner exists at position (0,2)
+      const miner02 = getMinerAtTileLocal(0, 2);
+      console.log(`Miner at position (0,2): ${miner02 ? 'EXISTS' : 'DOES NOT EXIST'}`, miner02);
+    }
+  }, [customPositions, minerPositions, contractFacilityLevel, facilityData?.level, getMinerAtTileLocal]);
 
   // Add this function to get the current grid template configuration based on facility level
   const getGridTemplate = useCallback(() => {
     const facilityLevel = contractFacilityLevel || (facilityData?.level || 1);
+    
+    console.log(`Getting grid template for facility level: ${facilityLevel}`);
     
     switch (facilityLevel) {
       case 2:
@@ -1041,14 +1283,34 @@ export const RoomVisualization = React.memo(function RoomVisualization({
           columns: 'repeat(2, 1fr)',
           rows: 'repeat(4, 1fr)',
           width: isMobile ? '280px' : '330px',
-          height: isMobile ? '380px' : '450px' // Increased height for 4 rows
+          height: isMobile ? '380px' : '450px', // Increased height for 4 rows
+          gridClass: 'level-2-grid',
+          extraStyles: `
+            .level-2-grid .mining-space:nth-child(5),
+            .level-2-grid .mining-space:nth-child(6) {
+              position: relative;
+            }
+            .level-2-grid .mining-space:nth-child(5)::after,
+            .level-2-grid .mining-space:nth-child(6)::after {
+              content: '';
+              position: absolute;
+              top: 0;
+              left: 0;
+              right: 0;
+              bottom: 0;
+              border: 1px solid rgba(255, 255, 255, 0.3);
+              pointer-events: none;
+            }
+          `
         };
       default:
         return {
           columns: 'repeat(2, 1fr)',
           rows: 'repeat(2, 1fr)',
           width: isMobile ? '250px' : '300px',
-          height: isMobile ? '140px' : '170px'
+          height: isMobile ? '140px' : '170px',
+          gridClass: '',
+          extraStyles: ''
         };
     }
   }, [isMobile, contractFacilityLevel, facilityData?.level]);
@@ -1301,6 +1563,24 @@ export const RoomVisualization = React.memo(function RoomVisualization({
           grid-template-rows: repeat(4, 1fr);
         }
         
+        /* Additional styles for the APEPAD MINI at (0,2) */
+        .apepad-special {
+          background-color: rgba(0, 0, 0, 0.6) !important;
+          box-shadow: 0 0 15px rgba(255, 255, 255, 0.5) !important;
+          border: 2px solid rgba(255, 255, 255, 0.5) !important;
+        }
+        
+        /* Style for APEPAD MINI image */
+        .apepad-mini {
+          object-fit: contain !important; 
+          width: 150% !important;
+          height: 150% !important;
+          transform: translate(-16%, -16%);
+        }
+        
+        /* Extra styles from getGridTemplate */
+        ${getGridTemplate().extraStyles}
+        
         .grid-mode {
           opacity: 1;
         }
@@ -1329,6 +1609,12 @@ export const RoomVisualization = React.memo(function RoomVisualization({
         .grid-miner-container {
           opacity: 0.9;
           filter: brightness(1.2);
+        }
+        
+        /* Special styling for APEPAD in grid */
+        .grid-miner-apepad {
+          opacity: 1;
+          filter: brightness(1.5) drop-shadow(0 0 10px rgba(255, 255, 255, 0.7));
         }
         
         /* Animation for miners */
@@ -1375,9 +1661,7 @@ export const RoomVisualization = React.memo(function RoomVisualization({
         
         {/* Mining Grid - For selection and interaction only */}
         {hasFacility && (
-          <div className={`mining-grid ${isGridMode ? 'grid-mode' : ''} ${
-            contractFacilityLevel === 2 || facilityData?.level === 2 ? 'level-2-grid' : ''
-          }`}>
+          <div className={`mining-grid ${isGridMode ? 'grid-mode' : ''} ${getGridTemplate().gridClass}`}>
             {renderMiningSpaces()}
           </div>
         )}
