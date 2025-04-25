@@ -5,6 +5,8 @@ import { CONTRACT_ADDRESSES, MAIN_CONTRACT_ABI, MAIN_CONTRACT_ABI_EXTENDED } fro
 import { MINERS, MinerType, getMinerById } from '../config/miners';
 import { Address, zeroAddress } from 'viem';
 import StarterMinerModal from './StarterMinerModal';
+import { useGameState } from '../hooks/useGameState';
+import { useFacilityLevel } from './FacilityLevelProvider';
 
 // Set debug logging to false to remove miner type overlays
 const DEBUG_MINERS = false;
@@ -319,8 +321,20 @@ export const RoomVisualization = React.memo(function RoomVisualization({
     });
   }, []); // Empty dependency array to run only once
 
-  // Create a ref to track previous miner data to avoid unnecessary rerenders
-  const prevMinersDataRef = useRef(null);
+  // Fix the prevMinersDataRef type issue by initializing it properly
+  const prevMinersDataRef = useRef<{
+    miners: PlayerMiner[];
+    contractMiners: PlayerMiner[];
+    minersString: string;
+    contractMinersString: string;
+    result: PlayerMiner[];
+  } | null>(null);
+
+  // Add the required state variables for facility tracking
+  const [imageRefreshKey, setImageRefreshKey] = useState(Date.now());
+  const [contractFacilityLevel, setContractFacilityLevel] = useState<number | null>(null);
+  const { facilityLevel: contextFacilityLevel } = useFacilityLevel();
+  const { facilityData: gameStateFacilityData } = useGameState();
 
   // Process the miners data outside of render to ensure consistent hook calls
   // Use stable object references with useMemo and implement deeper comparison
@@ -419,13 +433,12 @@ export const RoomVisualization = React.memo(function RoomVisualization({
     });
   }, [miners]);
   
-  // Combine processedMiners and allMinersData outside any render functions
-  // to ensure hooks are called consistently - use stable object comparison
-  const combinedMinersData = useMemo(() => {
+  // Define proper typing for combinedMinersData
+  const combinedMinersData = useMemo<PlayerMiner[]>(() => {
     // Create maps to track unique positions and IDs
     const minersByPosition = new Map();
     const minersByIds = new Map();
-    const processedItems = [];
+    const processedItems: PlayerMiner[] = [];
     
     // Add items from both sources to our maps
     [...(processedMiners || []), ...allMinersData].forEach(miner => {
@@ -949,26 +962,115 @@ export const RoomVisualization = React.memo(function RoomVisualization({
     };
   }, []);
 
-  // Get the appropriate facility image based on the facility index
-  const getFacilityImage = useMemo(() => {
-    if (!facilityData) return "/images/facilities/bedroom.png";
+  // Extract facility level from props for direct reference
+  const contractLevel = facilityData?.level;
+
+  // Add effect to update contractFacilityLevel when needed
+  useEffect(() => {
+    // First priority: direct level from props
+    if (contractLevel !== undefined) {
+      console.log(`🔥 USING DIRECT CONTRACT LEVEL PROP: ${contractLevel}`);
+      setContractFacilityLevel(contractLevel);
+    }
+    // Second priority: context facility level
+    else if (contextFacilityLevel) {
+      console.log(`🔥 USING CONTEXT FACILITY LEVEL: ${contextFacilityLevel}`);
+      setContractFacilityLevel(contextFacilityLevel);
+    }
+    // Third priority: game state facility data
+    else if (gameStateFacilityData && gameStateFacilityData.level) {
+      const newLevel = Number(gameStateFacilityData.level);
+      console.log(`🔥 DETECTED FACILITY LEVEL FROM GAME STATE: ${newLevel}`);
+      
+      // Only update if different to avoid re-renders
+      if (contractFacilityLevel !== newLevel) {
+        setContractFacilityLevel(newLevel);
+        console.log(`🔥 UPDATED CONTRACT FACILITY LEVEL TO: ${newLevel}`);
+      }
+    }
+  }, [gameStateFacilityData, contractFacilityLevel, contractLevel, contextFacilityLevel]);
+
+  // Implementation of getFacilityImage function without user identifiers
+  const getFacilityImage = useCallback((): string => {
+    // Always use a fresh timestamp for strong cache busting
+    const timestamp = Date.now();
     
-    // Use the level property from facilityData which corresponds to facilityIndex
-    const facilityIndex = facilityData.level;
+    // STEP 1: Get the facility level - prioritize direct contractLevel prop
+    let facilityLevel = 1; // Default level
     
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`Facility index: ${facilityIndex}, using image: ${facilityIndex === 1 ? 'bedroom.png' : 'treehouse.png'}`);
+    // First check direct contractLevel prop
+    if (contractLevel !== undefined) {
+      facilityLevel = contractLevel;
+      console.log(`🚨 USING DIRECT CONTRACT LEVEL PROP: ${facilityLevel}`);
+    }
+    // Then check if we have a confirmed contract level
+    else if (contractFacilityLevel) {
+      facilityLevel = contractFacilityLevel;
+      console.log(`🚨 USING CONFIRMED CONTRACT LEVEL: ${facilityLevel}`);
+    }
+    // Then check facility data as fallback
+    else if (gameStateFacilityData) {
+      facilityLevel = Number(gameStateFacilityData.level) || 1;
+      console.log(`🚨 USING FACILITY DATA LEVEL: ${facilityLevel}`);
     }
     
-    switch (facilityIndex) {
-      case 1:
-        return "/images/facilities/bedroom.png";
-      case 2:
-        return "/images/facilities/treehouse.png";
-      default:
-        return "/images/facilities/bedroom.png";
+    // STEP 2: Special DOM-based detection for level 2 facilities to fix the cache issue
+    try {
+      // Check DOM for any indicators that we're at level 2
+      const atLevel2 = document.querySelector('.level-2-grid') !== null;
+      if (atLevel2 && facilityLevel !== 2) {
+        console.log(`🔄 DOM indicates we're at level 2 - overriding detected level ${facilityLevel}`);
+        facilityLevel = 2;
+      }
+      
+      // Check URL params for any level indicators (helpful for debugging)
+      const urlParams = new URLSearchParams(window.location.search);
+      const levelParam = urlParams.get('level');
+      if (levelParam && !isNaN(Number(levelParam))) {
+        console.log(`🔄 URL indicates facility level ${levelParam} - overriding detected level ${facilityLevel}`);
+        facilityLevel = Number(levelParam);
+      }
+    } catch (e) {
+      console.error('Error checking DOM for level indicators:', e);
     }
-  }, [facilityData]);
+    
+    console.log(`🚨🚨🚨 FINAL FACILITY LEVEL DETERMINATION: ${facilityLevel}`);
+    
+    // STEP 3: Special handling based on detected level
+    if (facilityLevel === 2) {
+      // Complete bypass of cache for level 2
+      const level2Path = `/images/facilities/level-2.png?bypass=${timestamp}&force=true&t=${timestamp}&level=2`;
+      console.log(`⚠️ LEVEL 2 FACILITY - LOADING IMAGE: ${level2Path}`);
+      
+      // Immediately update the DOM to match level 2
+      setTimeout(() => {
+        try {
+          const gridElement = document.querySelector('.mining-grid');
+          if (gridElement) {
+            gridElement.classList.add('level-2-grid');
+            console.log('Added level-2-grid class for level 2 facility');
+          }
+        } catch (e) {
+          console.error('Error updating grid for level 2:', e);
+        }
+      }, 0);
+      
+      return level2Path;
+    } else if (facilityLevel === 3) {
+      const level3Path = `/images/facilities/level-3.png?t=${timestamp}&level=3`;
+      console.log(`⚠️ LEVEL 3 FACILITY - LOADING IMAGE: ${level3Path}`);
+      return level3Path;
+    } else if (facilityLevel === 4) {
+      const level4Path = `/images/facilities/level-4.png?t=${timestamp}&level=4`;
+      console.log(`⚠️ LEVEL 4 FACILITY - LOADING IMAGE: ${level4Path}`);
+      return level4Path;
+    } else {
+      // Default level 1
+      const level1Path = `/images/facilities/level-1.png?t=${timestamp}&level=1`;
+      console.log(`⚠️ LEVEL 1 FACILITY - LOADING IMAGE: ${level1Path}`);
+      return level1Path;
+    }
+  }, [gameStateFacilityData, contractFacilityLevel, contractLevel]);
 
   return (
     <>
@@ -1037,7 +1139,7 @@ export const RoomVisualization = React.memo(function RoomVisualization({
         {/* Room Background - Only show if hasFacility is true */}
         {hasFacility ? (
           <Image 
-            src={getFacilityImage} 
+            src={getFacilityImage()} 
             alt="Mining Room" 
             fill
             priority
@@ -1049,106 +1151,14 @@ export const RoomVisualization = React.memo(function RoomVisualization({
             }}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
+          <div className="w-full h-full flex items-center justify-center bg-dark-blue">
             <Image 
-              src="/images/facilities/bedroom.png" 
+              src="/bedroom.png" 
               alt="Empty Space" 
               width={690}
               height={690}
-              className="absolute inset-0 object-contain w-full h-full"
+              className="opacity-30"
             />
-            {/* Enhanced overlay with improved visibility and consistency across devices */}
-            {isMobile && (
-              <div className="absolute inset-0 flex items-center justify-center z-40">
-                <div className={`max-w-md p-2 bg-transparent backdrop-blur-sm rounded-lg border-2 border-banana shadow-lg relative overflow-hidden ${isMobile ? 'w-11/12' : ''}`}>
-                  {/* FREE Miner Badge */}
-                  <div className="absolute -right-12 top-3 bg-green-500 text-white font-press-start text-[8px] py-0.5 px-8 transform rotate-45 shadow-lg z-50">
-                    FREE MINER
-                  </div>
-                  
-                  <p className={`font-press-start text-white ${isMobile ? 'text-xs' : 'text-lg'} mb-1.5`}>Start Your Mining Operation Now!</p>
-                  
-                  {/* Free Miner Promotion */}
-                  <div className="bg-[#001420]/60 p-1.5 rounded-md mb-2 border-2 border-yellow-400 flex items-center">
-                    <div className={`relative ${isMobile ? 'w-10 h-10 mr-1.5' : 'w-24 h-24 mr-4'}`}>
-                      <Image 
-                        src={MINERS[MinerType.BANANA_MINER].image}
-                        alt="Free Banana Miner" 
-                        width={isMobile ? 40 : 96}
-                        height={isMobile ? 40 : 96}
-                        className="object-contain"
-                        unoptimized={true}
-                      />
-                    </div>
-                    <div>
-                      <p className={`text-yellow-400 font-press-start ${isMobile ? 'text-[10px]' : 'text-base'} mb-0.5`}>FREE BANANA MINER</p>
-                      <p className={`text-white font-press-start ${isMobile ? 'text-[8px]' : 'text-sm'} mb-0.5`}>
-                        • {MINERS[MinerType.BANANA_MINER].hashrate} GH/s Hashrate
-                      </p>
-                      <p className={`text-white font-press-start ${isMobile ? 'text-[8px]' : 'text-sm'} mb-0.5`}>
-                        • {MINERS[MinerType.BANANA_MINER].energyConsumption} WATTS Energy
-                      </p>
-                      <p className={`text-banana font-press-start ${isMobile ? 'text-[8px]' : 'text-sm'}`}>
-                        • Start mining immediately!
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {/* Combined purchase button with cost indicator */}
-                  <div className="flex flex-col items-center">
-                    <button 
-                      onClick={onPurchaseFacility}
-                      disabled={isPurchasingFacility}
-                      className={`font-press-start ${isMobile ? 'text-[10px] px-2 py-1.5' : 'px-8 py-4 text-base'} w-full bg-gradient-to-r from-[#F0B90B] to-[#FFDD00] text-black hover:opacity-90 transition-opacity rounded-md shadow-md font-bold border-none flex items-center justify-center`}
-                    >
-                      {isPurchasingFacility ? (
-                        <span className="flex items-center justify-center">
-                          <svg className="animate-spin -ml-1 mr-1.5 h-2.5 w-2.5 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          PURCHASING...
-                        </span>
-                      ) : (
-                        <>
-                          <span>BUY FACILITY</span>
-                          <div className="flex items-center ml-1.5 bg-blue-600 rounded-full px-1 py-0.5">
-                            {isMobile ? (
-                              // For mobile: use text only (more reliable)
-                              <span className="text-white text-[8px] font-bold mr-0.5">10</span>
-                            ) : (
-                              // For desktop: use the ApeCoin logo image
-                              <div className="w-4 h-4 flex-shrink-0 mr-1 relative">
-                                <img 
-                                  src="/apecoin.png" 
-                                  alt="APE" 
-                                  className="w-full h-full object-contain"
-                                  style={{ maxWidth: '100%', maxHeight: '100%' }}
-                                />
-                              </div>
-                            )}
-                            <span className="text-white font-bold text-[8px]">{isMobile ? "" : "10 "}APE</span>
-                          </div>
-                        </>
-                      )}
-                    </button>
-                    <p className="text-white text-[8px] mt-0.5 opacity-80">(Initial facility includes a FREE Miner)</p>
-                    
-                    {/* ApeCoin Powered Text */}
-                    <div className="flex items-center justify-center mt-2">
-                      <div className="w-3 h-3 mr-1">
-                        <img 
-                          src="/apecoin.png" 
-                          alt="ApeCoin Logo" 
-                          className="w-full h-full object-contain"
-                        />
-                      </div>
-                      <span className="text-banana font-press-start text-[8px]">Powered by ApeCoin</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         )}
         
@@ -1205,6 +1215,20 @@ export const RoomVisualization = React.memo(function RoomVisualization({
             </button>
           </div>
         )}
+        
+        {/* Initial purchase UI if no facility exists */}
+        {!hasFacility && (
+          <div className="flex flex-col items-center justify-center h-full text-center p-4">
+            <p className="font-press-start text-xs text-[#FFD700] mb-6">You don't have any mining space yet.</p>
+            <button
+              onClick={onPurchaseFacility}
+              disabled={isPurchasingFacility}
+              className="bigcoin-button"
+            >
+              {isPurchasingFacility ? 'PURCHASING...' : 'PURCHASE FACILITY'}
+        </button>
+          </div>
+        )}
       </div>
       
       {/* Starter Miner Modal - With auto-open when conditions are met */}
@@ -1213,7 +1237,7 @@ export const RoomVisualization = React.memo(function RoomVisualization({
           isOpen={isStarterMinerModalOpen}
           onClose={() => setIsStarterMinerModalOpen(false)}
           onClaim={handleClaimStarterMiner}
-          selectedTile={selectedTile}
+          selectedTile={selectedTile || undefined}
           isProcessing={isGettingStarterMiner}
         />
       )}
