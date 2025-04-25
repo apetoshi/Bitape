@@ -620,11 +620,11 @@ export function useGameState(): GameState {
       
       // First simulate transaction to check if it would succeed
       try {
-        await publicClient?.simulateContract({
-          address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
-          abi: MAIN_CONTRACT_ABI,
-          functionName: 'purchaseInitialFacility',
-          account: address,
+      await publicClient?.simulateContract({
+        address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
+        abi: MAIN_CONTRACT_ABI,
+        functionName: 'purchaseInitialFacility',
+        account: address,
           args: [referralAddress as `0x${string}`],
           value: parseEther('10')
         });
@@ -643,16 +643,16 @@ export function useGameState(): GameState {
       
       // Send the transaction - this will open the wallet for user confirmation
       const hash = await writeContractAsync({
-        address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
-        abi: MAIN_CONTRACT_ABI,
-        functionName: 'purchaseInitialFacility',
+            address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
+            abi: MAIN_CONTRACT_ABI,
+            functionName: 'purchaseInitialFacility',
         args: [referralAddress as `0x${string}`],
-        account: address as `0x${string}`,
+            account: address as `0x${string}`,
         value: parseEther('10'),
-        chain: publicClient?.chain
-      });
-      
-      console.log('Purchase transaction hash:', hash);
+            chain: publicClient?.chain
+          });
+          
+          console.log('Purchase transaction hash:', hash);
       
       // Once we have a hash, user has confirmed the transaction
       if (hash) {
@@ -829,11 +829,11 @@ export function useGameState(): GameState {
   };
 
   // Fix handleGetStarterMiner with proper typescript and remove duplicate hash declarations
-  const handleGetStarterMiner = async () => {
+  const handleGetStarterMiner = async (x: number, y: number) => {
     setIsGettingStarterMiner(true);
     
     try {
-      console.log('Getting starter miner...');
+      console.log(`Getting starter miner at position (${x}, ${y})...`);
       if (!address) {
         throw new Error('Address not found');
       }
@@ -843,17 +843,17 @@ export function useGameState(): GameState {
           address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
           abi: MAIN_CONTRACT_ABI,
           functionName: 'getFreeStarterMiner',
-          args: undefined, // No arguments needed
+          args: [BigInt(x), BigInt(y)], // Use the provided x and y coordinates
           account: address as `0x${string}`,
           chain: publicClient?.chain
         });
         
         console.log('Starter miner transaction hash:', hash);
-        
-        if (!hash) {
-          throw new Error('Failed to get transaction hash');
-        }
-        
+      
+      if (!hash) {
+        throw new Error('Failed to get transaction hash');
+      }
+      
         const receipt = await publicClient.waitForTransactionReceipt({
           hash,
         });
@@ -1244,7 +1244,7 @@ export function useGameState(): GameState {
       // Extract the cost from the miner data (index 6 is cost)
       const minerCost = Array.isArray(minerCostResult) && minerCostResult.length > 6 
         ? minerCostResult[6] as bigint 
-        : BigInt(0);
+          : BigInt(0);
       
       console.log("Miner cost:", formatEther(minerCost));
       
