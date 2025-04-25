@@ -19,7 +19,7 @@ const ReferralModal: React.FC<ReferralModalProps> = ({
   const { address } = useAccount();
 
   const referralLink = address 
-    ? `https://bitape.tech?ref=${address}`
+    ? `https://www.bitape.org/?ref=${address}`
     : '';
 
   return (
