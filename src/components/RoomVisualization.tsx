@@ -546,10 +546,10 @@ export const RoomVisualization = React.memo(function RoomVisualization({
   // Grid coordinates for the four mining spaces
   // Adjusted grid positions for better visual positioning
   const gridPositions = useMemo(() => [
-      { x: 0, y: 0, top: '40%', left: '40%', width: '15%', height: '15%' }, // near bed
-      { x: 1, y: 0, top: '46%', left: '29%', width: '15%', height: '15%' }, // near banana boxes - adjusted left position
-      { x: 0, y: 1, top: '50%', left: '55%', width: '15%', height: '15%' }, // near jukebox
-      { x: 1, y: 1, top: '60%', left: '35%', width: '15%', height: '15%' }  // near control panel
+    { x: 0, y: 0, top: '40%', left: '40%', width: '15%', height: '15%' }, // near bed
+    { x: 1, y: 0, top: '46%', left: '29%', width: '15%', height: '15%' }, // near banana boxes - adjusted left position
+    { x: 0, y: 1, top: '50%', left: '55%', width: '15%', height: '15%' }, // near jukebox
+    { x: 1, y: 1, top: '60%', left: '35%', width: '15%', height: '15%' }  // near control panel
   ], []);
 
   // Function to check if a selected tile has a miner - use our local implementation consistently
@@ -609,98 +609,251 @@ export const RoomVisualization = React.memo(function RoomVisualization({
     }
   }, [isGridMode, onTileSelect, selectedTile, disableSelection, isTileOccupied, selectedTileHasMiner]);
 
-  // Add memoized values at the component top level - before useCallback functions
-  // Define custom positions for the grid spaces to match the blue tiles
-  const customPositions = useMemo(() => [
-    { 
-      x: 0, y: 0, // TOP RIGHT
-      style: { 
-        gridColumn: 2, 
-        gridRow: 1,
-        ...(isMobile && {
-          margin: '0 0 0 10px' // Add some spacing for mobile
-        })
+  // Define custom positions for the grid spaces to match the blue tiles for each facility level
+  const customPositions = useMemo(() => {
+    // Default positions for level 1 facility (4 tiles in a 2x2 grid)
+    const level1Positions = [
+      { 
+        x: 0, y: 0, // TOP RIGHT
+        style: { 
+          gridColumn: 2, 
+          gridRow: 1,
+          ...(isMobile && {
+            margin: '0 0 0 10px' // Add some spacing for mobile
+          })
+        }
+      },
+      { 
+        x: 1, y: 0, // TOP LEFT
+        style: { 
+          gridColumn: 1, 
+          gridRow: 1,
+          ...(isMobile && {
+            margin: '0 10px 0 0' // Add some spacing for mobile
+          })
+        }
+      },
+      { 
+        x: 0, y: 1, // BOTTOM RIGHT
+        style: { 
+          gridColumn: 2, 
+          gridRow: 2,
+          ...(isMobile && {
+            margin: '10px 0 0 10px' // Add some spacing for mobile
+          })
+        }
+      },
+      { 
+        x: 1, y: 1, // BOTTOM LEFT
+        style: { 
+          gridColumn: 1, 
+          gridRow: 2,
+          ...(isMobile && {
+            margin: '10px 10px 0 0' // Add some spacing for mobile
+          })
+        }
       }
-    },
-    { 
-      x: 1, y: 0, // TOP LEFT
-      style: { 
-        gridColumn: 1, 
-        gridRow: 1,
-        ...(isMobile && {
-          margin: '0 10px 0 0' // Add some spacing for mobile
-        })
-      }
-    },
-    { 
-      x: 0, y: 1, // BOTTOM RIGHT
-      style: { 
-        gridColumn: 2, 
-        gridRow: 2,
-        ...(isMobile && {
-          margin: '10px 0 0 10px' // Add some spacing for mobile
-        })
-      }
-    },
-    { 
-      x: 1, y: 1, // BOTTOM LEFT
-      style: { 
-        gridColumn: 1, 
-        gridRow: 2,
-        ...(isMobile && {
-          margin: '10px 10px 0 0' // Add some spacing for mobile
-        })
-      }
+    ];
+    
+    // Level 2 facility positions (9 tiles in a 3x3 grid)
+    const level2Positions = [
+      // Top row
+      { x: 0, y: 0, style: { gridColumn: 3, gridRow: 1 } }, // TOP RIGHT
+      { x: 1, y: 0, style: { gridColumn: 2, gridRow: 1 } }, // TOP MIDDLE
+      { x: 2, y: 0, style: { gridColumn: 1, gridRow: 1 } }, // TOP LEFT
+      
+      // Middle row
+      { x: 0, y: 1, style: { gridColumn: 3, gridRow: 2 } }, // MIDDLE RIGHT
+      { x: 1, y: 1, style: { gridColumn: 2, gridRow: 2 } }, // CENTER
+      { x: 2, y: 1, style: { gridColumn: 1, gridRow: 2 } }, // MIDDLE LEFT
+      
+      // Bottom row
+      { x: 0, y: 2, style: { gridColumn: 3, gridRow: 3 } }, // BOTTOM RIGHT
+      { x: 1, y: 2, style: { gridColumn: 2, gridRow: 3 } }, // BOTTOM MIDDLE
+      { x: 2, y: 2, style: { gridColumn: 1, gridRow: 3 } }  // BOTTOM LEFT
+    ];
+    
+    // Check current facility level
+    const facilityLevel = contractFacilityLevel || (facilityData?.level || 1);
+    
+    // Return the appropriate positions based on the facility level
+    switch (facilityLevel) {
+      case 2:
+        return level2Positions;
+      default:
+        return level1Positions;
     }
-  ], [isMobile]);
+  }, [isMobile, contractFacilityLevel, facilityData?.level]);
 
-  // Define custom positions for the active miners on blue tiles
-  const minerPositions = useMemo(() => [
-    { 
-      x: 0, y: 0, // TOP RIGHT
-      style: { 
-        position: 'absolute' as const,
-        top: isMobile ? '42%' : '40%',
-        left: isMobile ? '45%' : '35%',
-        width: isMobile ? '40px' : '150px',
-        height: isMobile ? '90px' : '150px',
-        zIndex: 20
+  // Define custom positions for the active miners on blue tiles for each facility level
+  const minerPositions = useMemo(() => {
+    // Default positions for level 1 facility (4 tiles)
+    const level1Positions = [
+      { 
+        x: 0, y: 0, // TOP RIGHT
+        style: { 
+          position: 'absolute' as const,
+          top: isMobile ? '42%' : '40%',
+          left: isMobile ? '45%' : '35%',
+          width: isMobile ? '40px' : '150px',
+          height: isMobile ? '90px' : '150px',
+          zIndex: 20
+        }
+      },
+      { 
+        x: 1, y: 0, // TOP LEFT
+        style: { 
+          position: 'absolute' as const,
+          top: isMobile ? '50%' : '47%',
+          left: isMobile ? '30%' : '20%',
+          width: isMobile ? '40px' : '150px',
+          height: isMobile ? '90px' : '150px',
+          zIndex: 20
+        }
+      },
+      { 
+        x: 0, y: 1, // BOTTOM RIGHT
+        style: { 
+          position: 'absolute' as const,
+          top: isMobile ? '50%' : '46%',
+          left: isMobile ? '60%' : '50%',
+          width: isMobile ? '40px' : '150px',
+          height: isMobile ? '90px' : '150px',
+          zIndex: 20
+        }
+      },
+      { 
+        x: 1, y: 1, // BOTTOM LEFT
+        style: { 
+          position: 'absolute' as const,
+          top: isMobile ? '56%' : '55%',
+          left: isMobile ? '45%' : '35%',
+          width: isMobile ? '40px' : '150px',
+          height: isMobile ? '90px' : '150px',
+          zIndex: 20
+        }
       }
-    },
-    { 
-      x: 1, y: 0, // TOP LEFT
-      style: { 
-        position: 'absolute' as const,
-        top: isMobile ? '50%' : '47%',
-        left: isMobile ? '30%' : '20%',
-        width: isMobile ? '40px' : '150px',
-        height: isMobile ? '90px' : '150px',
-        zIndex: 20
+    ];
+
+    // Level 2 facility positions (9 tiles)
+    const level2Positions = [
+      // Top row
+      { 
+        x: 0, y: 0,
+        style: { 
+          position: 'absolute' as const,
+          top: isMobile ? '36%' : '34%',
+          left: isMobile ? '60%' : '55%',
+          width: isMobile ? '35px' : '100px',
+          height: isMobile ? '35px' : '100px',
+          zIndex: 20
+        }
+      },
+      { 
+        x: 1, y: 0,
+        style: { 
+          position: 'absolute' as const,
+          top: isMobile ? '36%' : '34%',
+          left: isMobile ? '45%' : '40%',
+          width: isMobile ? '35px' : '100px',
+          height: isMobile ? '35px' : '100px',
+          zIndex: 20
+        }
+      },
+      { 
+        x: 2, y: 0,
+        style: { 
+          position: 'absolute' as const,
+          top: isMobile ? '36%' : '34%',
+          left: isMobile ? '30%' : '25%',
+          width: isMobile ? '35px' : '100px',
+          height: isMobile ? '35px' : '100px',
+          zIndex: 20
+        }
+      },
+      
+      // Middle row
+      { 
+        x: 0, y: 1,
+        style: { 
+          position: 'absolute' as const,
+          top: isMobile ? '48%' : '46%',
+          left: isMobile ? '60%' : '55%',
+          width: isMobile ? '35px' : '100px',
+          height: isMobile ? '35px' : '100px',
+          zIndex: 20
+        }
+      },
+      { 
+        x: 1, y: 1,
+        style: { 
+          position: 'absolute' as const,
+          top: isMobile ? '48%' : '46%',
+          left: isMobile ? '45%' : '40%',
+          width: isMobile ? '35px' : '100px',
+          height: isMobile ? '35px' : '100px',
+          zIndex: 20
+        }
+      },
+      { 
+        x: 2, y: 1,
+        style: { 
+          position: 'absolute' as const,
+          top: isMobile ? '48%' : '46%',
+          left: isMobile ? '30%' : '25%',
+          width: isMobile ? '35px' : '100px',
+          height: isMobile ? '35px' : '100px',
+          zIndex: 20
+        }
+      },
+      
+      // Bottom row
+      { 
+        x: 0, y: 2,
+        style: { 
+          position: 'absolute' as const,
+          top: isMobile ? '60%' : '58%',
+          left: isMobile ? '60%' : '55%',
+          width: isMobile ? '35px' : '100px',
+          height: isMobile ? '35px' : '100px',
+          zIndex: 20
+        }
+      },
+      { 
+        x: 1, y: 2,
+        style: { 
+          position: 'absolute' as const,
+          top: isMobile ? '60%' : '58%',
+          left: isMobile ? '45%' : '40%',
+          width: isMobile ? '35px' : '100px',
+          height: isMobile ? '35px' : '100px',
+          zIndex: 20
+        }
+      },
+      { 
+        x: 2, y: 2,
+        style: { 
+          position: 'absolute' as const,
+          top: isMobile ? '60%' : '58%',
+          left: isMobile ? '30%' : '25%',
+          width: isMobile ? '35px' : '100px',
+          height: isMobile ? '35px' : '100px',
+          zIndex: 20
+        }
       }
-    },
-    { 
-      x: 0, y: 1, // BOTTOM RIGHT
-      style: { 
-        position: 'absolute' as const,
-        top: isMobile ? '50%' : '46%',
-        left: isMobile ? '60%' : '50%',
-        width: isMobile ? '40px' : '150px',
-        height: isMobile ? '90px' : '150px',
-        zIndex: 20
-      }
-    },
-    { 
-      x: 1, y: 1, // BOTTOM LEFT
-      style: { 
-        position: 'absolute' as const,
-        top: isMobile ? '56%' : '55%',
-        left: isMobile ? '45%' : '35%',
-        width: isMobile ? '40px' : '150px',
-        height: isMobile ? '90px' : '150px',
-        zIndex: 20
-      }
+    ];
+    
+    // Check current facility level
+    const facilityLevel = contractFacilityLevel || (facilityData?.level || 1);
+    
+    // Return the appropriate positions based on the facility level
+    switch (facilityLevel) {
+      case 2:
+        return level2Positions;
+      default:
+        return level1Positions;
     }
-  ], [isMobile]);
+  }, [isMobile, contractFacilityLevel, facilityData?.level]);
 
   // Create a position map from combinedMinersData
   const minersByPosition = useMemo(() => {
@@ -886,14 +1039,52 @@ export const RoomVisualization = React.memo(function RoomVisualization({
     }
   });
 
+  // Add this function to get the current grid template configuration based on facility level
+  const getGridTemplate = useCallback(() => {
+    const facilityLevel = contractFacilityLevel || (facilityData?.level || 1);
+    
+    switch (facilityLevel) {
+      case 2:
+        return {
+          columns: 'repeat(3, 1fr)',
+          rows: 'repeat(3, 1fr)',
+          width: isMobile ? '280px' : '330px',
+          height: isMobile ? '280px' : '330px'
+        };
+      default:
+        return {
+          columns: 'repeat(2, 1fr)',
+          rows: 'repeat(2, 1fr)',
+          width: isMobile ? '250px' : '300px',
+          height: isMobile ? '140px' : '170px'
+        };
+    }
+  }, [isMobile, contractFacilityLevel, facilityData?.level]);
+
+  // Update the handleClaimStarterMiner function to validate coordinates based on facility level
   const handleClaimStarterMiner = useCallback(async (x: number, y: number) => {
     if (process.env.NODE_ENV === 'development') {
       console.log(`Claiming starter miner at position (${x}, ${y})`);
     }
     
-    // Ensure valid coordinates
-    if (x < 0 || x > 1 || y < 0 || y > 1) {
-      console.error(`Invalid tile coordinates (${x}, ${y}). Valid ranges are 0-1.`);
+    // Get the current facility level
+    const facilityLevel = contractFacilityLevel || (facilityData?.level || 1);
+    
+    // Ensure valid coordinates based on facility level
+    let isValidCoordinate = false;
+    
+    switch (facilityLevel) {
+      case 2:
+        // For level 2 facilities, valid coordinates are (0-2, 0-2)
+        isValidCoordinate = x >= 0 && x <= 2 && y >= 0 && y <= 2;
+        break;
+      default:
+        // For level 1 facilities, valid coordinates are (0-1, 0-1)
+        isValidCoordinate = x >= 0 && x <= 1 && y >= 0 && y <= 1;
+    }
+    
+    if (!isValidCoordinate) {
+      console.error(`Invalid tile coordinates (${x}, ${y}) for facility level ${facilityLevel}`);
       return;
     }
     
@@ -947,7 +1138,7 @@ export const RoomVisualization = React.memo(function RoomVisualization({
     } catch (error) {
       console.error('Error claiming starter miner:', error);
     }
-  }, [isTileOccupied, onGetStarterMiner, onPurchaseMiner, refetchMinerIds, toggleGridMode, isGridMode]);
+  }, [isTileOccupied, onGetStarterMiner, onPurchaseMiner, refetchMinerIds, toggleGridMode, isGridMode, contractFacilityLevel, facilityData?.level]);
 
   // Define isGridEnabled to use consistently instead of directly using isGridMode
   const isGridEnabled = useMemo(() => {
@@ -1078,11 +1269,11 @@ export const RoomVisualization = React.memo(function RoomVisualization({
         ${pulseStyle}
         .mining-grid {
           display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          grid-template-rows: repeat(2, 1fr);
+          grid-template-columns: ${getGridTemplate().columns};
+          grid-template-rows: ${getGridTemplate().rows};
           gap: 4px;
-          width: ${isMobile ? '250px' : '300px'};
-          height: ${isMobile ? '140px' : '170px'};
+          width: ${getGridTemplate().width};
+          height: ${getGridTemplate().height};
           position: absolute;
           top: ${isMobile ? '47%' : '57%'};
           left: 50%;
@@ -1091,6 +1282,22 @@ export const RoomVisualization = React.memo(function RoomVisualization({
           pointer-events: ${isGridMode ? 'auto' : 'none'};
           opacity: ${isGridMode ? 1 : 0};
           transition: opacity 0.3s ease;
+        }
+        
+        /* Add specific classes for facility levels */
+        .level-2-grid {
+          grid-template-columns: repeat(3, 1fr);
+          grid-template-rows: repeat(3, 1fr);
+        }
+        
+        .level-3-grid {
+          grid-template-columns: repeat(4, 1fr);
+          grid-template-rows: repeat(4, 1fr);
+        }
+        
+        .level-4-grid {
+          grid-template-columns: repeat(4, 1fr);
+          grid-template-rows: repeat(4, 1fr);
         }
         
         .grid-mode {
