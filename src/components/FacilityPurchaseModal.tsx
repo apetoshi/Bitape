@@ -40,6 +40,7 @@ const FacilityPurchaseModal: React.FC<FacilityPurchaseModalProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [facilityPurchaseError, setFacilityPurchaseError] = useState('');
   const [isApprovingTokens, setIsApprovingTokens] = useState(false);
+  const [shouldProceedWithPurchase, setShouldProceedWithPurchase] = useState(false);
 
   // Read the facility data directly from contract
   const { data: facilityData } = useContractRead({
@@ -99,11 +100,18 @@ const FacilityPurchaseModal: React.FC<FacilityPurchaseModalProps> = ({
     args: [address as `0x${string}`, CONTRACT_ADDRESSES.MAIN],
     query: {
       enabled: Boolean(address),
+      refetchInterval: 5000, // Refetch every 5 seconds to catch allowance changes
     },
   });
 
   // Use contract write for token approval
-  const { writeContract: approveTokens, isPending: isApprovePending, status: approvalStatus } = useWriteContract();
+  const { 
+    writeContract: approveTokens, 
+    isPending: isApprovePending, 
+    status: approvalStatus,
+    error: approvalError,
+    reset: resetApproval
+  } = useWriteContract();
 
   // Check if user has sufficient BIT balance and allowance
   useEffect(() => {
@@ -118,10 +126,21 @@ const FacilityPurchaseModal: React.FC<FacilityPurchaseModalProps> = ({
     
     if (allowanceData) {
       const allowance = formatEther(allowanceData as bigint);
-      setHasSufficientAllowance(parseFloat(allowance) >= parseFloat(FACILITY_COST));
-      console.log('Current BIT allowance:', allowance);
+      const hasAllowance = parseFloat(allowance) >= parseFloat(FACILITY_COST);
+      setHasSufficientAllowance(hasAllowance);
+      console.log('Current BIT allowance:', allowance, 'Has sufficient allowance:', hasAllowance);
+      
+      // If we now have sufficient allowance and we were waiting to proceed with purchase
+      if (hasAllowance && shouldProceedWithPurchase && !isProcessing) {
+        console.log('Allowance is now sufficient, proceeding with purchase');
+        setShouldProceedWithPurchase(false);
+        // Use setTimeout to avoid state update conflicts
+        setTimeout(() => {
+          executeFacilityPurchase();
+        }, 500);
+      }
     }
-  }, [bitBalanceData, gameState.bitBalance, allowanceData]);
+  }, [bitBalanceData, gameState.bitBalance, allowanceData, shouldProceedWithPurchase, isProcessing]);
   
   // Monitor approval status
   useEffect(() => {
@@ -133,24 +152,26 @@ const FacilityPurchaseModal: React.FC<FacilityPurchaseModalProps> = ({
         setIsApprovingTokens(false);
       }, 5000);
     } else if (approvalStatus === 'error' && isApprovingTokens) {
-      console.error('Approval transaction failed');
+      console.error('Approval transaction failed:', approvalError?.message);
       setIsApprovingTokens(false);
-      setFacilityPurchaseError('Failed to approve token spending. Please try again.');
+      setFacilityPurchaseError(`Failed to approve token spending: ${approvalError?.message || 'Unknown error'}`);
+      setShouldProceedWithPurchase(false);
+      resetApproval();
     }
-  }, [approvalStatus, isApprovingTokens, refetchAllowance]);
+  }, [approvalStatus, isApprovingTokens, approvalError, refetchAllowance, resetApproval]);
 
-  // Handle approval of BIT tokens
+  // Handle approval of BIT tokens - this is a separate step now
   const handleApproveTokens = async () => {
     try {
       setIsApprovingTokens(true);
       setFacilityPurchaseError('');
       
       // Approve a large amount to avoid needing to approve again
-      const approvalAmount = parseEther('1000'); // 1000 BIT tokens
+      const approvalAmount = parseEther('10000'); // 10000 BIT tokens
       
-      console.log('Approving BIT tokens for spending...');
+      console.log('Approving BIT tokens for spending...', CONTRACT_ADDRESSES.MAIN);
       
-      // Call the approve function
+      // Call the approve function DIRECTLY with the specific contract
       approveTokens({
         address: BIT_TOKEN_ADDRESS,
         abi: BIT_TOKEN_ABI,
@@ -158,36 +179,25 @@ const FacilityPurchaseModal: React.FC<FacilityPurchaseModalProps> = ({
         args: [CONTRACT_ADDRESSES.MAIN, approvalAmount]
       });
       
-      // The status is tracked via the approvalStatus state and useEffect
+      // Set flag to continue with purchase after approval
+      setShouldProceedWithPurchase(true);
+      
+      // The actual status is tracked via the approvalStatus state and useEffect
       return true;
     } catch (error: any) {
       console.error("Error initiating token approval:", error);
       setFacilityPurchaseError(`Error approving tokens: ${error.message}`);
       setIsApprovingTokens(false);
+      setShouldProceedWithPurchase(false);
       return false;
     }
   };
 
-  // Handle facility purchase
-  const handleBuyNewFacility = async () => {
+  // The actual facility purchase function (separated from the approval flow)
+  const executeFacilityPurchase = async () => {
     try {
       setIsProcessing(true);
       setFacilityPurchaseError('');
-      
-      // Check if we need to approve tokens first
-      if (!hasSufficientAllowance) {
-        console.log('Insufficient allowance, requesting approval first');
-        const approvalSuccess = await handleApproveTokens();
-        
-        if (!approvalSuccess) {
-          console.log('Failed to approve tokens, aborting purchase');
-          return;
-        }
-        
-        // Return early - we'll continue after the approval completes via useEffect
-        setIsProcessing(false);
-        return;
-      }
       
       // Use the right upgrade function based on whether this is an initial purchase or upgrade
       const result = validatedLevel === 0 
@@ -217,21 +227,34 @@ const FacilityPurchaseModal: React.FC<FacilityPurchaseModalProps> = ({
       }
     } catch (error: any) {
       console.error("Error purchasing facility:", error);
-      setFacilityPurchaseError(`Error: ${error.message}`);
+      setFacilityPurchaseError(`Error: ${error.message || 'Transaction failed'}`);
     } finally {
       setIsProcessing(false);
     }
   };
 
-  // This effect handles continuing the purchase after approval completes
-  useEffect(() => {
-    // If we're not processing, allowance is sufficient, and we were approving tokens
-    if (!isProcessing && hasSufficientAllowance && approvalStatus === 'success' && !isApprovingTokens) {
-      console.log('Approval completed, continuing with facility purchase');
-      // Continue with the purchase now that we have sufficient allowance
-      handleBuyNewFacility();
+  // Handle button click - check allowance first, then handle accordingly
+  const handleBuyNewFacility = async () => {
+    // Clear any previous errors
+    setFacilityPurchaseError('');
+    
+    // Check balance first
+    if (!hasSufficientBalance) {
+      setFacilityPurchaseError('Insufficient BIT balance to complete this purchase');
+      return;
     }
-  }, [hasSufficientAllowance, isProcessing, approvalStatus, isApprovingTokens]);
+    
+    // First, check if we need to approve tokens
+    if (!hasSufficientAllowance) {
+      console.log('Insufficient allowance, requesting approval first');
+      await handleApproveTokens();
+      // The purchase will continue after approval via the useEffect when allowance updates
+    } else {
+      // We already have sufficient allowance, proceed directly
+      console.log('Sufficient allowance exists, proceeding with purchase');
+      await executeFacilityPurchase();
+    }
+  };
 
   if (!isOpen) return null;
 
