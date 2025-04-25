@@ -207,6 +207,14 @@ export const MAIN_CONTRACT_ABI = [
     stateMutability: 'nonpayable',
     type: 'function',
   },
+  // Add buyNewFacility function for purchasing larger facilities
+  {
+    inputs: [],
+    name: 'buyNewFacility',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
   // Miner-related functions - Fixed the miner index issue here
   {
     inputs: [

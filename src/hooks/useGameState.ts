@@ -83,6 +83,7 @@ export interface GameState {
   purchaseMiner: (minerType: MinerType, x: number, y: number) => Promise<boolean>;
   claimReward: () => Promise<boolean>;
   upgradeFacility: () => Promise<boolean>;
+  buyNewFacility: () => Promise<boolean>;
   removeMiner: (minerId: number) => Promise<boolean>;
   
   // Loading states
@@ -757,6 +758,129 @@ export function useGameState(): GameState {
     }
   };
 
+  // Add new function for buying larger facilities
+  const handleBuyNewFacility = async () => {
+    try {
+      if (!address) {
+        throw new Error('Address not found');
+      }
+      
+      console.log('Buying new facility...');
+      
+      // First check if the user has sufficient BIT balance
+      const bitBalance = await publicClient.readContract({
+        address: BIT_TOKEN_ADDRESS as `0x${string}`,
+        abi: BIT_TOKEN_ABI,
+        functionName: 'balanceOf',
+        args: [address]
+      });
+      
+      // Facility cost is 70 BIT
+      const facilityCost = parseEther('70');
+      
+      if ((bitBalance as bigint) < facilityCost) {
+        alert(`Insufficient BIT balance. You need 70 BIT but have ${formatEther(bitBalance as bigint)} BIT.`);
+        return false;
+      }
+      
+      // Check allowance
+      const allowance = await publicClient.readContract({
+        address: BIT_TOKEN_ADDRESS as `0x${string}`,
+        abi: BIT_TOKEN_ABI,
+        functionName: 'allowance',
+        args: [address, CONTRACT_ADDRESSES.MAIN]
+      });
+      
+      // If allowance is insufficient, request approval
+      if ((allowance as bigint) < facilityCost) {
+        console.log("Allowance insufficient, requesting approval");
+        
+        // The max approval amount (uint256 max value)
+        const maxApprovalAmount = BigInt("115792089237316195423570985008687907853269984665640564039457584007913129639935");
+        
+        try {
+          // Request approval for spending BIT
+          const { request } = await publicClient.simulateContract({
+            address: BIT_TOKEN_ADDRESS as `0x${string}`,
+            abi: BIT_TOKEN_ABI,
+            functionName: 'approve',
+            args: [CONTRACT_ADDRESSES.MAIN, maxApprovalAmount],
+            account: address as `0x${string}`
+          });
+          
+          const approvalHash = await writeContractAsync(request);
+          console.log("Approval transaction submitted:", approvalHash);
+          
+          // Wait for approval confirmation
+          await publicClient.waitForTransactionReceipt({
+            hash: approvalHash,
+          });
+          
+          console.log("Approval confirmed");
+        } catch (error) {
+          if (error.message?.includes('User rejected') || error.message?.includes('user rejected') || error.code === 4001) {
+            console.log("User rejected approval transaction");
+            alert("You need to approve the transaction to purchase a new facility.");
+            return false;
+          }
+          
+          console.error("Error approving BIT tokens:", error);
+          throw error;
+        }
+      }
+      
+      // Now buy the new facility
+      try {
+        const { request } = await publicClient.simulateContract({
+          address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
+          abi: MAIN_CONTRACT_ABI,
+          functionName: 'buyNewFacility',
+          args: [],
+          account: address as `0x${string}`
+        });
+        
+        const hash = await writeContractAsync(request);
+        console.log("New facility purchase transaction submitted:", hash);
+        
+        // Wait for the transaction to be confirmed
+        const receipt = await publicClient.waitForTransactionReceipt({
+          hash,
+        });
+        
+        console.log("New facility purchase confirmed:", receipt);
+        
+        // Update game state after successful purchase
+        setTimeout(async () => {
+          try {
+            console.log("Refreshing game state after new facility purchase");
+            await refetchUserInfo();
+            alert("New facility purchased successfully!");
+          } catch (refreshError) {
+            console.error("Error refreshing game state:", refreshError);
+          }
+        }, 2000);
+        
+        return true;
+      } catch (error) {
+        console.error("Error purchasing new facility:", error);
+        
+        // Check if user rejected the transaction
+        if (error.message?.includes('User rejected') || error.message?.includes('user rejected') || error.code === 4001) {
+          console.log("User rejected new facility purchase transaction");
+          alert("Purchase canceled.");
+          return false;
+        }
+        
+        alert(`Error purchasing new facility: ${error.message}`);
+        return false;
+      }
+    } catch (error) {
+      console.error("Error in buying new facility flow:", error);
+      alert(`Error purchasing new facility: ${error.message}`);
+      return false;
+    }
+  };
+
   // Fix handleUpgradeFacility with proper typescript return types
   const handleUpgradeFacility = async () => {
     setIsUpgrading(true);
@@ -1376,6 +1500,7 @@ export function useGameState(): GameState {
     purchaseMiner: handlePurchaseMiner,
     claimReward: handleClaimRewards,
     upgradeFacility: handleUpgradeFacility,
+    buyNewFacility: handleBuyNewFacility,
     removeMiner: handleRemoveMiner,
     
     // Loading states

@@ -1,6 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { Dialog } from '@headlessui/react';
+import { useAccount, useContractRead } from 'wagmi';
+import { BIT_TOKEN_ABI, BIT_TOKEN_ADDRESS } from '../config/contracts';
+import { formatEther } from 'viem';
+import { useGameState } from '../hooks/useGameState';
 
 interface FacilityPurchaseModalProps {
   isOpen: boolean;
@@ -9,12 +13,67 @@ interface FacilityPurchaseModalProps {
   isPurchasing: boolean;
 }
 
+const FACILITY_COST = '70'; // 70 BIT tokens
+
 const FacilityPurchaseModal: React.FC<FacilityPurchaseModalProps> = ({
   isOpen,
   onClose,
   onPurchase,
   isPurchasing
 }) => {
+  const { address } = useAccount();
+  const gameState = useGameState();
+  
+  const [hasSufficientBalance, setHasSufficientBalance] = useState(false);
+  const [bitBalance, setBitBalance] = useState('0');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [facilityPurchaseError, setFacilityPurchaseError] = useState('');
+
+  // Get BIT token balance
+  const { data: bitBalanceData } = useContractRead({
+    address: BIT_TOKEN_ADDRESS,
+    abi: BIT_TOKEN_ABI,
+    functionName: 'balanceOf',
+    args: [address as `0x${string}`],
+    query: {
+      enabled: Boolean(address),
+    },
+  });
+
+  // Check if user has sufficient BIT balance
+  useEffect(() => {
+    if (bitBalanceData) {
+      const balance = formatEther(bitBalanceData as bigint);
+      setBitBalance(balance);
+      setHasSufficientBalance(parseFloat(balance) >= parseFloat(FACILITY_COST));
+    } else if (gameState.bitBalance) {
+      setBitBalance(gameState.bitBalance);
+      setHasSufficientBalance(parseFloat(gameState.bitBalance) >= parseFloat(FACILITY_COST));
+    }
+  }, [bitBalanceData, gameState.bitBalance]);
+
+  // Handle facility purchase
+  const handleBuyNewFacility = async () => {
+    try {
+      setIsProcessing(true);
+      setFacilityPurchaseError('');
+      
+      const result = await gameState.buyNewFacility();
+      
+      if (result) {
+        // Call the onPurchase callback to update the UI
+        onPurchase();
+        // Close the modal
+        onClose();
+      }
+    } catch (error: any) {
+      console.error("Error purchasing facility:", error);
+      setFacilityPurchaseError(`Error: ${error.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -76,8 +135,15 @@ const FacilityPurchaseModal: React.FC<FacilityPurchaseModalProps> = ({
           </div>
 
           <div className="text-center mb-6">
-            <h4 className="font-press-start text-banana text-lg mb-1">UPGRADE COST: 70 $BIT</h4>
-            <p className="text-red-500 font-press-start text-xs">INSUFFICIENT $BIT BALANCE</p>
+            <h4 className="font-press-start text-banana text-lg mb-1">UPGRADE COST: {FACILITY_COST} $BIT</h4>
+            {!hasSufficientBalance && (
+              <p className="text-red-500 font-press-start text-xs">
+                INSUFFICIENT $BIT BALANCE (YOU HAVE: {parseFloat(bitBalance).toFixed(2)} $BIT)
+              </p>
+            )}
+            {facilityPurchaseError && (
+              <p className="text-red-500 font-press-start text-xs mt-2">{facilityPurchaseError}</p>
+            )}
           </div>
 
           <div className="flex justify-center space-x-6">
@@ -88,11 +154,11 @@ const FacilityPurchaseModal: React.FC<FacilityPurchaseModalProps> = ({
               CANCEL
             </button>
             <button
-              onClick={onPurchase}
-              disabled={isPurchasing || true} // Disabled because of insufficient balance
-              className="font-press-start px-8 py-2 bg-[#444444] text-[#888888] transition-colors disabled:opacity-50"
+              onClick={handleBuyNewFacility}
+              disabled={isPurchasing || isProcessing || !hasSufficientBalance}
+              className={`font-press-start px-8 py-2 ${hasSufficientBalance ? 'bg-banana text-royal hover:bg-banana/90' : 'bg-[#444444] text-[#888888]'} transition-colors disabled:opacity-50`}
             >
-              UPGRADE NOW
+              {isPurchasing || isProcessing ? 'UPGRADING...' : 'UPGRADE NOW'}
             </button>
           </div>
         </Dialog.Panel>
