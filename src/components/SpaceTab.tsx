@@ -45,26 +45,26 @@ export default function SpaceTab() {
       return null;
     }
       
-    try {
-      // [facilityIndex, maxMiners, currMiners, totalPowerOutput, currPowerOutput, x, y]
-      const facilityIndex = Number(rawFacilityData[0] || 0);
-      const maxMiners = Number(rawFacilityData[1] || 0);
-      const currMiners = Number(rawFacilityData[2] || 0);
-      const totalPowerOutput = Number(rawFacilityData[3] || 0);
-      const currPowerOutput = Number(rawFacilityData[4] || 0);
-      
+      try {
+        // [facilityIndex, maxMiners, currMiners, totalPowerOutput, currPowerOutput, x, y]
+        const facilityIndex = Number(rawFacilityData[0] || 0);
+        const maxMiners = Number(rawFacilityData[1] || 0);
+        const currMiners = Number(rawFacilityData[2] || 0);
+        const totalPowerOutput = Number(rawFacilityData[3] || 0);
+        const currPowerOutput = Number(rawFacilityData[4] || 0);
+        
       // Only set facility data if facilityIndex > 0 (user has a facility)
-      if (facilityIndex > 0) {
+        if (facilityIndex > 0) {
         return {
-          level: facilityIndex,
-          maxMiners,
-          currMiners,
-          totalPower: totalPowerOutput,
-          usedPower: currPowerOutput
-        };
-      }
-    } catch (error) {
-      console.error('Error processing facility data in SpaceTab:', error);
+            level: facilityIndex,
+            maxMiners,
+            currMiners,
+            totalPower: totalPowerOutput,
+            usedPower: currPowerOutput
+          };
+        }
+      } catch (error) {
+        console.error('Error processing facility data in SpaceTab:', error);
     }
     
     return null;
@@ -94,6 +94,8 @@ export default function SpaceTab() {
       if (dataSource !== 'gameState' || 
           JSON.stringify(facilityData) !== JSON.stringify(processedGameStateData)) {
         console.log('SpaceTab - Using game state data:', processedGameStateData);
+        console.log('SpaceTab - Game state facility level:', processedGameStateData.level);
+        console.log('SpaceTab - Game state max miners:', processedGameStateData.maxMiners);
         setFacilityData(processedGameStateData);
         setDataSource('gameState');
       }
@@ -101,6 +103,8 @@ export default function SpaceTab() {
       if (dataSource !== 'contract' || 
           JSON.stringify(facilityData) !== JSON.stringify(processedContractData)) {
         console.log('SpaceTab - Using contract data:', processedContractData);
+        console.log('SpaceTab - Contract facility level:', processedContractData.level);
+        console.log('SpaceTab - Contract max miners:', processedContractData.maxMiners);
         setFacilityData(processedContractData);
         setDataSource('contract');
       }
@@ -115,6 +119,17 @@ export default function SpaceTab() {
   useEffect(() => {
     setDataSource('none');
   }, [address]);
+
+  // Force refresh when facility level changes in gameState
+  useEffect(() => {
+    if (gameState.facilityData?.level !== facilityData.level) {
+      console.log('SpaceTab - Detected facility level change!', {
+        'Current level': facilityData.level,
+        'New level': gameState.facilityData?.level
+      });
+      setDataSource('none'); // Force a refresh of the data source
+    }
+  }, [gameState.facilityData?.level, facilityData.level]);
 
   // Calculate derived values using memoization
   const { spacesLeft, gigawattsAvailable, userHasFacility } = useMemo(() => ({
@@ -161,44 +176,44 @@ export default function SpaceTab() {
     <div className="h-full p-4 flex flex-col space-y-6">
       <div className="space-y-6 flex-grow">
         {/* Space Usage */}
-        <div className="space-y-2">
-          <div className="flex justify-between items-center">
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
             <div className="pixel-text text-white">Spaces Left:</div>
             <div className="pixel-text text-banana">{spacesLeft} Spaces</div>
-          </div>
+              </div>
           
           <Progress 
             value={(facilityData.currMiners / facilityData.maxMiners) * 100} 
             className="h-2 bg-blue-950" 
-          />
+                />
           
           <div className="flex justify-between text-xs">
             <div className="pixel-text text-white/70">Used: {facilityData.currMiners}</div>
             <div className="pixel-text text-white/70">Max: {facilityData.maxMiners}</div>
-          </div>
-        </div>
-        
+              </div>
+            </div>
+
         {/* Power Usage */}
-        <div className="space-y-2">
-          <div className="flex justify-between items-center">
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
             <div className="pixel-text text-white">Gigawatts Available:</div>
             <div className="pixel-text text-banana">{gigawattsAvailable} GW</div>
-          </div>
+              </div>
           
           <Progress 
             value={(facilityData.usedPower / facilityData.totalPower) * 100} 
             className="h-2 bg-blue-950" 
-          />
+                />
           
           <div className="flex justify-between text-xs">
             <div className="pixel-text text-white/70">Used: {facilityData.usedPower} GW</div>
             <div className="pixel-text text-white/70">Max: {facilityData.totalPower} GW</div>
-          </div>
-        </div>
-        
+              </div>
+            </div>
+
         {/* Facility Level */}
-        <div className="space-y-2">
-          <div className="flex justify-between items-center">
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
             <div className="pixel-text text-white">Facility Level:</div>
             <div className="pixel-text text-banana">Level {facilityData.level}</div>
           </div>

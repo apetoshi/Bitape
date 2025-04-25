@@ -234,7 +234,7 @@ export const SelectedTileTab: React.FC<SelectedTileTabProps> = ({
                                   }
                                 } else {
                                   console.warn('No miner ID found, cannot remove');
-                                  handleShowMinerModal();
+                                handleShowMinerModal();
                                 }
                               }
                             }}

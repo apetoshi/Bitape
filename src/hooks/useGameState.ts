@@ -2,9 +2,10 @@ import { useAccount, useContractRead, useBalance, useWriteContract, usePublicCli
 import { formatEther, parseEther, zeroAddress, TransactionReceipt } from 'viem';
 import { CONTRACT_ADDRESSES, ERC20_ABI, APECHAIN_ID, MAIN_CONTRACT_ABI, BIT_TOKEN_ADDRESS, BIT_TOKEN_ABI } from '../config/contracts';
 import { MINERS, MinerType, MinerData } from '../config/miners';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useReferral } from '@/hooks/useReferral';
 import { formatUnits } from 'viem';
+import { useFacilityLevel } from '@/components/FacilityLevelProvider';
 
 interface PlayerFacility {
   facilityIndex: bigint;
@@ -66,6 +67,7 @@ export interface GameState {
   
   // Facility state
   hasFacility: boolean;
+  isFacilityDataLoading: boolean;
   facilityData: {
     power: number;
     level: number;
@@ -175,6 +177,7 @@ export function useGameState(): GameState {
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
   const { referralAddress } = useReferral();
+  const { facilityLevel: correctedFacilityLevel } = useFacilityLevel();
   
   // State variables
   const [apeBalance, setApeBalance] = useState('0');
@@ -197,6 +200,8 @@ export function useGameState(): GameState {
   const [miners, setMiners] = useState<PlayerMiner[]>([]);
   const [isPurchasingMiner, setIsPurchasingMiner] = useState(false);
   const [forceRender, setForceRender] = useState(false);
+  // Add loading state for facilityData - set to true by default to show loading state
+  const [isFacilityDataLoading, setIsFacilityDataLoading] = useState(true);
 
   // Track the current connected wallet to clear state on wallet changes
   const [lastConnectedAddress, setLastConnectedAddress] = useState<string | undefined>(undefined);
@@ -276,6 +281,11 @@ export function useGameState(): GameState {
 
   // Process facility data from contract - THIS IS NOW THE SINGLE SOURCE OF TRUTH FOR FACILITY OWNERSHIP
   useEffect(() => {
+    // Set loading state immediately when component mounts or address changes
+    if (address) {
+      setIsFacilityDataLoading(true);
+    }
+    
     if (rawFacilityData) {
       try {
         console.log('🔍 GameState - Raw facility data received:', rawFacilityData);
@@ -331,12 +341,17 @@ export function useGameState(): GameState {
       } catch (error) {
         console.error('🛑 GameState - Error processing facility data:', error);
         setHasFacility(false);
+      } finally {
+        // Mark loading as complete after processing data
+        setIsFacilityDataLoading(false);
       }
-    } else {
+    } else if (!isFacilityLoading && address) {
+      // Only update loading state when we actually have an address and the query has completed
       console.warn('⚠️ GameState - No facility data received from ownerToFacility call');
       setHasFacility(false);
+      setIsFacilityDataLoading(false);
     }
-  }, [rawFacilityData, address]);
+  }, [rawFacilityData, address, isFacilityLoading]);
 
   // Get player stats
   const { data: playerStats, refetch: refetchStats } = useContractRead({
@@ -962,6 +977,11 @@ export function useGameState(): GameState {
         throw new Error('Address not found');
       }
       
+      if (!publicClient) {
+        console.error('❌ getStarterMiner - Cannot get starter miner: publicClient not available');
+        return false;
+      }
+      
       try {
         const hash = await writeContractAsync({
           address: CONTRACT_ADDRESSES.MAIN as `0x${string}`,
@@ -1442,7 +1462,7 @@ export function useGameState(): GameState {
     }
   };
 
-  // Add a final check before return to ensure hardcoded values are used
+  // Update the final gameState definition to always prioritize contract level
   const finalGameState = {
     // User state
     isConnected,
@@ -1473,9 +1493,10 @@ export function useGameState(): GameState {
     
     // Facility state - Use actual contract data
     hasFacility, // Use the real value from contract
+    isFacilityDataLoading, // Add the loading state to the return value
     facilityData: facilityData ? {
       power: Number(facilityData.totalPowerOutput),
-      level: Number(facilityData.facilityIndex),
+      level: Number(facilityData.facilityIndex), // ALWAYS use facilityIndex from contract
       miners: Number(facilityData.currMiners),
       capacity: Number(facilityData.maxMiners),
       used: Number(facilityData.currPowerOutput),
@@ -1542,6 +1563,9 @@ export function useGameState(): GameState {
   };
 
   console.log('🔄 RETURNING GameState with facilityData:', finalGameState.facilityData);
+  console.log('🔄 Corrected facility level from context:', correctedFacilityLevel);
+  console.log('🔄 Original facility level from contract:', facilityData ? Number(facilityData.facilityIndex) : 0);
+  console.log('⚠️ ALWAYS USING CONTRACT LEVEL:', finalGameState.facilityData?.level || 0);
   console.log('🔄 RETURNING GameState with miners count:', miners.length, 'hasClaimedStarterMiner:', Boolean(hasClaimedStarterMiner));
   return finalGameState;
 }

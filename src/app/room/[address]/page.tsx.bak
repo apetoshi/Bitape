@@ -28,7 +28,6 @@ import FacilityPurchaseModal from '@/components/FacilityPurchaseModal';
 import MinerPurchaseModal from '@/components/MinerPurchaseModal';
 import StatsDisplay from '@/components/StatsDisplay';
 import { getMinerMap, addMinerToMap, getMinerAtPosition } from './fixedMinerMap';
-import { useFacilityLevel } from '@/components/FacilityLevelProvider';
 
 // Import the PlayerMiner interface from the GameState type
 import type { PlayerMiner } from '@/hooks/useGameState';
@@ -123,13 +122,11 @@ export default function RoomPage() {
   const [showMinerModal, setShowMinerModal] = useState(false);
   const [isGridModeActive, setIsGridModeActive] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const [upgradeCompleted, setUpgradeCompleted] = useState<number>(0);
   const isMounted = useIsMounted();
   const [statsView, setStatsView] = useState<'simple' | 'pro'>('simple');
   const { writeContract } = useWriteContract();
   const publicClient = usePublicClient();
-  const { facilityLevel: correctedFacilityLevel } = useFacilityLevel();
-  // Add a state to track when facility upgrades happen for forcing refreshes
-  const [facilityUpgradeTimestamp, setFacilityUpgradeTimestamp] = useState<number>(0);
   
   // Add refs for tracking selection time
   const lastSelectionTimeRef = useRef<number>(0);
@@ -172,6 +169,10 @@ export default function RoomPage() {
     };
   }, []); // Empty dependency array means it only runs once on mount
   
+  // We had a fix here that was causing invalid hook calls, so it has been removed.
+  // The proper way to fix hook ordering issues is to ensure hooks are always called
+  // in the same order in the component body, not conditionally.
+  
   // Get player facility data directly from contract
   const { data: facilityData } = useContractRead({
     address: CONTRACT_ADDRESSES.MAIN,
@@ -182,19 +183,6 @@ export default function RoomPage() {
       enabled: Boolean(address)
     }
   });
-  
-  // Process the facility data from the contract
-  useEffect(() => {
-    if (facilityData) {
-      console.log('RoomPage - Raw facility data received:', facilityData);
-      
-      if (Array.isArray(facilityData) && facilityData.length >= 7) {
-        console.log('RoomPage - Facility level:', Number(facilityData[0]));
-        console.log('RoomPage - Facility max miners:', Number(facilityData[1]));
-        console.log('RoomPage - Facility total power:', Number(facilityData[3]));
-      }
-    }
-  }, [facilityData]);
   
   // Direct contract read for miner data - using pagination to get all miners
   const { data: userMinersPaginated } = useContractRead({
@@ -765,6 +753,18 @@ export default function RoomPage() {
   // Process facility data
   const facility = facilityData as unknown as bigint[] | undefined;
   
+  // Add debugging to help identify facility data issues
+  useEffect(() => {
+    if (facility) {
+      console.log('Raw facility data:', facility);
+      console.log('Facility index/level:', Number(facility[0]));
+      console.log('Max miners:', Number(facility[1]));
+      console.log('Current miners:', Number(facility[2]));
+    } else {
+      console.log('No facility data available');
+    }
+  }, [facility]);
+  
   // Create a parsed version of facility data with proper Number conversions
   const parsedFacility = facility ? {
     level: Number(facility[0]),         // level
@@ -776,33 +776,16 @@ export default function RoomPage() {
     y: Number(facility[6])              // grid Y
   } : null;
 
-  // Transform raw facility data into user-friendly format for visualization
+  // Create a compatible version for RoomVisualization component
   const visualizationFacilityData = {
-    // Prioritize correctedFacilityLevel, then the facility index from raw contract data, then fallback to parsed level
-    level: correctedFacilityLevel ||                       // First choice: correctedFacilityLevel from provider
-          (facility && Number(facility[0])) ||             // Second choice: direct facility index from contract
-          parsedFacility?.level ||                         // Third choice: parsed facility level
-          1,                                               // Fallback
+    level: parsedFacility?.level || 0,
     miners: parsedFacility?.miners || 0,
     power: typeof parsedFacility?.power !== 'undefined' ? Number(parsedFacility.power) : 0,
     capacity: typeof parsedFacility?.capacity !== 'undefined' ? Number(parsedFacility.capacity) : 0,
     used: typeof parsedFacility?.used !== 'undefined' ? Number(parsedFacility.used) : 0,
     resources: 0,
-    spaces: typeof parsedFacility?.capacity !== 'undefined' ? Number(parsedFacility.capacity) : 0,
-    // Add timestamp to force refresh after upgrades
-    _refreshTimestamp: facilityUpgradeTimestamp
+    spaces: typeof parsedFacility?.capacity !== 'undefined' ? Number(parsedFacility.capacity) : 0
   };
-  
-  // Log the sources of facility level to help debugging
-  console.log('🏢 Facility levels - correctedFacilityLevel:', correctedFacilityLevel, 
-              'contract facility[0]:', facility && Number(facility[0]),
-              'parsedFacility.level:', parsedFacility?.level,
-              'FINAL visualizationFacilityData.level:', visualizationFacilityData.level);
-  
-  // Log visualizationFacilityData changes
-  useEffect(() => {
-    console.log('RoomPage - visualizationFacilityData updated:', visualizationFacilityData);
-  }, [visualizationFacilityData]);
 
   // Calculate derived values for displaying in UI
   const spacesLeft = parsedFacility ? 
@@ -1388,30 +1371,6 @@ export default function RoomPage() {
     };
   }, []);
 
-  // Add a useEffect to refresh the UI when facility level changes
-  useEffect(() => {
-    if (parsedFacility && correctedFacilityLevel && gameState) {
-      const facilityLevel = parsedFacility?.level || 1;
-      
-      console.log('Room page - Current facility level:', facilityLevel);
-      console.log('Room page - Parsed facility data:', parsedFacility);
-      
-      // Force a refresh of facilityData-dependent components when the level changes
-      if (correctedFacilityLevel > 0 && facilityLevel !== correctedFacilityLevel) {
-        console.log(`LEVEL MISMATCH: UI shows ${correctedFacilityLevel}, parsed shows ${facilityLevel}, refreshing`);
-        
-        // Update the facility upgrade timestamp to trigger re-renders
-        setFacilityUpgradeTimestamp(Date.now());
-        
-        // Refresh game state data
-        if (gameState.refetch) {
-          console.log('Forcing game state refresh due to facility level change');
-          gameState.refetch();
-        }
-      }
-    }
-  }, [parsedFacility, correctedFacilityLevel, gameState, setFacilityUpgradeTimestamp]);
-
   if (!isConnected || !address) {
     return null;
   }
@@ -1482,26 +1441,26 @@ export default function RoomPage() {
         }
         
         console.log('Found miner to remove:', miner);
-        
+            
         // Use the gameState.removeMiner function to call the contract
         if (gameState.removeMiner) {
           const success = await gameState.removeMiner(Number(miner.id));
           
           if (success) {
             console.log('Miner successfully removed via contract call');
-            // Close the warning dialog
-            setShowRemoveWarning(false);
-            
-            // Refresh the UI to reflect the change
-            if (gameState.refetch) {
-              await gameState.refetch();
-            }
-            
-            // Force UI update
-            setSelectedTile({...selectedTile});
-            
-            // Switch to resources tab
-            setActiveTab('resources');
+        // Close the warning dialog
+        setShowRemoveWarning(false);
+        
+        // Refresh the UI to reflect the change
+        if (gameState.refetch) {
+          await gameState.refetch();
+        }
+        
+        // Force UI update
+        setSelectedTile({...selectedTile});
+        
+        // Switch to resources tab
+        setActiveTab('resources');
           } else {
             console.error('Contract call to remove miner failed');
             alert('Failed to remove miner. Please try again.');
@@ -2000,31 +1959,31 @@ export default function RoomPage() {
                 
                 {hasFacility && gameState.hasClaimedStarterMiner ? (
                   <>
-                    <div className="border-b border-white/20 pb-2">
-                      <span className="font-press-start text-white text-xs">- TOTAL SPACES</span>
-                      <span className="font-press-start text-banana text-xs block mt-1 ml-2">
-                        {parsedFacility ? parsedFacility.capacity : 4} SPACES
-                      </span>
-                    </div>
-                    <div className="border-b border-white/20 pb-2">
-                      <span className="font-press-start text-white text-xs">- TOTAL GIGAWATTS</span>
-                      <span className="font-press-start text-banana text-xs block mt-1 ml-2">
-                        {parsedFacility ? parsedFacility.power : 28} GIGAWATTS
-                      </span>
-                    </div>
-                    <div className="border-b border-white/20 pb-2">
-                      <span className="font-press-start text-white text-xs">- FOOD SOURCE</span>
-                      <span className="font-press-start text-banana text-xs block mt-1 ml-2">FREE BANANAS 🍌 FROM APETOSHI</span>
-                    </div>
-                    {parsedFacility && (
-                      <div className="text-center mt-4">
-                        <button
-                          onClick={() => gameState.upgradeFacility()}
-                          disabled={gameState.isUpgradingFacility}
-                          className="bg-banana text-royal font-press-start text-xs py-2 px-4 rounded-md w-full"
-                        >
+                <div className="border-b border-white/20 pb-2">
+                  <span className="font-press-start text-white text-xs">- TOTAL SPACES</span>
+                  <span className="font-press-start text-banana text-xs block mt-1 ml-2">
+                    {parsedFacility ? parsedFacility.capacity : 4} SPACES
+                  </span>
+                </div>
+                <div className="border-b border-white/20 pb-2">
+                  <span className="font-press-start text-white text-xs">- TOTAL GIGAWATTS</span>
+                  <span className="font-press-start text-banana text-xs block mt-1 ml-2">
+                    {parsedFacility ? parsedFacility.power : 28} GIGAWATTS
+                  </span>
+                </div>
+                <div className="border-b border-white/20 pb-2">
+                  <span className="font-press-start text-white text-xs">- FOOD SOURCE</span>
+                  <span className="font-press-start text-banana text-xs block mt-1 ml-2">FREE BANANAS 🍌 FROM APETOSHI</span>
+                </div>
+                {parsedFacility && (
+                  <div className="text-center mt-4">
+                    <button
+                      onClick={() => gameState.upgradeFacility()}
+                      disabled={gameState.isUpgradingFacility}
+                      className="bg-banana text-royal font-press-start text-xs py-2 px-4 rounded-md w-full"
+                    >
                           {gameState.isUpgradingFacility ? "UPGRADING..." : "UPGRADE FACILITY"}
-                        </button>
+                    </button>
                       </div>
                     )}
                   </>
@@ -2266,16 +2225,15 @@ export default function RoomPage() {
   };
 
   const handleUpgradeFacility = async () => {
-    // Open the upgrade modal
     setIsUpgradeModalOpen(true);
   };
 
   // Handle the actual facility upgrade from the modal
-  const handleFacilityUpgradeConfirm = async () => {
+  const processFacilityUpgrade = async () => {
     try {
       console.log('Processing facility upgrade');
       
-      // Close the modal to prevent multiple submissions
+      // Close the modal first to prevent multiple submissions
       setIsUpgradeModalOpen(false);
       
       // Call the gameState function to upgrade the facility
@@ -2284,86 +2242,38 @@ export default function RoomPage() {
       if (success) {
         console.log('Facility upgraded successfully, refreshing data');
         
-        // Update the timestamp to force a refresh of the visualization
-        setFacilityUpgradeTimestamp(Date.now());
+        // Override current level for immediate UI update
+        // After upgrade, facility should be at least level 2
+        if (parsedFacility) {
+          // Create a temporary variable for easier access
+          const upgradedLevel = parsedFacility.level + 1;
+          console.log('🏠 Facility upgraded to level:', upgradedLevel);
+          
+          // ALWAYS use treehouse.png for upgraded facilities (level 2+)
+          const newImagePath = `/images/facilities/treehouse.png?force=${Date.now()}`;
+          console.log('🏠 Using image path after upgrade:', newImagePath);
+        }
         
         // Force refresh all game data
         if (gameState.refetch) {
-          try {
-            await gameState.refetch();
-            console.log('Game state refreshed after facility upgrade');
-            
-            // Force another refresh after a delay to ensure contract data is updated
-            setTimeout(() => {
-              if (gameState.refetch) {
-                gameState.refetch();
-                // Update the timestamp again after the second refresh
-                setFacilityUpgradeTimestamp(Date.now());
-                console.log('Second refresh completed after facility upgrade');
-              }
-            }, 3000);
-          } catch (refreshError) {
-            console.error('Error refreshing game state:', refreshError);
-          }
+          await gameState.refetch();
+          
+      }
+      
+      // Force a re-render of the selected tile
+      if (selectedTile) {
+        setSelectedTile({...selectedTile});
+      }
+      
+      // Switch to resources tab to show updated stats
+      setActiveTab('resources');
+      
+      // Wait a moment and then check again (async refresh might take time)
+      setTimeout(() => {
+        if (gameState.refetch) {
+          gameState.refetch();
         }
-      }
-    } catch (error) {
-      console.error('Error upgrading facility:', error);
-    }
-  };
-
-  // Add a wrapper function to fix the type error with gameState.purchaseMiner
-  const handlePurchaseMiner = useCallback(async (minerType: MinerType, x: number, y: number): Promise<void> => {
-    await gameState.purchaseMiner(minerType, x, y);
-  }, [gameState]);
-
-  // Add functionality to remove a miner from a tile
-  const handleRemoveMiner = async (x: number, y: number) => {
-    if (!confirm(`Are you sure you want to remove the miner at position (${x}, ${y})? This action cannot be undone.`)) {
-      return;
-    }
-    
-    try {
-      console.log(`Removing miner at position (${x}, ${y})`);
-      
-      // Get the miner at this position to find its ID
-      const miner = getMinerAtTile(x, y);
-      
-      if (!miner || !miner.id) {
-        console.error('Cannot remove miner: no miner ID found');
-        alert('Failed to remove miner. Miner data not found.');
-        return;
-      }
-      
-      console.log('Found miner to remove:', miner);
-      
-      // Use the gameState.removeMiner function to call the contract
-      if (gameState.removeMiner) {
-        const success = await gameState.removeMiner(Number(miner.id));
-        
-        if (success) {
-          console.log('Miner successfully removed via contract call');
-          
-          // Refresh game state to update UI
-          if (gameState.refetch) {
-            console.log('Refreshing game state after removing miner');
-            await gameState.refetch();
-          }
-          
-          // Force a re-render of the selected tile
-          if (selectedTile) {
-            setSelectedTile({...selectedTile});
-          }
-          
-          // Switch to resources tab to show updated stats
-          setActiveTab('resources');
-          
-          // Wait a moment and then check again (async refresh might take time)
-          setTimeout(() => {
-            if (gameState.refetch) {
-              gameState.refetch();
-            }
-          }, 2000);
+      }, 2000);
         } else {
           console.error('Contract call to remove miner failed');
           alert('Failed to remove miner. Please try again.');
@@ -2517,6 +2427,52 @@ export default function RoomPage() {
     );
   };
 
+  // Add facility image error handling
+  useEffect(() => {
+    if (!parsedFacility || typeof window === 'undefined') return;
+    
+    // Wait a bit for images to load
+    const timeoutId = setTimeout(() => {
+      try {
+        // Find all facility images
+        const images = document.querySelectorAll('img');
+        images.forEach(img => {
+          if (img.src.includes('/images/facilities/')) {
+            console.log('🏠 Setting error handler for facility image:', img.src);
+            
+            // Add error handler to detect and fix wrong images
+            img.onerror = () => {
+              console.log('🏠 Facility image error detected! Forcing reload with correct image.');
+              
+              // Determine correct image based on facility level
+              const facilityLevel = parsedFacility.level;
+              console.log('🏠 Current facility level from parsedFacility:', facilityLevel);
+              
+              const correctPath = facilityLevel >= 2 
+                ? `/images/facilities/treehouse.png?force=${Date.now()}`
+                : `/images/facilities/bedroom.png?force=${Date.now()}`;
+                
+              console.log('🏠 Forcing image src to:', correctPath);
+              img.src = correctPath;
+            };
+            
+            // Check the image against facility level
+            const facilityLevel = parsedFacility.level;
+            if (facilityLevel >= 2 && img.src.includes('bedroom.png')) {
+              console.log('🏠 Wrong image detected! Should be treehouse for level 2+. Forcing correct image.');
+              img.src = `/images/facilities/treehouse.png?force=${Date.now()}`;
+            }
+          }
+        });
+      } catch (error) {
+        console.error('Error in facility image handling:', error);
+      }
+    }, 500);
+    
+    return () => clearTimeout(timeoutId);
+  }, [parsedFacility]);
+
+  // Return the UI
   return (
     <div className="h-screen w-screen overflow-hidden">
       {/* Buy Miner button - fixed position at top right, only shown when no tile is selected */}
@@ -2839,18 +2795,18 @@ export default function RoomPage() {
                             <div className="flex items-center bg-blue-600 rounded-full px-2 py-1">
                               <span className="text-white mr-1 font-bold">10</span>
                               <div className="w-5 h-5 relative">
-                                <Image 
-                                  src="/apecoin.png"
+                      <Image 
+                        src="/apecoin.png" 
                                   alt="APE" 
                                   width={20}
                                   height={20}
                                   className="object-contain"
                                 />
-                              </div>
+                    </div>
                             </div>
                           </div>
                         )}
-                      </button>
+                    </button>
                       <p className="text-white text-xs mt-1 opacity-80 text-center">(Initial facility includes a FREE Miner)</p>
                       
                       {/* ApeCoin Powered Text */}
@@ -2941,9 +2897,9 @@ export default function RoomPage() {
       <FacilityPurchaseModal 
         isOpen={isUpgradeModalOpen}
         onClose={() => setIsUpgradeModalOpen(false)}
-        onPurchase={handleFacilityUpgradeConfirm}
+        onPurchase={processFacilityUpgrade}
         isPurchasing={gameState.isUpgradingFacility}
-        facilityLevel={parsedFacility?.level || 1}
+        facilityLevel={Number(facility?.[0] || parsedFacility?.level || visualizationFacilityData?.level || 1)}
       />
 
       {/* Trade Modal */}

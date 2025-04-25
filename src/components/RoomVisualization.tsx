@@ -655,22 +655,23 @@ export const RoomVisualization = React.memo(function RoomVisualization({
       }
     ];
     
-    // Level 2 facility positions (9 tiles in a 3x3 grid)
+    // Level 2 facility positions (8 tiles in a 2x4 grid)
     const level2Positions = [
       // Top row
-      { x: 0, y: 0, style: { gridColumn: 3, gridRow: 1 } }, // TOP RIGHT
-      { x: 1, y: 0, style: { gridColumn: 2, gridRow: 1 } }, // TOP MIDDLE
-      { x: 2, y: 0, style: { gridColumn: 1, gridRow: 1 } }, // TOP LEFT
+      { x: 0, y: 0, style: { gridColumn: 2, gridRow: 1 } }, // TOP RIGHT
+      { x: 1, y: 0, style: { gridColumn: 1, gridRow: 1 } }, // TOP LEFT
       
-      // Middle row
-      { x: 0, y: 1, style: { gridColumn: 3, gridRow: 2 } }, // MIDDLE RIGHT
-      { x: 1, y: 1, style: { gridColumn: 2, gridRow: 2 } }, // CENTER
-      { x: 2, y: 1, style: { gridColumn: 1, gridRow: 2 } }, // MIDDLE LEFT
+      // Second row
+      { x: 0, y: 1, style: { gridColumn: 2, gridRow: 2 } }, // SECOND ROW RIGHT
+      { x: 1, y: 1, style: { gridColumn: 1, gridRow: 2 } }, // SECOND ROW LEFT
+      
+      // Third row
+      { x: 0, y: 2, style: { gridColumn: 2, gridRow: 3 } }, // THIRD ROW RIGHT
+      { x: 1, y: 2, style: { gridColumn: 1, gridRow: 3 } }, // THIRD ROW LEFT
       
       // Bottom row
-      { x: 0, y: 2, style: { gridColumn: 3, gridRow: 3 } }, // BOTTOM RIGHT
-      { x: 1, y: 2, style: { gridColumn: 2, gridRow: 3 } }, // BOTTOM MIDDLE
-      { x: 2, y: 2, style: { gridColumn: 1, gridRow: 3 } }  // BOTTOM LEFT
+      { x: 0, y: 3, style: { gridColumn: 2, gridRow: 4 } }, // BOTTOM RIGHT
+      { x: 1, y: 3, style: { gridColumn: 1, gridRow: 4 } }  // BOTTOM LEFT
     ];
     
     // Check current facility level
@@ -735,15 +736,15 @@ export const RoomVisualization = React.memo(function RoomVisualization({
       }
     ];
 
-    // Level 2 facility positions (9 tiles)
+    // Level 2 facility positions (8 tiles in a 2x4 grid)
     const level2Positions = [
       // Top row
       { 
         x: 0, y: 0,
         style: { 
           position: 'absolute' as const,
-          top: isMobile ? '36%' : '34%',
-          left: isMobile ? '60%' : '55%',
+          top: isMobile ? '40%' : '35%',
+          left: isMobile ? '35%' : '30%',
           width: isMobile ? '35px' : '100px',
           height: isMobile ? '35px' : '100px',
           zIndex: 20
@@ -753,32 +754,21 @@ export const RoomVisualization = React.memo(function RoomVisualization({
         x: 1, y: 0,
         style: { 
           position: 'absolute' as const,
-          top: isMobile ? '36%' : '34%',
-          left: isMobile ? '45%' : '40%',
-          width: isMobile ? '35px' : '100px',
-          height: isMobile ? '35px' : '100px',
-          zIndex: 20
-        }
-      },
-      { 
-        x: 2, y: 0,
-        style: { 
-          position: 'absolute' as const,
-          top: isMobile ? '36%' : '34%',
-          left: isMobile ? '30%' : '25%',
+          top: isMobile ? '45%' : '40%',
+          left: isMobile ? '20%' : '15%',
           width: isMobile ? '35px' : '100px',
           height: isMobile ? '35px' : '100px',
           zIndex: 20
         }
       },
       
-      // Middle row
+      // Second row
       { 
         x: 0, y: 1,
         style: { 
           position: 'absolute' as const,
-          top: isMobile ? '48%' : '46%',
-          left: isMobile ? '60%' : '55%',
+          top: isMobile ? '48%' : '40%',
+          left: isMobile ? '52%' : '45%',
           width: isMobile ? '35px' : '100px',
           height: isMobile ? '35px' : '100px',
           zIndex: 20
@@ -788,31 +778,20 @@ export const RoomVisualization = React.memo(function RoomVisualization({
         x: 1, y: 1,
         style: { 
           position: 'absolute' as const,
-          top: isMobile ? '48%' : '46%',
-          left: isMobile ? '45%' : '40%',
-          width: isMobile ? '35px' : '100px',
-          height: isMobile ? '35px' : '100px',
-          zIndex: 20
-        }
-      },
-      { 
-        x: 2, y: 1,
-        style: { 
-          position: 'absolute' as const,
-          top: isMobile ? '48%' : '46%',
-          left: isMobile ? '30%' : '25%',
+          top: isMobile ? '55%' : '50%',
+          left: isMobile ? '35%' : '30%',
           width: isMobile ? '35px' : '100px',
           height: isMobile ? '35px' : '100px',
           zIndex: 20
         }
       },
       
-      // Bottom row
+      // Third row
       { 
         x: 0, y: 2,
         style: { 
           position: 'absolute' as const,
-          top: isMobile ? '60%' : '58%',
+          top: isMobile ? '52%' : '50%',
           left: isMobile ? '60%' : '55%',
           width: isMobile ? '35px' : '100px',
           height: isMobile ? '35px' : '100px',
@@ -823,18 +802,31 @@ export const RoomVisualization = React.memo(function RoomVisualization({
         x: 1, y: 2,
         style: { 
           position: 'absolute' as const,
-          top: isMobile ? '60%' : '58%',
-          left: isMobile ? '45%' : '40%',
+          top: isMobile ? '52%' : '50%',
+          left: isMobile ? '30%' : '25%',
+          width: isMobile ? '35px' : '100px',
+          height: isMobile ? '35px' : '100px',
+          zIndex: 20
+        }
+      },
+      
+      // Bottom row
+      { 
+        x: 0, y: 3,
+        style: { 
+          position: 'absolute' as const,
+          top: isMobile ? '62%' : '60%',
+          left: isMobile ? '60%' : '55%',
           width: isMobile ? '35px' : '100px',
           height: isMobile ? '35px' : '100px',
           zIndex: 20
         }
       },
       { 
-        x: 2, y: 2,
+        x: 1, y: 3,
         style: { 
           position: 'absolute' as const,
-          top: isMobile ? '60%' : '58%',
+          top: isMobile ? '62%' : '60%',
           left: isMobile ? '30%' : '25%',
           width: isMobile ? '35px' : '100px',
           height: isMobile ? '35px' : '100px',
@@ -1046,10 +1038,10 @@ export const RoomVisualization = React.memo(function RoomVisualization({
     switch (facilityLevel) {
       case 2:
         return {
-          columns: 'repeat(3, 1fr)',
-          rows: 'repeat(3, 1fr)',
+          columns: 'repeat(2, 1fr)',
+          rows: 'repeat(4, 1fr)',
           width: isMobile ? '280px' : '330px',
-          height: isMobile ? '280px' : '330px'
+          height: isMobile ? '380px' : '450px' // Increased height for 4 rows
         };
       default:
         return {
@@ -1075,8 +1067,8 @@ export const RoomVisualization = React.memo(function RoomVisualization({
     
     switch (facilityLevel) {
       case 2:
-        // For level 2 facilities, valid coordinates are (0-2, 0-2)
-        isValidCoordinate = x >= 0 && x <= 2 && y >= 0 && y <= 2;
+        // For level 2 facilities, valid coordinates are (0-1, 0-3)
+        isValidCoordinate = x >= 0 && x <= 1 && y >= 0 && y <= 3;
         break;
       default:
         // For level 1 facilities, valid coordinates are (0-1, 0-1)
@@ -1263,6 +1255,15 @@ export const RoomVisualization = React.memo(function RoomVisualization({
     }
   }, [gameStateFacilityData, contractFacilityLevel, contractLevel]);
 
+  // Add debug logging for grid layout
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Rendering RoomVisualization with facility level: ${contractFacilityLevel || facilityData?.level || 1}`);
+      console.log(`Grid template: ${getGridTemplate().columns} columns, ${getGridTemplate().rows} rows`);
+      console.log(`Adding level-2-grid class: ${contractFacilityLevel === 2 || facilityData?.level === 2}`);
+    }
+  }, [contractFacilityLevel, facilityData?.level, getGridTemplate]);
+
   return (
     <>
       <style jsx global>{`
@@ -1286,8 +1287,8 @@ export const RoomVisualization = React.memo(function RoomVisualization({
         
         /* Add specific classes for facility levels */
         .level-2-grid {
-          grid-template-columns: repeat(3, 1fr);
-          grid-template-rows: repeat(3, 1fr);
+          grid-template-columns: repeat(2, 1fr);
+          grid-template-rows: repeat(4, 1fr);
         }
         
         .level-3-grid {
@@ -1374,7 +1375,9 @@ export const RoomVisualization = React.memo(function RoomVisualization({
         
         {/* Mining Grid - For selection and interaction only */}
         {hasFacility && (
-          <div className={`mining-grid ${isGridMode ? 'grid-mode' : ''}`}>
+          <div className={`mining-grid ${isGridMode ? 'grid-mode' : ''} ${
+            contractFacilityLevel === 2 || facilityData?.level === 2 ? 'level-2-grid' : ''
+          }`}>
             {renderMiningSpaces()}
           </div>
         )}

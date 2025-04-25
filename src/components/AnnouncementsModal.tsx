@@ -93,7 +93,7 @@ export default function AnnouncementsModal({ isOpen, onClose, onOpenReferralModa
       }
     }
   }, [isOpen]);
-  
+
   return (
     <Dialog
       open={isOpen}
@@ -110,8 +110,8 @@ export default function AnnouncementsModal({ isOpen, onClose, onOpenReferralModa
               ANNOUNCEMENTS
               <span className="animate-pulse ml-2">🔥</span>
             </div>
-          </Dialog.Title>
-          
+            </Dialog.Title>
+            
           <div 
             ref={contentRef}
             className="bg-royal-dark p-6 mb-6 rounded-lg max-h-[60vh] overflow-y-auto"
@@ -243,8 +243,8 @@ export default function AnnouncementsModal({ isOpen, onClose, onOpenReferralModa
                     <p className="text-banana font-press-start text-[8px] text-center">{miner.name}</p>
                     <p className="text-white font-press-start text-[8px] text-center">{miner.hashrate} GH/s</p>
                     <p className="text-green-400 font-press-start text-[8px] text-center">{miner.price} $BIT</p>
-                  </div>
-                ))}
+                </div>
+              ))}
               </div>
               
               <div className="bg-gradient-to-r from-[#001420] to-[#002A46] rounded-lg p-4">
@@ -253,7 +253,7 @@ export default function AnnouncementsModal({ isOpen, onClose, onOpenReferralModa
                 </p>
               </div>
             </div>
-            
+
             {/* Referral Section */}
             <div>
               <h3 className="font-press-start text-yellow-300 text-sm mb-4">
@@ -283,13 +283,13 @@ export default function AnnouncementsModal({ isOpen, onClose, onOpenReferralModa
               <div ref={buttonRef} className="mt-4">
                 <div className={`transition-all duration-500 ${hasScrolledToBottom ? 'opacity-100' : 'opacity-0'}`}>
                   {onOpenReferralModal && (
-                    <button
+              <button
                       onClick={onOpenReferralModal}
                       className="w-full font-press-start px-6 py-3 bg-banana text-[#001420] hover:bg-banana/90 active:bg-banana/80 transition-colors font-bold rounded-md animate-pulse"
                       disabled={!hasScrolledToBottom}
-                    >
+              >
                       REFER A FRIEND
-                    </button>
+              </button>
                   )}
                 </div>
               </div>

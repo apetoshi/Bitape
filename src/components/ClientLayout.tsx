@@ -3,6 +3,8 @@
 import React from 'react';
 import Script from 'next/script';
 import Providers from '@/components/Providers';
+import FacilityImageHandler from '@/components/FacilityImageHandler';
+import FacilityLevelProvider from '@/components/FacilityLevelProvider';
 
 interface ClientLayoutProps {
   children: React.ReactNode;
@@ -94,7 +96,10 @@ const ClientLayout: React.FC<ClientLayoutProps> = ({ children }) => {
           console.error('Error in cleanup script:', e);
         }
       `}</Script>
-      {children}
+      <FacilityLevelProvider>
+        <FacilityImageHandler />
+        {children}
+      </FacilityLevelProvider>
     </Providers>
   );
 };

@@ -160,39 +160,39 @@ export default function SpaceTab() {
 
               {/* Space usage visualization */}
               <div className="space-y-2 pt-2">
-                <div className="flex justify-between items-center">
-                  <span className="font-press-start text-white text-xs">SPACES LEFT:</span>
-                  <span className="font-press-start text-banana text-xs">{spacesLeft} SPACES</span>
-                </div>
-                <div className="w-full bg-blue-900 h-3 rounded-full overflow-hidden">
-                  <div 
-                    className="bg-yellow-400 h-full" 
-                    style={{ width: `${facilityData.maxMiners ? (facilityData.currMiners / facilityData.maxMiners) * 100 : 0}%` }}
-                  />
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-press-start text-white text-[9px]">USED: {facilityData.currMiners}</span>
-                  <span className="font-press-start text-white text-[9px]">MAX: {facilityData.maxMiners}</span>
-                </div>
+              <div className="flex justify-between items-center">
+                <span className="font-press-start text-white text-xs">SPACES LEFT:</span>
+                <span className="font-press-start text-banana text-xs">{spacesLeft} SPACES</span>
               </div>
+              <div className="w-full bg-blue-900 h-3 rounded-full overflow-hidden">
+                <div 
+                  className="bg-yellow-400 h-full" 
+                  style={{ width: `${facilityData.maxMiners ? (facilityData.currMiners / facilityData.maxMiners) * 100 : 0}%` }}
+                />
+              </div>
+              <div className="flex justify-between">
+                <span className="font-press-start text-white text-[9px]">USED: {facilityData.currMiners}</span>
+                <span className="font-press-start text-white text-[9px]">MAX: {facilityData.maxMiners}</span>
+              </div>
+            </div>
 
               {/* Power usage visualization */}
               <div className="space-y-2 pt-2">
-                <div className="flex justify-between items-center">
-                  <span className="font-press-start text-white text-xs">GIGAWATTS AVAILABLE:</span>
-                  <span className="font-press-start text-banana text-xs">{gigawattsAvailable} GW</span>
-                </div>
-                <div className="w-full bg-blue-900 h-3 rounded-full overflow-hidden">
-                  <div 
-                    className="bg-yellow-400 h-full" 
-                    style={{ width: `${facilityData.totalPower ? (facilityData.usedPower / facilityData.totalPower) * 100 : 0}%` }}
-                  />
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-press-start text-white text-[9px]">USED: {facilityData.usedPower} GW</span>
-                  <span className="font-press-start text-white text-[9px]">MAX: {facilityData.totalPower} GW</span>
-                </div>
+              <div className="flex justify-between items-center">
+                <span className="font-press-start text-white text-xs">GIGAWATTS AVAILABLE:</span>
+                <span className="font-press-start text-banana text-xs">{gigawattsAvailable} GW</span>
               </div>
+              <div className="w-full bg-blue-900 h-3 rounded-full overflow-hidden">
+                <div 
+                  className="bg-yellow-400 h-full" 
+                  style={{ width: `${facilityData.totalPower ? (facilityData.usedPower / facilityData.totalPower) * 100 : 0}%` }}
+                />
+              </div>
+              <div className="flex justify-between">
+                <span className="font-press-start text-white text-[9px]">USED: {facilityData.usedPower} GW</span>
+                <span className="font-press-start text-white text-[9px]">MAX: {facilityData.totalPower} GW</span>
+              </div>
+            </div>
             </>
           ) : (
             <div className="flex h-full flex-col items-center justify-center py-4">
@@ -203,7 +203,7 @@ export default function SpaceTab() {
               <Button className="pixel-text bg-banana text-black hover:bg-banana/90 py-1 px-2 text-xs" onClick={() => gameState.getStarterMiner(0, 0)}>
                 Get Starter Miner
               </Button>
-            </div>
+          </div>
           )
         ) : (
           <div className="flex h-full flex-col items-center justify-center py-4">
@@ -236,8 +236,8 @@ export default function SpaceTab() {
             >
               {gameState.isUpgradingFacility ? 'UPGRADING...' : 'UPGRADE FACILITY'}
             </Button>
-          </div>
-        )}
+        </div>
+      )}
       </div>
     </div>
   );

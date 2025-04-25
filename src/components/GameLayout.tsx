@@ -294,6 +294,7 @@ const GameLayout: React.FC = () => {
         onClose={() => setIsModalOpen(false)}
         onPurchase={handleConfirmPurchase}
         isPurchasing={gameState.isPurchasingFacility}
+        facilityLevel={gameState.facilityData?.level}
       />
       
       <PWAInstallButton />
