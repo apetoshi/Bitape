@@ -949,6 +949,27 @@ export const RoomVisualization = React.memo(function RoomVisualization({
     };
   }, []);
 
+  // Get the appropriate facility image based on the facility index
+  const getFacilityImage = useMemo(() => {
+    if (!facilityData) return "/images/facilities/bedroom.png";
+    
+    // Use the level property from facilityData which corresponds to facilityIndex
+    const facilityIndex = facilityData.level;
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Facility index: ${facilityIndex}, using image: ${facilityIndex === 1 ? 'bedroom.png' : 'treehouse.png'}`);
+    }
+    
+    switch (facilityIndex) {
+      case 1:
+        return "/images/facilities/bedroom.png";
+      case 2:
+        return "/images/facilities/treehouse.png";
+      default:
+        return "/images/facilities/bedroom.png";
+    }
+  }, [facilityData]);
+
   return (
     <>
       <style jsx global>{`
@@ -1016,7 +1037,7 @@ export const RoomVisualization = React.memo(function RoomVisualization({
         {/* Room Background - Only show if hasFacility is true */}
         {hasFacility ? (
           <Image 
-            src="/bedroom.png" 
+            src={getFacilityImage} 
             alt="Mining Room" 
             fill
             priority
@@ -1030,7 +1051,7 @@ export const RoomVisualization = React.memo(function RoomVisualization({
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <Image 
-              src="/bedroom.png" 
+              src="/images/facilities/bedroom.png" 
               alt="Empty Space" 
               width={690}
               height={690}
