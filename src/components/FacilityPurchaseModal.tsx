@@ -40,10 +40,16 @@ const FacilityPurchaseModal: React.FC<FacilityPurchaseModalProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [facilityPurchaseError, setFacilityPurchaseError] = useState('');
   const [isApprovingTokens, setIsApprovingTokens] = useState(false);
-  const [shouldProceedWithPurchase, setShouldProceedWithPurchase] = useState(false);
+  
+  // Track transaction progress with refs to avoid race conditions and prevent double execution
+  const transactionInProgressRef = useRef(false);
+  const approvalCompletedRef = useRef(false);
+  const purchaseExecutedRef = useRef(false); // Track if purchase has been executed
+  const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const closeModalAfterSuccessRef = useRef(false);
 
   // Read the facility data directly from contract
-  const { data: facilityData } = useContractRead({
+  const { data: facilityData, refetch: refetchFacilityData } = useContractRead({
     address: CONTRACT_ADDRESSES.MAIN,
     abi: MAIN_CONTRACT_ABI,
     functionName: 'getPlayerFacility',
@@ -122,17 +128,12 @@ const FacilityPurchaseModal: React.FC<FacilityPurchaseModalProps> = ({
     reset: resetFacilityWrite
   } = useWriteContract();
 
-  // Track transaction progress with a ref to avoid race conditions
-  const transactionInProgressRef = useRef(false);
-  const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
-
   // Reset all states when modal closes
   useEffect(() => {
     if (!isOpen) {
       // Reset all states when modal closes
       setIsProcessing(false);
       setFacilityPurchaseError('');
-      setShouldProceedWithPurchase(false);
       setIsApprovingTokens(false);
       resetApproval?.();
       resetFacilityWrite?.();
@@ -143,18 +144,93 @@ const FacilityPurchaseModal: React.FC<FacilityPurchaseModalProps> = ({
         checkIntervalRef.current = null;
       }
       
-      // Reset transaction in progress flag
+      // Reset all transaction tracking refs
       transactionInProgressRef.current = false;
+      approvalCompletedRef.current = false;
+      purchaseExecutedRef.current = false;
+      closeModalAfterSuccessRef.current = false;
     }
   }, [isOpen, resetApproval, resetFacilityWrite]);
 
-  // Add effect to monitor facility write status changes
+  // Update balance and allowance checks
+  useEffect(() => {
+    // Update BIT balance
+    if (bitBalanceData) {
+      const balance = formatEther(bitBalanceData as bigint);
+      setBitBalance(balance);
+      setHasSufficientBalance(parseFloat(balance) >= parseFloat(FACILITY_COST));
+    } else if (gameState.bitBalance) {
+      setBitBalance(gameState.bitBalance);
+      setHasSufficientBalance(parseFloat(gameState.bitBalance) >= parseFloat(FACILITY_COST));
+    }
+    
+    // Update allowance status
+    if (allowanceData) {
+      const allowance = formatEther(allowanceData as bigint);
+      setHasSufficientAllowance(parseFloat(allowance) >= parseFloat(FACILITY_COST));
+    }
+  }, [bitBalanceData, gameState.bitBalance, allowanceData]);
+  
+  // Monitor approval status with better tracking
+  useEffect(() => {
+    // Only process if we're actively approving and we haven't already completed it
+    if (approvalStatus === 'success' && isApprovingTokens && !approvalCompletedRef.current) {
+      console.log('Approval transaction succeeded, setting approval completed flag');
+      
+      // Mark approval as completed to prevent duplicate purchases
+      approvalCompletedRef.current = true;
+      
+      // Wait a moment before refetching to allow for blockchain confirmation
+      setTimeout(async () => {
+        await refetchAllowance();
+        setIsApprovingTokens(false);
+        
+        // Check allowance after approval and execute purchase if sufficient
+        if (!purchaseExecutedRef.current) {
+          const allowance = formatEther(allowanceData as bigint);
+          const hasAllowance = parseFloat(allowance) >= parseFloat(FACILITY_COST);
+          
+          if (hasAllowance) {
+            console.log('Allowance now sufficient after approval, proceeding with purchase');
+            executeFacilityPurchase();
+          } else {
+            console.log('Waiting for allowance update after approval...');
+            // Wait a bit longer and check again
+            setTimeout(async () => {
+              await refetchAllowance();
+              const updatedAllowanceData = allowanceData;
+              if (updatedAllowanceData) {
+                const updatedAllowance = formatEther(updatedAllowanceData as bigint);
+                if (parseFloat(updatedAllowance) >= parseFloat(FACILITY_COST) && !purchaseExecutedRef.current) {
+                  console.log('Allowance now sufficient after delay, proceeding with purchase');
+                  executeFacilityPurchase();
+                }
+              }
+            }, 3000);
+          }
+        }
+      }, 2000);
+    } else if (approvalStatus === 'error' && isApprovingTokens) {
+      console.error('Approval transaction failed:', approvalError?.message);
+      setIsApprovingTokens(false);
+      setFacilityPurchaseError(`Failed to approve token spending: ${approvalError?.message || 'Unknown error'}`);
+      
+      // Reset flags to allow trying again
+      approvalCompletedRef.current = false;
+      purchaseExecutedRef.current = false;
+      
+      resetApproval();
+    }
+  }, [approvalStatus, isApprovingTokens, approvalError, refetchAllowance, resetApproval, allowanceData]);
+
+  // Enhanced facility transaction monitoring
   useEffect(() => {
     if (facilityWriteStatus === 'success' && transactionInProgressRef.current) {
       console.log('Facility upgrade transaction succeeded');
       
-      // Reset the transaction flag
+      // Reset transaction flags
       transactionInProgressRef.current = false;
+      closeModalAfterSuccessRef.current = true;
       
       // Clear any check intervals
       if (checkIntervalRef.current) {
@@ -162,23 +238,37 @@ const FacilityPurchaseModal: React.FC<FacilityPurchaseModalProps> = ({
         checkIntervalRef.current = null;
       }
       
-      // Refresh contract data to get the updated facility level
+      // Comprehensive data refresh to ensure UI updates
       const refreshData = async () => {
-        if (gameState.refetch) {
-          try {
+        try {
+          // First refresh facility data directly
+          await refetchFacilityData();
+          console.log('Refreshed facility data directly after upgrade');
+          
+          // Then refresh full game state
+          if (gameState.refetch) {
             await gameState.refetch();
             console.log('Refreshed game state after facility upgrade');
-          } catch (refreshError) {
-            console.error('Error refreshing data after upgrade:', refreshError);
           }
+          
+          // Force update to the parent component
+          onPurchase();
+          
+          // Add a slight delay before closing to ensure UI updates
+          setTimeout(() => {
+            // Always reset processing state
+            setIsProcessing(false);
+            
+            // Only close if that's what we want to do
+            if (closeModalAfterSuccessRef.current) {
+              onClose();
+            }
+          }, 1000);
+        } catch (error) {
+          console.error('Error refreshing data after upgrade:', error);
+          setIsProcessing(false);
+          setFacilityPurchaseError('Upgrade succeeded but there was an error refreshing data. Please refresh the page.');
         }
-        
-        // Always reset processing state
-        setIsProcessing(false);
-        
-        // Notify parent components
-        onPurchase();
-        onClose();
       };
       
       refreshData();
@@ -190,6 +280,7 @@ const FacilityPurchaseModal: React.FC<FacilityPurchaseModalProps> = ({
       // Reset states
       setIsProcessing(false);
       transactionInProgressRef.current = false;
+      purchaseExecutedRef.current = false;
       
       // Clear any check intervals
       if (checkIntervalRef.current) {
@@ -197,57 +288,16 @@ const FacilityPurchaseModal: React.FC<FacilityPurchaseModalProps> = ({
         checkIntervalRef.current = null;
       }
     }
-  }, [facilityWriteStatus, facilityWriteError, gameState, onPurchase, onClose]);
-
-  // Check if user has sufficient BIT balance and allowance
-  useEffect(() => {
-    if (bitBalanceData) {
-      const balance = formatEther(bitBalanceData as bigint);
-      setBitBalance(balance);
-      setHasSufficientBalance(parseFloat(balance) >= parseFloat(FACILITY_COST));
-    } else if (gameState.bitBalance) {
-      setBitBalance(gameState.bitBalance);
-      setHasSufficientBalance(parseFloat(gameState.bitBalance) >= parseFloat(FACILITY_COST));
-    }
-    
-    if (allowanceData) {
-      const allowance = formatEther(allowanceData as bigint);
-      const hasAllowance = parseFloat(allowance) >= parseFloat(FACILITY_COST);
-      setHasSufficientAllowance(hasAllowance);
-      console.log('Current BIT allowance:', allowance, 'Has sufficient allowance:', hasAllowance);
-      
-      // If we now have sufficient allowance and we were waiting to proceed with purchase
-      if (hasAllowance && shouldProceedWithPurchase && !isProcessing) {
-        console.log('Allowance is now sufficient, proceeding with purchase');
-        setShouldProceedWithPurchase(false);
-        // Use setTimeout to avoid state update conflicts
-        setTimeout(() => {
-          executeFacilityPurchase();
-        }, 500);
-      }
-    }
-  }, [bitBalanceData, gameState.bitBalance, allowanceData, shouldProceedWithPurchase, isProcessing]);
-  
-  // Monitor approval status
-  useEffect(() => {
-    if (approvalStatus === 'success' && isApprovingTokens) {
-      console.log('Approval transaction succeeded');
-      // Wait a moment before refetching to allow for blockchain confirmation
-      setTimeout(async () => {
-        await refetchAllowance();
-        setIsApprovingTokens(false);
-      }, 5000);
-    } else if (approvalStatus === 'error' && isApprovingTokens) {
-      console.error('Approval transaction failed:', approvalError?.message);
-      setIsApprovingTokens(false);
-      setFacilityPurchaseError(`Failed to approve token spending: ${approvalError?.message || 'Unknown error'}`);
-      setShouldProceedWithPurchase(false);
-      resetApproval();
-    }
-  }, [approvalStatus, isApprovingTokens, approvalError, refetchAllowance, resetApproval]);
+  }, [facilityWriteStatus, facilityWriteError, gameState, onPurchase, onClose, refetchFacilityData]);
 
   // Handle approval of BIT tokens - this is a separate step now
   const handleApproveTokens = async () => {
+    // Don't proceed if already approving or processing
+    if (isApprovingTokens || isProcessing || approvalCompletedRef.current) {
+      console.log('Skipping approval as it is already in progress or completed');
+      return false;
+    }
+    
     try {
       setIsApprovingTokens(true);
       setFacilityPurchaseError('');
@@ -265,46 +315,58 @@ const FacilityPurchaseModal: React.FC<FacilityPurchaseModalProps> = ({
         args: [CONTRACT_ADDRESSES.MAIN, approvalAmount]
       });
       
-      // Set flag to continue with purchase after approval
-      setShouldProceedWithPurchase(true);
-      
-      // The actual status is tracked via the approvalStatus state and useEffect
       return true;
     } catch (error: any) {
       console.error("Error initiating token approval:", error);
       setFacilityPurchaseError(`Error approving tokens: ${error.message}`);
       setIsApprovingTokens(false);
-      setShouldProceedWithPurchase(false);
+      approvalCompletedRef.current = false;
       return false;
     }
   };
 
-  // The actual facility purchase function (separated from the approval flow)
+  // The facility purchase function with improved state management
   const executeFacilityPurchase = async () => {
+    // Check if a purchase is already in progress or has been executed
+    if (transactionInProgressRef.current || purchaseExecutedRef.current) {
+      console.log('Purchase already in progress or executed, skipping duplicate execution');
+      return false;
+    }
+    
     try {
       setIsProcessing(true);
       setFacilityPurchaseError('');
       
+      // Set purchase flag to prevent duplicate calls
+      purchaseExecutedRef.current = true;
+      
       // For initial purchase, use the gameState method
       if (validatedLevel === 0) {
+        console.log('Executing initial facility purchase...');
+        
         const result = await gameState.purchaseFacility();
         if (result) {
           console.log('Initial facility purchase successful!');
           
           // Refresh contract data to get the updated facility level
-          if (gameState.refetch) {
-            try {
+          try {
+            await refetchFacilityData();
+            
+            if (gameState.refetch) {
               await gameState.refetch();
               console.log('Refreshed game state after facility purchase');
-            } catch (refreshError) {
-              console.error('Error refreshing data after purchase:', refreshError);
             }
+            
+            // Call the onPurchase callback to update the UI
+            onPurchase();
+            
+            // Close the modal
+            setTimeout(() => {
+              onClose();
+            }, 1000);
+          } catch (refreshError) {
+            console.error('Error refreshing data after purchase:', refreshError);
           }
-          
-          // Call the onPurchase callback to update the UI
-          onPurchase();
-          // Close the modal
-          onClose();
         }
         
         // Always reset processing state for initial purchase
@@ -314,7 +376,7 @@ const FacilityPurchaseModal: React.FC<FacilityPurchaseModalProps> = ({
         // For upgrades, directly call the buyNewFacility function
         console.log('Calling buyNewFacility function directly...');
         
-        // Set transaction in progress flag
+        // Set transaction flags
         transactionInProgressRef.current = true;
         
         // Send the transaction
@@ -331,6 +393,7 @@ const FacilityPurchaseModal: React.FC<FacilityPurchaseModalProps> = ({
             console.warn('Safety timeout triggered - resetting processing state');
             setIsProcessing(false);
             transactionInProgressRef.current = false;
+            purchaseExecutedRef.current = false;
             setFacilityPurchaseError('Transaction status unknown. Please check your wallet for confirmation.');
           }
         }, 60000); // 60 second safety timeout
@@ -342,12 +405,19 @@ const FacilityPurchaseModal: React.FC<FacilityPurchaseModalProps> = ({
       setFacilityPurchaseError(`Error: ${error.message || 'Transaction failed'}`);
       setIsProcessing(false);
       transactionInProgressRef.current = false;
+      purchaseExecutedRef.current = false;
       return false;
     }
   };
 
   // Handle button click - check allowance first, then handle accordingly
   const handleBuyNewFacility = async () => {
+    // Don't process if a transaction is already in progress
+    if (transactionInProgressRef.current || isProcessing || isApprovingTokens || isApprovePending || isFacilityWritePending || purchaseExecutedRef.current) {
+      console.log('Transaction already in progress, ignoring click');
+      return;
+    }
+    
     // Clear any previous errors
     setFacilityPurchaseError('');
     
@@ -360,11 +430,19 @@ const FacilityPurchaseModal: React.FC<FacilityPurchaseModalProps> = ({
     // First, check if we need to approve tokens
     if (!hasSufficientAllowance) {
       console.log('Insufficient allowance, requesting approval first');
+      
+      // Reset execution tracking to prevent duplicates
+      purchaseExecutedRef.current = false;
+      
       await handleApproveTokens();
-      // The purchase will continue after approval via the useEffect when allowance updates
+      // The purchase will continue after approval via the useEffect monitoring approval status
     } else {
       // We already have sufficient allowance, proceed directly
       console.log('Sufficient allowance exists, proceeding with purchase');
+      
+      // Reset execution tracking to prevent duplicates
+      purchaseExecutedRef.current = false;
+      
       await executeFacilityPurchase();
     }
   };
@@ -380,6 +458,7 @@ const FacilityPurchaseModal: React.FC<FacilityPurchaseModalProps> = ({
           console.log('Transaction appears to have been rejected in wallet');
           setIsProcessing(false);
           transactionInProgressRef.current = false;
+          purchaseExecutedRef.current = false;
           setFacilityPurchaseError('Transaction was rejected or failed to send.');
         }
       }, 1000);
@@ -401,7 +480,11 @@ const FacilityPurchaseModal: React.FC<FacilityPurchaseModalProps> = ({
   return (
     <Dialog
       open={isOpen}
-      onClose={onClose}
+      onClose={() => {
+        if (!isProcessing && !isApprovingTokens && !isApprovePending && !isFacilityWritePending) {
+          onClose();
+        }
+      }}
       className="relative z-50"
     >
       <div className="fixed inset-0 bg-black/70" aria-hidden="true" />
@@ -487,7 +570,8 @@ const FacilityPurchaseModal: React.FC<FacilityPurchaseModalProps> = ({
           <div className="flex justify-center space-x-6">
             <button
               onClick={onClose}
-              className="font-press-start px-8 py-2 border-2 border-banana text-banana hover:bg-banana hover:text-royal transition-colors"
+              disabled={isProcessing || isApprovingTokens || isApprovePending || isFacilityWritePending}
+              className="font-press-start px-8 py-2 border-2 border-banana text-banana hover:bg-banana hover:text-royal transition-colors disabled:opacity-50"
             >
               CANCEL
             </button>
