@@ -146,7 +146,7 @@ function ApeGlobe() {
   
   // Load textures with error handling
   const [apeTexture, apeIcon] = useLoader(THREE.TextureLoader, [
-    '/ApeChain/treehouse.png',
+    '/ApeChain/level-2.png',
     '/ApeChain/Mask group.png'
   ]);
   
