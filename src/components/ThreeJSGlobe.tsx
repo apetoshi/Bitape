@@ -51,6 +51,7 @@ function ApeParticles() {
             count={particleCount}
             array={particlePositions}
             itemSize={3}
+            args={[particlePositions, 3]}
           />
         </bufferGeometry>
         <pointsMaterial 
@@ -169,7 +170,7 @@ function ApeGlobe() {
     for (let i = 0; i <= latSegments; i++) {
       const phi = (Math.PI * i) / latSegments;
       const geometry = new THREE.BufferGeometry();
-      const vertices = [];
+      const vertices: number[] = [];
       
       for (let j = 0; j <= 100; j++) {
         const theta = (2 * Math.PI * j) / 100;
@@ -189,7 +190,7 @@ function ApeGlobe() {
     for (let i = 0; i < lonSegments; i++) {
       const theta = (2 * Math.PI * i) / lonSegments;
       const geometry = new THREE.BufferGeometry();
-      const vertices = [];
+      const vertices: number[] = [];
       
       for (let j = 0; j <= 100; j++) {
         const phi = (Math.PI * j) / 100;
@@ -344,6 +345,7 @@ function EnhancedSpace() {
             array={starPositions1}
             count={100}
             itemSize={3}
+            args={[starPositions1, 3]}
           />
         </bufferGeometry>
         <pointsMaterial size={0.2} color="#ffffff" sizeAttenuation />
@@ -357,6 +359,7 @@ function EnhancedSpace() {
             array={starPositions2}
             count={50}
             itemSize={3}
+            args={[starPositions2, 3]}
           />
         </bufferGeometry>
         <pointsMaterial size={0.3} color="#aaccff" sizeAttenuation />
