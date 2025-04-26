@@ -800,7 +800,7 @@ export const RoomVisualization = React.memo(function RoomVisualization({
         x: 1, y: 0, // TOP LEFT
         style: { 
           position: 'absolute' as const,
-          top: isMobile ? '50%' : '47%',
+          top: isMobile ? '45%' : '47%',
           left: isMobile ? '30%' : '20%',
           width: isMobile ? '40px' : '150px',
           height: isMobile ? '90px' : '150px',
@@ -838,10 +838,10 @@ export const RoomVisualization = React.memo(function RoomVisualization({
         x: 0, y: 0,
         style: { 
           position: 'absolute' as const,
-          top: isMobile ? '40%' : '35%',
-          left: isMobile ? '35%' : '30%',
-          width: isMobile ? '35px' : '100px',
-          height: isMobile ? '35px' : '100px',
+          top: isMobile ? '33%' : '35%',
+          left: isMobile ? '33%' : '30%',
+          width: isMobile ? '69px' : '100px',
+          height: isMobile ? '69px' : '100px',
           zIndex: 20
         }
       },
@@ -849,10 +849,10 @@ export const RoomVisualization = React.memo(function RoomVisualization({
         x: 1, y: 0,
         style: { 
           position: 'absolute' as const,
-          top: isMobile ? '45%' : '40%',
-          left: isMobile ? '20%' : '15%',
-          width: isMobile ? '35px' : '100px',
-          height: isMobile ? '35px' : '100px',
+          top: isMobile ? '40%' : '40%',
+          left: isMobile ? '18%' : '15%',
+          width: isMobile ? '69px' : '100px',
+          height: isMobile ? '69px' : '100px',
           zIndex: 20
         }
       },
@@ -862,10 +862,10 @@ export const RoomVisualization = React.memo(function RoomVisualization({
         x: 0, y: 1,
         style: { 
           position: 'absolute' as const,
-          top: isMobile ? '48%' : '40%',
-          left: isMobile ? '52%' : '45%',
-          width: isMobile ? '35px' : '100px',
-          height: isMobile ? '35px' : '100px',
+          top: isMobile ? '40%' : '40%',
+          left: isMobile ? '45%' : '45%',
+          width: isMobile ? '69px' : '100px',
+          height: isMobile ? '69px' : '100px',
           zIndex: 20
         }
       },
@@ -873,10 +873,10 @@ export const RoomVisualization = React.memo(function RoomVisualization({
         x: 1, y: 1,
         style: { 
           position: 'absolute' as const,
-          top: isMobile ? '55%' : '50%',
-          left: isMobile ? '35%' : '30%',
-          width: isMobile ? '35px' : '100px',
-          height: isMobile ? '35px' : '100px',
+          top: isMobile ? '48%' : '50%',
+          left: isMobile ? '30%' : '30%',
+          width: isMobile ? '69px' : '100px',
+          height: isMobile ? '69px' : '100px',
           zIndex: 20
         }
       },
@@ -886,10 +886,10 @@ export const RoomVisualization = React.memo(function RoomVisualization({
         x: 0, y: 2,
         style: { 
           position: 'absolute' as const,
-          top: isMobile ? '52%' : '44%',
+          top: isMobile ? '48%' : '44%',
           left: isMobile ? '60%' : '60%',
-          width: isMobile ? '45px' : '130px', // Make slightly larger for better visibility
-          height: isMobile ? '45px' : '130px',
+          width: isMobile ? '75px' : '130px', // Make slightly larger for better visibility
+          height: isMobile ? '75px' : '130px',
           zIndex: 25 // Higher z-index to ensure visibility
         }
       },
@@ -897,10 +897,10 @@ export const RoomVisualization = React.memo(function RoomVisualization({
         x: 1, y: 2,
         style: { 
           position: 'absolute' as const,
-          top: isMobile ? '52%' : '56%',
-          left: isMobile ? '30%' : '44%',
-          width: isMobile ? '35px' : '120px',
-          height: isMobile ? '35px' : '120px',
+          top: isMobile ? '58%' : '56%',
+          left: isMobile ? '40%' : '44%',
+          width: isMobile ? '75px' : '120px',
+          height: isMobile ? '75px' : '120px',
           zIndex: 20
         }
       },
@@ -910,10 +910,10 @@ export const RoomVisualization = React.memo(function RoomVisualization({
         x: 0, y: 3,
         style: { 
           position: 'absolute' as const,
-          top: isMobile ? '62%' : '59%',
-          left: isMobile ? '60%' : '75%',
-          width: isMobile ? '35px' : '100px',
-          height: isMobile ? '35px' : '100px',
+          top: isMobile ? '55%' : '59%',
+          left: isMobile ? '73%' : '75%',
+          width: isMobile ? '90px' : '100px',
+          height: isMobile ? '90px' : '100px',
           zIndex: 20
         }
       },
@@ -921,10 +921,10 @@ export const RoomVisualization = React.memo(function RoomVisualization({
         x: 1, y: 3,
         style: { 
           position: 'absolute' as const,
-          top: isMobile ? '62%' : '69%',
-          left: isMobile ? '30%' : '60%',
-          width: isMobile ? '35px' : '100px',
-          height: isMobile ? '35px' : '100px',
+          top: isMobile ? '66%' : '69%',
+          left: isMobile ? '60%' : '60%',
+          width: isMobile ? '80px' : '100px',
+          height: isMobile ? '80px' : '100px',
           zIndex: 20
         }
       }
