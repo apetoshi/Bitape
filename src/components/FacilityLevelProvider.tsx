@@ -79,20 +79,20 @@ export default function FacilityLevelProvider({ children }: FacilityLevelProvide
       setIsLevelLoading(false);
     }
   }, [rawFacilityData]);
-
+    
   // Add periodic refresh of facility data
   useEffect(() => {
     // Initial refetch
     if (refetchFacility) {
       refetchFacility();
-    }
-    
+        }
+        
     // Set up interval to refetch
     const intervalId = setInterval(() => {
       if (refetchFacility) {
         console.log('⚠️ FacilityLevelProvider: Refreshing facility data...');
         refetchFacility();
-      }
+        }
     }, 30000); // Every 30 seconds
     
     return () => clearInterval(intervalId);

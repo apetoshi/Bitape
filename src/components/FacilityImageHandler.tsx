@@ -34,7 +34,7 @@ export default function FacilityImageHandler() {
             const newSrc = `${basePath}${newName}?t=${timestamp}`;
             
             console.log(`🏠 Updating image path from ${oldName} to ${newName}`);
-            img.src = newSrc;
+              img.src = newSrc;
             fixedAny = true;
           }
         }

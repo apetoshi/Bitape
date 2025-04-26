@@ -56,7 +56,7 @@ export const MINERS: Record<number, MinerData> = {
     image: "/gorilla-gadget.gif",
     hashrate: 5000,
     energyConsumption: 30,
-    price: 100, // 100 BIT
+    price: 60, // 60 BIT
     description: "50X HASHRATE OF BANANA MINER",
     isActive: true, // Now active
   },

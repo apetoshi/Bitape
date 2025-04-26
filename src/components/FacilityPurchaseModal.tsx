@@ -170,7 +170,7 @@ const FacilityPurchaseModal: React.FC<FacilityPurchaseModalProps> = ({
       setHasSufficientAllowance(parseFloat(allowance) >= parseFloat(FACILITY_COST));
     }
   }, [bitBalanceData, gameState.bitBalance, allowanceData]);
-  
+
   // Monitor approval status with better tracking
   useEffect(() => {
     // Only process if we're actively approving and we haven't already completed it
@@ -345,7 +345,7 @@ const FacilityPurchaseModal: React.FC<FacilityPurchaseModalProps> = ({
         console.log('Executing initial facility purchase...');
         
         const result = await gameState.purchaseFacility();
-        if (result) {
+      if (result) {
           console.log('Initial facility purchase successful!');
           
           // Refresh contract data to get the updated facility level
@@ -357,12 +357,12 @@ const FacilityPurchaseModal: React.FC<FacilityPurchaseModalProps> = ({
               console.log('Refreshed game state after facility purchase');
             }
             
-            // Call the onPurchase callback to update the UI
-            onPurchase();
+        // Call the onPurchase callback to update the UI
+        onPurchase();
             
-            // Close the modal
+        // Close the modal
             setTimeout(() => {
-              onClose();
+        onClose();
             }, 1000);
           } catch (refreshError) {
             console.error('Error refreshing data after purchase:', refreshError);

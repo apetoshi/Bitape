@@ -792,7 +792,7 @@ export default function RoomPage() {
     // Add timestamp to force refresh after upgrades
     _refreshTimestamp: facilityUpgradeTimestamp
   };
-  
+
   // Log the sources of facility level to help debugging
   console.log('🏢 Facility levels - correctedFacilityLevel:', correctedFacilityLevel, 
               'contract facility[0]:', facility && Number(facility[0]),

@@ -886,7 +886,7 @@ export const RoomVisualization = React.memo(function RoomVisualization({
         x: 0, y: 2,
         style: { 
           position: 'absolute' as const,
-          top: isMobile ? '52%' : '44 %',
+          top: isMobile ? '52%' : '44%',
           left: isMobile ? '60%' : '60%',
           width: isMobile ? '45px' : '130px', // Make slightly larger for better visibility
           height: isMobile ? '45px' : '130px',
