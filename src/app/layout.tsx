@@ -11,7 +11,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 5,
   minimumScale: 1,
-  userScalable: true
+  userScalable: true,
+  themeColor: '#000000'
 };
 
 export const metadata: Metadata = {
@@ -19,7 +20,6 @@ export const metadata: Metadata = {
   description: 'Mine BitApe with your virtual mining facility on ApeChain',
   manifest: '/manifest.json',
   metadataBase: new URL('https://www.bitape.org'),
-  themeColor: '#000000',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
@@ -65,6 +65,21 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en-US" suppressHydrationWarning>
+      <head>
+        {/* Manual OpenGraph and Twitter tags for maximum compatibility */}
+        <meta property="og:title" content="BitApe - A Peer-to-Peer Electronic Ape Cash System" />
+        <meta property="og:description" content="Mine BitApe with your virtual mining facility on ApeChain" />
+        <meta property="og:image" content="https://www.bitape.org/opengraph-image.png" />
+        <meta property="og:url" content="https://www.bitape.org" />
+        <meta property="og:site_name" content="BitApe" />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="BitApe - A Peer-to-Peer Electronic Ape Cash System" />
+        <meta name="twitter:description" content="Mine BitApe with your virtual mining facility on ApeChain" />
+        <meta name="twitter:image" content="https://www.bitape.org/opengraph-image.png" />
+        <meta name="twitter:site" content="@BitApeOrg" />
+        <meta name="twitter:creator" content="@BitApeOrg" />
+      </head>
       <body className={`${inter.className} bg-royal text-white overflow-x-hidden`}>
         <ClientLayout>
           {children}
