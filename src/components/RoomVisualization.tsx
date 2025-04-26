@@ -886,10 +886,10 @@ export const RoomVisualization = React.memo(function RoomVisualization({
         x: 0, y: 2,
         style: { 
           position: 'absolute' as const,
-          top: isMobile ? '52%' : '47%',
+          top: isMobile ? '52%' : '44 %',
           left: isMobile ? '60%' : '60%',
-          width: isMobile ? '45px' : '120px', // Make slightly larger for better visibility
-          height: isMobile ? '45px' : '120px',
+          width: isMobile ? '45px' : '130px', // Make slightly larger for better visibility
+          height: isMobile ? '45px' : '130px',
           zIndex: 25 // Higher z-index to ensure visibility
         }
       },
@@ -897,10 +897,10 @@ export const RoomVisualization = React.memo(function RoomVisualization({
         x: 1, y: 2,
         style: { 
           position: 'absolute' as const,
-          top: isMobile ? '52%' : '60%',
-          left: isMobile ? '30%' : '43%',
-          width: isMobile ? '35px' : '100px',
-          height: isMobile ? '35px' : '100px',
+          top: isMobile ? '52%' : '56%',
+          left: isMobile ? '30%' : '44%',
+          width: isMobile ? '35px' : '120px',
+          height: isMobile ? '35px' : '120px',
           zIndex: 20
         }
       },
@@ -910,8 +910,8 @@ export const RoomVisualization = React.memo(function RoomVisualization({
         x: 0, y: 3,
         style: { 
           position: 'absolute' as const,
-          top: isMobile ? '62%' : '60%',
-          left: isMobile ? '60%' : '55%',
+          top: isMobile ? '62%' : '59%',
+          left: isMobile ? '60%' : '75%',
           width: isMobile ? '35px' : '100px',
           height: isMobile ? '35px' : '100px',
           zIndex: 20
@@ -921,8 +921,8 @@ export const RoomVisualization = React.memo(function RoomVisualization({
         x: 1, y: 3,
         style: { 
           position: 'absolute' as const,
-          top: isMobile ? '62%' : '60%',
-          left: isMobile ? '30%' : '25%',
+          top: isMobile ? '62%' : '69%',
+          left: isMobile ? '30%' : '60%',
           width: isMobile ? '35px' : '100px',
           height: isMobile ? '35px' : '100px',
           zIndex: 20
@@ -1007,8 +1007,6 @@ export const RoomVisualization = React.memo(function RoomVisualization({
       }
       
       // Use a local cached variable to avoid calling functions during render
-      // This breaks potential render loops by not triggering re-renders
-      // Force direct lookup in combinedMinersData for more reliable detection
       let miner = getMinerAtTileLocal(x, y);
       
       // If that fails, try direct lookup in combinedMinersData
@@ -1023,19 +1021,10 @@ export const RoomVisualization = React.memo(function RoomVisualization({
       
       const hasMiner = Boolean(miner);
       
-      // Add debug for positions (0,2) and (1,2)
-      if ((x === 0 && y === 2) || (x === 1 && y === 2)) {
-        console.log(`Grid rendering for position (${x},${y}) - Has miner: ${hasMiner}`, miner);
-      }
-      
-      // Check if this is the special position with APEPAD_MINI
-      const isSpecialAPEPAD = hasMiner && miner && 
-                          Number(miner.minerType || miner.type || 0) === 3; // APEPAD_MINI is type 3
-        
       return (
         <div 
           key={key}
-          className={`mining-space ${isSelected ? 'selected' : ''} ${hasMiner ? 'has-miner' : ''} ${isSpecialAPEPAD ? 'apepad-special' : ''}`}
+          className={`mining-space ${isSelected ? 'selected' : ''} ${hasMiner ? 'has-miner' : ''}`}
           onClick={() => handleTileClick(x, y)}
           style={{
             ...style,
@@ -1050,17 +1039,11 @@ export const RoomVisualization = React.memo(function RoomVisualization({
             transition: 'all 0.2s ease',
             // Add debug outline when in development
             ...(process.env.NODE_ENV === 'development' && DEBUG_MINERS ? { outline: '1px solid rgba(255,255,0,0.3)' } : {}),
-            // Make positions stand out more when in grid mode
+            // Style for occupied tiles - standardized for all miner types
             ...(hasMiner ? {
               backgroundColor: 'rgba(0, 0, 0, 0.6)', 
               boxShadow: '0 0 10px rgba(255, 221, 0, 0.5)',
               border: '2px solid rgba(255, 221, 0, 0.5)'
-            } : {}),
-            // Make APEPAD MINI stand out even more
-            ...(isSpecialAPEPAD ? {
-              backgroundColor: 'rgba(0, 0, 0, 0.6)', 
-              boxShadow: '0 0 15px rgba(255, 255, 255, 0.5)',
-              border: '2px solid rgba(255, 255, 255, 0.5)'
             } : {})
           }}
         >
@@ -1072,7 +1055,7 @@ export const RoomVisualization = React.memo(function RoomVisualization({
               left: '5px',
               fontSize: '10px',
               fontWeight: 'bold',
-              color: isSpecialAPEPAD ? '#FFFFFF' : '#FFDD00',
+              color: '#FFDD00',
               fontFamily: 'monospace',
               zIndex: 30,
               textShadow: '1px 1px 1px rgba(0,0,0,0.8)'
@@ -1082,50 +1065,47 @@ export const RoomVisualization = React.memo(function RoomVisualization({
           {/* Show miner in grid if one exists */}
           {hasMiner && miner && isGridMode && (
             <div 
-              className={`grid-miner-container ${isSpecialAPEPAD ? 'grid-miner-apepad' : ''}`}
+              className="grid-miner-container"
               style={{ 
                 position: 'relative',
-                width: isSpecialAPEPAD ? '90%' : '80%',
-                height: isSpecialAPEPAD ? '90%' : '80%',
+                width: '80%',
+                height: '80%',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                zIndex: 25,
-                ...(isSpecialAPEPAD ? { filter: 'brightness(1.3) drop-shadow(0 0 10px rgba(255, 255, 255, 0.7))' } : {})
+                zIndex: 25
               }}
             >
               <Image
                 src={miner.image || '/banana-miner.gif'}
                 alt={`Miner ${miner.id}`}
                 fill
-                className={`object-contain ${isSpecialAPEPAD ? 'miner-pulse-strong' : ''}`}
+                className="object-contain"
                 priority
               />
               
-              {/* For APEPAD at special positions, add a label for better visibility */}
-              {isSpecialAPEPAD && (
-                <div style={{
-                  position: 'absolute',
-                  bottom: '-5px',
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  fontSize: '9px',
-                  color: '#ffffff',
-                  backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                  padding: '1px 4px',
-                  borderRadius: '3px',
-                  whiteSpace: 'nowrap',
-                  zIndex: 30
-                }}>
-                  APEPAD MINI
-                </div>
-              )}
+              {/* Display miner type label for better visibility */}
+              <div style={{
+                position: 'absolute',
+                bottom: '-5px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                fontSize: '9px',
+                color: '#ffffff',
+                backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                padding: '1px 4px',
+                borderRadius: '3px',
+                whiteSpace: 'nowrap',
+                zIndex: 30
+              }}>
+                {getMinerLabel ? getMinerLabel(miner) : `Type ${miner.minerType || miner.type || 0}`}
+              </div>
             </div>
           )}
         </div>
       );
     }).filter(Boolean); // Filter out null entries (invalid positions)
-  }, [isGridMode, DEBUG_MINERS, DEBUG_RENDERS, getMinerAtTileLocal, handleTileClick, customPositions, contractFacilityLevel, facilityData?.level, combinedMinersData]);
+  }, [isGridMode, DEBUG_MINERS, DEBUG_RENDERS, getMinerAtTileLocal, handleTileClick, customPositions, contractFacilityLevel, facilityData?.level, combinedMinersData, getMinerLabel]);
 
   // Function to ensure a miner has the correct image based on its type
   const getMinerImage = useCallback((miner: PlayerMiner) => {
@@ -1153,28 +1133,14 @@ export const RoomVisualization = React.memo(function RoomVisualization({
     // Add debugging to check all miners in combinedMinersData
     if (DEBUG_MINERS) {
       console.log('All miners in combinedMinersData:', combinedMinersData);
-      // Check specifically for position (0,2)
-      const miner02 = combinedMinersData.find(m => Number(m.x) === 0 && Number(m.y) === 2);
-      if (miner02) {
-        console.log('Found miner at (0,2) in combinedMinersData:', miner02);
-      }
     }
 
     return minerPositions.map(pos => {
       const { x, y, style } = pos;
       
       // Check if there's a miner at this position using the position map
-      // This avoids calling functions during render that might trigger state updates
       const posKey = `${x}-${y}`;
       const miner = minersByPosition.get(posKey);
-      
-      // Debug for position (0,2)
-      if (x === 0 && y === 2) {
-        console.log(`Checking miner at position (0,2): ${miner ? 'FOUND' : 'NOT FOUND'}`);
-        if (miner) {
-          console.log('Miner details:', miner);
-        }
-      }
       
       // Skip rendering if no miner at this position
       if (!miner) return null;
@@ -1182,19 +1148,15 @@ export const RoomVisualization = React.memo(function RoomVisualization({
       // Get the proper miner image
       const minerImage = getMinerImage(miner);
       
-      // If this is position (0,2), add even more debug
-      if (x === 0 && y === 2) {
-        console.log(`Rendering miner at (0,2) with image: ${minerImage}`);
-        console.log(`Miner type: ${miner.minerType || miner.type}, Position: (${miner.x}, ${miner.y})`);
-      }
+      // Apply standardized styling to all miner types
+      const minerType = Number(miner.minerType || miner.type || 0);
       
-      // Check if this is the special position (0,2) with APEPAD_MINI
-      const isSpecialAPEPAD = x === 0 && y === 2 && 
-                            Number(miner.minerType || miner.type || 0) === 3; // APEPAD_MINI is type 3
+      // Common base class for all miners
+      let minerClassName = "object-contain miner-standard";
       
-      // Apply a special class instead of inline styles to avoid the conflict with "fill"
-      const minerClassName = `object-contain ${isSpecialAPEPAD ? 'miner-pulse-strong apepad-mini' : 'miner-pulse'}`;
-
+      // Add type-specific class for targeted styling in CSS
+      minerClassName += ` miner-type-${minerType}`;
+      
       return (
         <div
           key={`active-miner-${x}-${y}`}
@@ -1211,8 +1173,7 @@ export const RoomVisualization = React.memo(function RoomVisualization({
             height: '100%',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            ...(isSpecialAPEPAD ? { filter: 'brightness(1.3) drop-shadow(0 0 10px rgba(255, 255, 255, 0.7))' } : {})
+            justifyContent: 'center'
           }}>
             <Image
               src={minerImage}
@@ -1285,23 +1246,7 @@ export const RoomVisualization = React.memo(function RoomVisualization({
           width: isMobile ? '280px' : '330px',
           height: isMobile ? '380px' : '450px', // Increased height for 4 rows
           gridClass: 'level-2-grid',
-          extraStyles: `
-            .level-2-grid .mining-space:nth-child(5),
-            .level-2-grid .mining-space:nth-child(6) {
-              position: relative;
-            }
-            .level-2-grid .mining-space:nth-child(5)::after,
-            .level-2-grid .mining-space:nth-child(6)::after {
-              content: '';
-              position: absolute;
-              top: 0;
-              left: 0;
-              right: 0;
-              bottom: 0;
-              border: 1px solid rgba(255, 255, 255, 0.3);
-              pointer-events: none;
-            }
-          `
+          extraStyles: ''
         };
       default:
         return {
@@ -1532,11 +1477,11 @@ export const RoomVisualization = React.memo(function RoomVisualization({
         ${pulseStyle}
         .mining-grid {
           display: grid;
-          grid-template-columns: ${getGridTemplate().columns};
-          grid-template-rows: ${getGridTemplate().rows};
+          grid-template-columns: ${getGridTemplate()?.columns || 'repeat(2, 1fr)'};
+          grid-template-rows: ${getGridTemplate()?.rows || 'repeat(2, 1fr)'};
           gap: 4px;
-          width: ${getGridTemplate().width};
-          height: ${getGridTemplate().height};
+          width: ${getGridTemplate()?.width || '300px'};
+          height: ${getGridTemplate()?.height || '170px'};
           position: absolute;
           top: ${isMobile ? '47%' : '57%'};
           left: 50%;
@@ -1563,26 +1508,33 @@ export const RoomVisualization = React.memo(function RoomVisualization({
           grid-template-rows: repeat(4, 1fr);
         }
         
-        /* Additional styles for the APEPAD MINI at (0,2) */
-        .apepad-special {
-          background-color: rgba(0, 0, 0, 0.6) !important;
-          box-shadow: 0 0 15px rgba(255, 255, 255, 0.5) !important;
-          border: 2px solid rgba(255, 255, 255, 0.5) !important;
+        /* Standardized styling for all miners */
+        .miner-standard {
+          object-fit: contain !important;
+          width: 100% !important;
+          height: 100% !important;
+          filter: drop-shadow(0 0 8px rgba(255, 221, 0, 0.6));
+          transition: filter 0.3s ease;
         }
         
-        /* Style for APEPAD MINI image */
-        .apepad-mini {
-          object-fit: contain !important; 
-          width: 150% !important;
-          height: 150% !important;
-          transform: translate(-16%, -16%);
+        /* Type-specific styling adjustments if needed */
+        .miner-type-3 {
+          /* Specific styles for APEPAD_MINI if needed */
         }
         
-        /* Extra styles from getGridTemplate */
-        ${getGridTemplate().extraStyles}
+        .miner-type-4 {
+          /* Specific styles for GORILLA_GADGET if needed */
+        }
         
-        .grid-mode {
-          opacity: 1;
+        /* Animation for all miners */
+        @keyframes standardPulse {
+          0% { filter: drop-shadow(0 0 6px rgba(255, 221, 0, 0.7)); }
+          50% { filter: drop-shadow(0 0 10px rgba(255, 221, 0, 0.9)); }
+          100% { filter: drop-shadow(0 0 6px rgba(255, 221, 0, 0.7)); }
+        }
+        
+        .miner-standard {
+          animation: standardPulse 2s infinite ease-in-out;
         }
         
         .mining-space {
@@ -1605,16 +1557,10 @@ export const RoomVisualization = React.memo(function RoomVisualization({
           transition: opacity 0.3s ease;
         }
         
-        /* Grid miner styling */
+        /* Grid miner styling - standardized across all miner types */
         .grid-miner-container {
           opacity: 0.9;
           filter: brightness(1.2);
-        }
-        
-        /* Special styling for APEPAD in grid */
-        .grid-miner-apepad {
-          opacity: 1;
-          filter: brightness(1.5) drop-shadow(0 0 10px rgba(255, 255, 255, 0.7));
         }
         
         /* Animation for miners */
@@ -1622,10 +1568,6 @@ export const RoomVisualization = React.memo(function RoomVisualization({
           0% { filter: brightness(1) drop-shadow(0 0 6px rgba(255, 221, 0, 0.7)); }
           50% { filter: brightness(1.2) drop-shadow(0 0 10px rgba(255, 221, 0, 0.9)); }
           100% { filter: brightness(1) drop-shadow(0 0 6px rgba(255, 221, 0, 0.7)); }
-        }
-        
-        .miner-pulse {
-          animation: pulse 2s infinite ease-in-out;
         }
       `}</style>
       
